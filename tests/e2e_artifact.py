@@ -73,7 +73,8 @@ def main():
         check('card saved', page.locator('.row').count() == 1)
         check('fee status pill uses NLNLALD vocabulary', page.locator('.row .pill').first.inner_text() in ('Renews soon', 'On track', 'Urgent', 'Overdue'))
         check('calendar reminder links', page.locator('.rem a').count() >= 1 and 'calendar.google.com' in page.locator('.rem a').first.get_attribute('href'))
-        check('bill dates shown for credit card', 'Next bill' in page.inner_text('.detail') and 'Remind' in page.inner_text('.detail'))
+        check('bill dates shown for credit card', 'Next Bill' in page.inner_text('.detail') and 'Remind' in page.inner_text('.detail'))
+        check('no Diners Club network', page.locator('#f-network option:has-text("Diners")').count() == 0 if page.locator('#f-network').count() else True)
         check('no rules yet message', page.locator('.box.warn:has-text("No verified rules")').count() == 1)
 
         # Rule import: invalid JSON, then invalid pack, then valid

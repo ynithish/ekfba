@@ -181,6 +181,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .spend-top .ins { min-width: 0; overflow-wrap: anywhere; }
 .purchase { justify-content: space-between; align-items: center; }
 .purchase > div:first-child { min-width: 0; }
+.check.rename { font-size: 13px; color: var(--accent); margin-top: 2px; }
 .push-right { margin-left: auto; }
 .danger-text { color: var(--urgent); }
 .center-actions { justify-content: center; }
@@ -356,8 +357,8 @@ function billBox(c) {
   };
   return html`<div><div class="label">Bills</div>
     <dl class="kv">
-      <dt>Last bill</dt><dd>${fmtDate(b.lastBill)}${b.lastDue ? ` · due ${fmtDate(b.lastDue)}` : ''} · ${formatPaise(b.lastBilledPaise)} logged</dd>
-      <dt>Next bill</dt><dd>${fmtDate(b.nextBill)}${b.nextDue ? ` · due ${fmtDate(b.nextDue)}` : ''} · ${formatPaise(b.unbilledPaise)} logged so far</dd>
+      <dt>Last Bill</dt><dd>${fmtDate(b.lastBill)}${b.lastDue ? ` · Payment Date ${fmtDate(b.lastDue)}` : ''} · ${formatPaise(b.lastBilledPaise)} logged</dd>
+      <dt>Next Bill</dt><dd>${fmtDate(b.nextBill)}${b.nextDue ? ` · Payment Date ${fmtDate(b.nextDue)}` : ''} · ${formatPaise(b.unbilledPaise)} logged so far</dd>
     </dl>
     ${due ? html`<div class="rem" style="margin-top:8px">${[3, 0].map((n) => { const l = calLink(due.date, n); const lbl = n ? `Remind ${n} days before ${fmtShort(due.date)}` : `Remind on ${fmtShort(due.date)}`; return l ? html`<a href="${l}" target="_blank" rel="noopener">${lbl}</a>` : ''; })}</div>` : html`<p class="hint">Add the payment due day to see when to pay.</p>`}
     <p class="hint">Amounts are what you logged here; your bank statement is the final word.</p></div>`;
@@ -588,7 +589,7 @@ function cardForm() {
     </div>
     <div class="two">
       <div class="field"><label for="f-network">Network *</label><select id="f-network" name="network">${opt('', c.network, 'Choose…')}${NETWORKS.map((n) => opt(n, c.network))}</select>${err('network')}</div>
-      <div class="field"></div>
+      <div class="field"><label for="f-issue">Issue date (sets the fee date)</label><input id="f-issue" name="issueDate" type="date" value="${c.issueDate || ''}">${err('issueDate')}</div>
     </div>
     <div class="two">
       <div class="field"><label for="f-nickname">Nickname</label><input id="f-nickname" name="nickname" value="${c.nickname || ''}" maxlength="40" autocomplete="off" placeholder="Shopping card">${err('nickname')}</div>
@@ -596,17 +597,13 @@ function cardForm() {
     </div>
     <p class="hint">Never the full card number, expiry date, CVV or PIN. The page refuses them.</p>
     <div class="two">
+      <div class="field"><label for="f-holder">Primary or add-on</label><select id="f-holder" name="holder">${opt('primary', c.holder || 'primary', 'Primary card')}${opt('add-on', c.holder, 'Add-on card')}</select></div>
       <div class="field"><label for="f-holderName">Card holder</label><input id="f-holderName" name="holderName" list="holder-list" value="${c.holderName || ''}" autocomplete="off" placeholder="Same spelling as in Policies">
         <datalist id="holder-list">${names.map((n) => html`<option value="${n}">`)}</datalist>${err('holderName')}</div>
-      <div class="field"><label for="f-holder">Primary or add-on</label><select id="f-holder" name="holder">${opt('primary', c.holder || 'primary', 'Primary card')}${opt('add-on', c.holder, 'Add-on card')}</select></div>
     </div>
     <div class="two">
       <div class="field"><label for="f-joining">Joining fee (₹)</label><input id="f-joining" name="joiningFee" value="${rup(c.joiningFeePaise)}" inputmode="decimal" placeholder="0">${err('joiningFeePaise')}</div>
       <div class="field"><label for="f-annual">Annual fee (₹)</label><input id="f-annual" name="annualFee" value="${rup(c.annualFeePaise)}" inputmode="decimal" placeholder="0">${err('annualFeePaise')}</div>
-    </div>
-    <div class="two">
-      <div class="field"><label for="f-issue">Issue date (sets the fee date)</label><input id="f-issue" name="issueDate" type="date" value="${c.issueDate || ''}">${err('issueDate')}</div>
-      <div class="field"></div>
     </div>
     <div class="two" id="credit-fields" ${c.kind === 'debit' ? 'hidden' : ''}>
       <div class="field"><label for="f-stmt">Bill generation day (1–31)</label><input id="f-stmt" name="statementDay" value="${c.statementDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="15">${err('statementDay')}</div>
@@ -742,7 +739,8 @@ function logForm() {
     ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
     <div class="two">
       <div class="field"><label for="l-merchant">Shop, outlet or app</label><input id="l-merchant" name="merchant" list="merchant-list" value="${d.merchant || ''}" autocomplete="off">
-        <datalist id="merchant-list">${known.map((m) => html`<option value="${m}">`)}</datalist>${err('merchant')}</div>
+        <datalist id="merchant-list">${known.map((m) => html`<option value="${m}">`)}</datalist>${err('merchant')}
+        ${renameBox(d)}</div>
       <div class="field"><label for="l-amount">Amount paid (₹)</label><input id="l-amount" name="amount" inputmode="decimal" value="${rup(d.amountPaise)}" autocomplete="off">${err('amountPaise')}</div>
     </div>
     <div class="two">
@@ -750,7 +748,6 @@ function logForm() {
       <div class="field"><label for="l-date">Date</label><input id="l-date" name="date" type="date" value="${d.date || today()}">${err('date')}</div>
     </div>
     <div class="field"><label for="l-category">Category</label><select id="l-category" name="category">${cats.map((c) => html`<option value="${c}" ${c === d.category ? 'selected' : ''}>${CAT_LABEL[c]}</option>`)}</select>${err('category')}</div>
-    ${renameBox(d)}
     <div class="field"><label for="l-notes">Notes (optional)</label><input id="l-notes" name="notes" value="${d.notes || ''}" autocomplete="off"></div>
     ${d.recommendedCardId && d.cardId && d.recommendedCardId !== d.cardId ? html`<p class="hint">EKFBA suggested ${cardLabel(cardById(d.recommendedCardId) || { nickname: 'another card' })}; this records the card you actually used.</p>` : ''}
     ${state.logConfirmDelete ? html`<div class="box bad">Delete this purchase? It will be removed from your totals.
@@ -767,7 +764,7 @@ function renameBox(d) {
   const name = formatShopName(orig.merchant);
   const others = allPurchases().filter((p) => p.id !== d.id && formatShopName(p.merchant) === name).length;
   if (!others) return '';
-  return html`<label class="check" id="rename-box" data-original="${name}" hidden><input type="checkbox" name="renameAll" checked> Also rename the ${others} other purchase${others === 1 ? '' : 's'} called “${name}”</label>`;
+  return html`<label class="check rename" id="rename-box" data-original="${name}" hidden><input type="checkbox" name="renameAll" checked> Also rename the ${others} other purchase${others === 1 ? '' : 's'} called “${name}”</label>`;
 }
 
 function billLine(c, ps, t) {
@@ -775,7 +772,10 @@ function billLine(c, ps, t) {
   if (!b) return '';
   const pay = b.payBy;
   const days = pay ? daysBetween(t, pay.date) : null;
-  return html`<div class="meta bill-line">Next bill ${fmtShort(b.nextBill)}${pay ? html` · <span class="${days <= 3 ? 'due-soon' : ''}">pay by ${fmtShort(pay.date)}${pay.amountPaise ? ' (' + formatPaise(pay.amountPaise) + ' logged)' : ''}</span>` : ''}</div>`;
+  const items = [{ date: b.nextBill, node: html`<span>Next Bill ${fmtShort(b.nextBill)}</span>` }];
+  if (pay) items.push({ date: pay.date, node: html`<span class="${days <= 3 ? 'due-soon' : ''}">Payment Date ${fmtShort(pay.date)}${pay.amountPaise ? ' (' + formatPaise(pay.amountPaise) + ' logged)' : ''}</span>` });
+  items.sort((x, y) => x.date.localeCompare(y.date));
+  return html`<div class="meta bill-line">${items.map((x, i) => html`${i ? ' · ' : ''}${x.node}`)}</div>`;
 }
 
 /** Category for a shop name: the one you used most recently for it, else the merchant directory's. */

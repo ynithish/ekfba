@@ -5,7 +5,7 @@ import { scanForSensitiveData, findExpiryDate } from './sensitive.js';
 import { uuid } from './ids.js';
 
 export const CARD_KINDS = ['credit', 'debit'];
-export const NETWORKS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Diners Club', 'Other'];
+export const NETWORKS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Other'];
 export const HOLDER_TYPES = ['primary', 'add-on'];
 export const CARD_STATUSES = ['active', 'deactivated', 'replaced', 'archived'];
 
