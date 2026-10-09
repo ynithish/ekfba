@@ -185,7 +185,8 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .due-soon { color: var(--urgent); font-weight: 600; }
 .strike { text-decoration: line-through; color: var(--muted); }
 .cat-list { gap: 10px; }
-.cat-row { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 10px; align-items: center; font-size: 14px; text-transform: capitalize; }
+.field select.auto-filled { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-bg); }
+.cat-row { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 10px; align-items: center; font-size: 14px; }
 .ms { display: flex; flex-direction: column; gap: 4px; }
 .ms-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -211,7 +212,7 @@ const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank o
 const STATUS_LABEL = { active: 'Active', deactivated: 'Deactivated', replaced: 'Replaced', archived: 'Archived' };
 const PERIOD_LABEL = { transaction: 'per transaction', statement_cycle: 'per statement cycle', calendar_month: 'per month',
   calendar_quarter: 'per quarter', calendar_year: 'per calendar year', card_year: 'per card year' };
-const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c.replace(/_/g, ' ')]));
+const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c === 'emi' ? 'EMI' : c.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')]));
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
@@ -747,12 +748,7 @@ function logForm() {
       <div class="field"><label for="l-status">Status</label><select id="l-status" name="status">${[['completed', 'Paid'], ['pending', 'Pending'], ['refunded', 'Refunded'], ['cancelled', 'Cancelled']].map(([v, l]) => html`<option value="${v}" ${v === (d.status || 'completed') ? 'selected' : ''}>${l}</option>`)}</select></div>
     </div>
     <div class="field" id="refund-field" ${d.status === 'refunded' ? '' : 'hidden'}><label for="l-refund">Refund received (₹, blank = full refund)</label><input id="l-refund" name="refund" inputmode="decimal" value="${d.status === 'refunded' ? rup(d.refundPaise) : ''}">${err('refundPaise')}</div>
-    <div class="two">
-      <div class="field"><label for="l-discount">Discount or cashback received (₹, optional)</label><input id="l-discount" name="discount" inputmode="decimal" value="${rup(d.discountPaise)}" placeholder="${d.estimatedSavingPaise ? 'Estimated ' + formatPaise(d.estimatedSavingPaise) : ''}">${err('discountPaise')}</div>
-      <div class="field"><label for="l-channel">Paid</label><select id="l-channel" name="channel">${[['', 'Not sure'], ['online', 'Online / in app'], ['offline', 'In store']].map(([v, l]) => html`<option value="${v}" ${v === (d.channel || '') ? 'selected' : ''}>${l}</option>`)}</select></div>
-    </div>
     ${renameBox(d)}
-    <label class="check"><input type="checkbox" name="offerUsed" ${d.offerUsed ? 'checked' : ''}> A bank offer or promo code was used</label>
     <div class="field"><label for="l-notes">Notes (optional)</label><input id="l-notes" name="notes" value="${d.notes || ''}" autocomplete="off"></div>
     ${d.recommendedCardId && d.cardId && d.recommendedCardId !== d.cardId ? html`<p class="hint">EKFBA suggested ${cardLabel(cardById(d.recommendedCardId) || { nickname: 'another card' })}; this records the card you actually used.</p>` : ''}
     <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save purchase'}</button><button class="btn ghost" type="button" data-action="log-cancel">Cancel</button></div>
@@ -777,14 +773,24 @@ function billLine(c, ps, t) {
   return html`<div class="meta bill-line">Next bill ${fmtShort(b.nextBill)}${pay ? html` · <span class="${days <= 3 ? 'due-soon' : ''}">pay by ${fmtShort(pay.date)}${pay.amountPaise ? ' (' + formatPaise(pay.amountPaise) + ' logged)' : ''}</span>` : ''}</div>`;
 }
 
+/** Category for a shop name: the one you used most recently for it, else the merchant directory's. */
+function categoryForShop(raw) {
+  const name = formatShopName(raw);
+  if (!name) return null;
+  const mine = allPurchases().find((p) => formatShopName(p.merchant) === name);
+  if (mine) return mine.category;
+  const m = MERCHANTS.find((x) => x.name === name);
+  return m ? m.categories[0] : null;
+}
+
 function readLogForm() {
   const f = Object.fromEntries(new FormData(document.getElementById('log-form')));
   const money = (v, blank = null) => (String(v ?? '').trim() === '' ? blank : parseRupeesToPaise(v) ?? -1);
   const amountPaise = money(f.amount, null);
   const status = f.status;
   return { ...state.logDraft, merchant: f.merchant, amountPaise: amountPaise === null ? 0 : amountPaise, cardId: f.cardId, date: f.date, category: f.category,
-    status, refundPaise: status === 'refunded' ? money(f.refund, amountPaise) : 0, discountPaise: money(f.discount, null),
-    channel: f.channel || null, offerUsed: f.offerUsed === 'on', notes: f.notes, renameAll: f.renameAll === 'on' };
+    status, refundPaise: status === 'refunded' ? money(f.refund, amountPaise) : 0, 
+    notes: f.notes, renameAll: f.renameAll === 'on' };
 }
 
 async function savePurchase(confirmedDuplicate) {
@@ -915,6 +921,14 @@ function afterRender() {
     if (file.size > 300000) { toast('That file is too large for a rule pack.'); return; }
     checkPack(state.importing, await file.text());
   });
+  const shop = document.getElementById('l-merchant');
+  const pickCategory = () => {
+    const cat = categoryForShop(shop.value);
+    const sel = document.getElementById('l-category');
+    if (cat && sel && sel.value !== cat) { sel.value = cat; sel.classList.add('auto-filled'); setTimeout(() => sel.classList.remove('auto-filled'), 1200); }
+  };
+  shop?.addEventListener('change', pickCategory);
+  shop?.addEventListener('input', () => { if (categoryForShop(shop.value)) pickCategory(); });
   document.getElementById('l-status')?.addEventListener('change', (ev) => { const r = document.getElementById('refund-field'); if (r) r.hidden = ev.target.value !== 'refunded'; });
 }
 
