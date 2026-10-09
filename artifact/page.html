@@ -181,7 +181,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .spend-top .ins { min-width: 0; overflow-wrap: anywhere; }
 .purchase { justify-content: space-between; align-items: center; }
 .purchase > div:first-child { min-width: 0; }
-.check.rename { font-size: 13px; color: var(--accent); margin-top: 2px; }
+.check.rename { font-size: 13px; color: var(--accent); margin-top: -4px; }
 .push-right { margin-left: auto; }
 .danger-text { color: var(--urgent); }
 .center-actions { justify-content: center; }
@@ -731,7 +731,7 @@ function logForm() {
   const cards = state.cards.filter((c) => c.status === 'active' || c.id === d.cardId);
   const known = [...new Set([...allPurchases().map((p) => formatShopName(p.merchant)), ...MERCHANTS.map((m) => m.name)])].slice(0, 400);
   const rup = (p) => (p == null ? '' : String(p / 100));
-  const cats = [...CATEGORIES].sort();
+  const cats = CATEGORIES.filter((c) => c !== 'cash_withdrawal' || c === d.category).sort();
   return html`<form class="panel" id="log-form" novalidate>
     <h2>${d.id ? 'Edit purchase' : 'Log purchase'}</h2>
     ${state.logDup ? html`<div class="box warn"><strong>This looks already logged.</strong> ${state.logDup.length === 1 ? 'A purchase' : `${state.logDup.length} purchases`} with the same date, card, amount and shop exist${state.logDup.length === 1 ? 's' : ''}.
@@ -739,10 +739,10 @@ function logForm() {
     ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
     <div class="two">
       <div class="field"><label for="l-merchant">Shop, outlet or app</label><input id="l-merchant" name="merchant" list="merchant-list" value="${d.merchant || ''}" autocomplete="off">
-        <datalist id="merchant-list">${known.map((m) => html`<option value="${m}">`)}</datalist>${err('merchant')}
-        ${renameBox(d)}</div>
+        <datalist id="merchant-list">${known.map((m) => html`<option value="${m}">`)}</datalist>${err('merchant')}</div>
       <div class="field"><label for="l-amount">Amount paid (₹)</label><input id="l-amount" name="amount" inputmode="decimal" value="${rup(d.amountPaise)}" autocomplete="off">${err('amountPaise')}</div>
     </div>
+    ${renameBox(d)}
     <div class="two">
       <div class="field"><label for="l-card">Card used</label><select id="l-card" name="cardId"><option value="">Choose…</option>${cards.map((c) => html`<option value="${c.id}" ${c.id === d.cardId ? 'selected' : ''}>${cardLabel(c)}</option>`)}</select>${err('cardId')}</div>
       <div class="field"><label for="l-date">Date</label><input id="l-date" name="date" type="date" value="${d.date || today()}">${err('date')}</div>

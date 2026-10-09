@@ -161,6 +161,7 @@ def main():
         check('category picked from known shop', page.input_value('#l-category') == 'grocery')
         check('discount, paid and offer fields removed', page.locator('#l-discount, #l-channel, [name=offerUsed]').count() == 0)
         check('categories capitalised', 'Food Delivery' in page.inner_text('#l-category'))
+        check('no Cash Withdrawal category', 'Cash Withdrawal' not in page.inner_text('#l-category'))
         page.click('#log-form [data-action=log-cancel]')
         page.click('.cat-row:has-text("Electronics")')
         check('category filter shows only that category', page.locator('.purchase').count() == 1 and 'Croma' in page.inner_text('.purchase'))
