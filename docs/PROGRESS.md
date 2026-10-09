@@ -61,6 +61,10 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Spends tab (opens first): month / quarter / year totals, by card, by category, purchase list filtered by card
 - ✅ Card milestones with progress bars (fee waiver needs issue date; lounge unlock shows this and last quarter) (Scenarios 3, 5)
 - Owner decisions: Backup and Offers tabs removed; no Apple Pay setting
+- ✅ Shop names tidied (directory spelling or capitalised words); "rename everywhere" when correcting a typo
+- ✅ Credit cards: bill generation day + payment due day; last/next bill with logged amounts; pay-by date and calendar reminders
+- ✅ Purchases list shows 10 at a time with "Show more"; Spends total no longer shows a saved amount
+- ⬜ Search purchases (owner: later phase)
 - Tests: 41 unit tests; 32 page checks
 
 ## Phase 5 — Milestones & reminders ⬜

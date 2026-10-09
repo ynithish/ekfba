@@ -91,3 +91,39 @@ test('month records flatten newest first', () => {
   const m = [{ purchases: [{ id: 'a', date: '2026-10-01', createdAt: 1 }] }, { purchases: [{ id: 'b', date: '2026-10-05', createdAt: 2 }, { id: 'c', date: '2026-10-05', createdAt: 3 }] }];
   assert.deepEqual(flattenMonths(m).map((x) => x.id), ['c', 'b', 'a']);
 });
+
+test('shop names: directory spelling or capitalised words', async () => {
+  const { formatShopName } = await import('../src/core/merchants.js');
+  assert.equal(formatShopName('bookmyshow'), 'BookMyShow');
+  assert.equal(formatShopName('  dmart '), 'DMart');
+  assert.equal(formatShopName('ratnadeep   supermarket'), 'Ratnadeep');
+  assert.equal(formatShopName('sri sai tiffin centre'), 'Sri Sai Tiffin Centre');
+  assert.equal(formatShopName('KFC'), 'KFC');
+  assert.equal(formatShopName('othe'), 'Othe');
+});
+
+test('credit card bill and payment dates', async () => {
+  const { billingInfo, dueDateFor } = await import('../src/core/purchases.js');
+  assert.equal(dueDateFor('2026-10-15', 4), '2026-11-04');
+  assert.equal(dueDateFor('2026-10-02', 22), '2026-10-22');
+  assert.equal(dueDateFor('2026-12-20', 8), '2027-01-08');
+  assert.equal(dueDateFor('2026-01-31', 30), '2026-02-28');
+  const card = { id: 'c', kind: 'credit', statementDay: 15, dueDay: 4 };
+  const ps = [
+    { cardId: 'c', date: '2026-09-20', amountPaise: 100000, status: 'completed' },
+    { cardId: 'c', date: '2026-10-01', amountPaise: 50000, status: 'refunded', refundPaise: 20000 },
+    { cardId: 'c', date: '2026-10-16', amountPaise: 70000, status: 'completed' },
+  ];
+  const b = billingInfo(card, ps, '2026-10-09');
+  assert.equal(b.lastBill, '2026-09-15');
+  assert.equal(b.lastDue, '2026-10-04');
+  assert.equal(b.nextBill, '2026-10-15');
+  assert.equal(b.nextDue, '2026-11-04');
+  assert.equal(b.unbilledPaise, 130000);
+  assert.deepEqual(b.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: null });
+  const b2 = billingInfo(card, ps, '2026-10-20');
+  assert.equal(b2.lastBilledPaise, 130000);
+  assert.deepEqual(b2.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000 });
+  assert.equal(billingInfo({ ...card, kind: 'debit' }, ps, '2026-10-09'), null);
+  assert.equal(billingInfo({ ...card, statementDay: null }, ps, '2026-10-09'), null);
+});

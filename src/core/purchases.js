@@ -172,3 +172,39 @@ export function milestoneProgress(card, pack, purchases, today) {
     };
   });
 }
+
+/* ---------------- Credit card bills ---------------- */
+
+function dayIn(y, m, day) { return ymd(y, m, Math.min(day, lastDay(y, m))); }
+
+/** Payment due date for a bill generated on `billDate`, given the card's due day of month. */
+export function dueDateFor(billDate, dueDay) {
+  if (!(Number.isInteger(dueDay) && dueDay >= 1 && dueDay <= 31)) return null;
+  const [y, m, d] = billDate.split('-').map(Number);
+  if (dueDay > d) return dayIn(y, m, dueDay);
+  const nm = m === 12 ? 1 : m + 1;
+  return dayIn(m === 12 ? y + 1 : y, nm, dueDay);
+}
+
+/**
+ * Bill dates for a credit card with a statement (bill generation) day. Returns null without one.
+ * { lastBill, lastDue, lastBilledPaise, nextBill, nextDue, unbilledPaise, payBy } where payBy is the next
+ * payment date that has not passed (the last bill's due date if still ahead, else the next bill's).
+ */
+export function billingInfo(card, purchases, today) {
+  if (card.kind !== 'credit') return null;
+  const cur = periodContaining('statement_cycle', today, card);
+  if (!cur) return null;
+  const prev = periodContaining('statement_cycle', addDays(cur.start, -1), card);
+  const mine = purchases.filter((p) => p.cardId === card.id);
+  const sum = (per) => mine.filter((p) => p.date >= per.start && p.date <= per.end).reduce((a, p) => a + netSpend(p), 0);
+  const lastBill = prev.end;
+  const lastDue = dueDateFor(lastBill, card.dueDay);
+  const nextBill = cur.end;
+  const nextDue = dueDateFor(nextBill, card.dueDay);
+  return {
+    lastBill, lastDue, lastBilledPaise: sum(prev), lastCycle: prev,
+    nextBill, nextDue, unbilledPaise: sum(cur), currentCycle: cur,
+    payBy: lastDue && lastDue >= today ? { date: lastDue, bill: lastBill, amountPaise: sum(prev) } : nextDue ? { date: nextDue, bill: nextBill, amountPaise: null } : null,
+  };
+}

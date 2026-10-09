@@ -115,3 +115,18 @@ export const CATEGORY_WORDS = {
   wallet_load: ['wallet'],
   emi: ['emi'],
 };
+
+/**
+ * Tidies a shop / outlet name for display and storage: the directory's own spelling when it is a known
+ * merchant ("bookmyshow" -> "BookMyShow"), otherwise each word capitalised ("ratnadeep supermarket" ->
+ * "Ratnadeep Supermarket"). Short all-capital words (KFC, ATM) are kept.
+ */
+export function formatShopName(raw) {
+  const t = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const key = t.toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const m of MERCHANTS) {
+    if ([m.name, ...(m.aliases || [])].some((n) => n.toLowerCase().replace(/[^a-z0-9]/g, '') === key)) return m.name;
+  }
+  return t.split(' ').map((w) => (/^[A-Z0-9&]{2,4}$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())).join(' ');
+}

@@ -35,6 +35,7 @@ export function validateCard(draft, existing = null) {
     annualFeePaise: draft.annualFeePaise ?? null,
     issueDate: trim(draft.issueDate) || '',
     statementDay: draft.statementDay ?? null,
+    dueDay: draft.dueDay ?? null,
     status: draft.status || 'active',
     replacedById: draft.replacedById || null,
     sourceUrls: (draft.sourceUrls || []).map(trim).filter(Boolean),
@@ -56,6 +57,9 @@ export function validateCard(draft, existing = null) {
   if (c.issueDate && !isDate(c.issueDate)) errors.issueDate = 'Use a valid date';
   if (c.statementDay !== null && !(Number.isInteger(c.statementDay) && c.statementDay >= 1 && c.statementDay <= 31)) {
     errors.statementDay = 'Statement day must be 1–31';
+  }
+  if (c.dueDay !== null && !(Number.isInteger(c.dueDay) && c.dueDay >= 1 && c.dueDay <= 31)) {
+    errors.dueDay = 'Payment due day must be 1–31';
   }
   c.sourceUrls.forEach((u, i) => { if (!isUrl(u)) errors[`sourceUrls.${i}`] = 'Not a valid web address'; });
   if (c.notes.length > 2000) errors.notes = 'Notes are too long (max 2000 characters)';

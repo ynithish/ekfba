@@ -62,7 +62,7 @@ def main():
         page.click('[data-action=new]')
         page.fill('#f-bank', 'Example Bank'); page.fill('#f-name', 'Sample Rewards'); page.fill('#f-variant', 'Classic')
         page.select_option('#f-network', 'Visa'); page.fill('#f-nickname', 'Everyday'); page.fill('#f-last4', '4417')
-        page.fill('#f-holderName', 'Nithish'); page.fill('#f-annual', '500'); page.fill('#f-issue', '2024-11-20')
+        page.fill('#f-holderName', 'Nithish'); page.fill('#f-annual', '500'); page.fill('#f-issue', '2024-11-20'); page.fill('#f-stmt', '15'); page.fill('#f-due', '4')
         page.fill('#f-notes', 'valid thru 08/29')
         page.click('#card-form [type=submit]')
         page.wait_for_selector('.ferr')
@@ -73,6 +73,7 @@ def main():
         check('card saved', page.locator('.row').count() == 1)
         check('fee status pill uses NLNLALD vocabulary', page.locator('.row .pill').first.inner_text() in ('Renews soon', 'On track', 'Urgent', 'Overdue'))
         check('calendar reminder links', page.locator('.rem a').count() >= 1 and 'calendar.google.com' in page.locator('.rem a').first.get_attribute('href'))
+        check('bill dates shown for credit card', 'Next bill' in page.inner_text('.detail') and 'Remind' in page.inner_text('.detail'))
         check('no rules yet message', page.locator('.box.warn:has-text("No verified rules")').count() == 1)
 
         # Rule import: invalid JSON, then invalid pack, then valid
@@ -135,6 +136,16 @@ def main():
         page.wait_for_selector('.pill:has-text("Refunded")')
         check('refund reduces spend (Scenario 7)', page.inner_text('.total-n') == '₹15,000')
         check('milestone progress shown', page.locator('.ms .bar').count() >= 1)
+        # Manual purchase: shop name tidied, then corrected everywhere
+        for i in range(2):
+            page.click('[data-action=log-new]'); page.wait_for_selector('#log-form')
+            page.fill('#l-merchant', 'sri sai  tiffin'); page.fill('#l-amount', str(100 + i)); page.select_option('#l-card', label='Everyday ••4417')
+            page.click('#log-form [type=submit]'); page.wait_for_selector('#log-form', state='detached')
+        check('shop name capitalised', page.locator('.purchase .ins:has-text("Sri Sai Tiffin")').count() == 2)
+        page.click('.purchase:has-text("Sri Sai Tiffin")'); page.wait_for_selector('[name=renameAll]')
+        page.fill('#l-merchant', 'sri sai tiffins'); page.click('#log-form [type=submit]'); page.wait_for_selector('#log-form', state='detached')
+        check('rename applies to all purchases with that name', page.locator('.purchase .ins:has-text("Sri Sai Tiffins")').count() == 2)
+        check('no saved amount in the total', 'saved' not in page.inner_text('.total'))
         page.screenshot(path=str(SHOTS / 'a6-spends.png'), full_page=True)
         page.click('[data-tab=ask]')
         page.fill('#ask-q', 'croma'); page.click('#ask-form [type=submit]'); page.wait_for_selector('.winner')
