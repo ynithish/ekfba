@@ -2195,7 +2195,11 @@ function logForm() {
   const cards = state.cards.filter((c) => c.status === 'active' || c.id === d.cardId);
   const known = [...new Set([...allPurchases().map((p) => formatShopName(p.merchant)), ...MERCHANTS.map((m) => m.name)])].slice(0, 400);
   const rup = (p) => (p == null ? '' : String(p / 100));
-  const cats = CATEGORIES.filter((c) => c !== 'cash_withdrawal' || c === d.category).sort();
+  const spentBy = {};
+  for (const p of allPurchases()) spentBy[p.category] = (spentBy[p.category] || 0) + netSpend(p);
+  // Most-used categories first (by your total spend), the rest alphabetically.
+  const cats = CATEGORIES.filter((c) => c !== 'cash_withdrawal' || c === d.category)
+    .sort((a, b) => (spentBy[b] || 0) - (spentBy[a] || 0) || CAT_LABEL[a].localeCompare(CAT_LABEL[b]));
   return html`<form class="panel" id="log-form" novalidate>
     <h2>${d.id ? 'Edit purchase' : 'Log purchase'}</h2>
     ${state.logDup ? html`<div class="box warn"><strong>This looks already logged.</strong> ${state.logDup.length === 1 ? 'A purchase' : `${state.logDup.length} purchases`} with the same date, card, amount and shop exist${state.logDup.length === 1 ? 's' : ''}.
