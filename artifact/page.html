@@ -43,6 +43,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; padding-inline: 16px; padding-block: 20px 40px; }
 main { max-width: 680px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
 h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
@@ -180,6 +181,8 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .spend-top .ins { min-width: 0; overflow-wrap: anywhere; }
 .purchase { justify-content: space-between; align-items: center; }
 .purchase > div:first-child { min-width: 0; }
+.push-right { margin-left: auto; }
+.danger-text { color: var(--urgent); }
 .center-actions { justify-content: center; }
 .bill-line { margin-top: 2px; }
 .due-soon { color: var(--urgent); font-weight: 600; }
@@ -372,8 +375,8 @@ function cardDetail(c, fee, pack) {
       ${c.joiningFeePaise != null ? html`<dt>Joining fee</dt><dd class="num">${formatPaise(c.joiningFeePaise)}</dd>` : ''}
       ${c.annualFeePaise != null ? html`<dt>Annual fee</dt><dd class="num">${formatPaise(c.annualFeePaise)}</dd>` : ''}
       ${c.issueDate ? html`<dt>Issued</dt><dd>${fmtDate(c.issueDate)}</dd>` : ''}
-      ${c.statementDay ? html`<dt>Bill generated</dt><dd>${ordinal(c.statementDay)} of every month</dd>` : ''}
-      ${c.dueDay ? html`<dt>Payment due</dt><dd>${ordinal(c.dueDay)} of every month</dd>` : ''}
+      ${c.kind === 'credit' && c.statementDay ? html`<dt>Bill generated</dt><dd>${ordinal(c.statementDay)} of every month</dd>` : ''}
+      ${c.kind === 'credit' && c.dueDay ? html`<dt>Payment due</dt><dd>${ordinal(c.dueDay)} of every month</dd>` : ''}
       ${c.status !== 'active' ? html`<dt>Status</dt><dd>${STATUS_LABEL[c.status]}${replacement ? ' by ' + cardLabel(replacement) : ''}</dd>` : ''}
       ${c.notes ? html`<dt>Notes</dt><dd>${c.notes}</dd>` : ''}
     </dl>
@@ -603,11 +606,11 @@ function cardForm() {
     </div>
     <div class="two">
       <div class="field"><label for="f-issue">Issue date (sets the fee date)</label><input id="f-issue" name="issueDate" type="date" value="${c.issueDate || ''}">${err('issueDate')}</div>
-      <div class="field"><label for="f-stmt">Bill generation day (credit, 1–31)</label><input id="f-stmt" name="statementDay" value="${c.statementDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="15">${err('statementDay')}</div>
-    </div>
-    <div class="two">
-      <div class="field"><label for="f-due">Payment due day (credit, 1–31)</label><input id="f-due" name="dueDay" value="${c.dueDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="4">${err('dueDay')}</div>
       <div class="field"></div>
+    </div>
+    <div class="two" id="credit-fields" ${c.kind === 'debit' ? 'hidden' : ''}>
+      <div class="field"><label for="f-stmt">Bill generation day (1–31)</label><input id="f-stmt" name="statementDay" value="${c.statementDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="15">${err('statementDay')}</div>
+      <div class="field"><label for="f-due">Payment due day (1–31)</label><input id="f-due" name="dueDay" value="${c.dueDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="4">${err('dueDay')}</div>
     </div>
     <div class="field"><label for="f-urls">Official benefit / T&amp;C links, one per line</label><textarea id="f-urls" name="sourceUrls" placeholder="https://…">${(c.sourceUrls || []).join('\n')}</textarea>
       ${Object.keys(e).filter((k) => k.startsWith('sourceUrls')).map((k) => err(k))}</div>
@@ -624,7 +627,7 @@ function readForm(form) {
   const base = state.editing === 'new' ? {} : state.cards.find((c) => c.id === state.editing) || {};
   return { ...base, kind: f.kind, bank: f.bank, name: f.name, network: f.network, nickname: f.nickname, last4: f.last4,
     holderName: f.holderName, holder: f.holder, joiningFeePaise: fee(f.joiningFee), annualFeePaise: fee(f.annualFee), issueDate: f.issueDate,
-    statementDay: sd === '' ? null : (/^\d+$/.test(sd) ? Number(sd) : -1), dueDay: dd === '' ? null : (/^\d+$/.test(dd) ? Number(dd) : -1), sourceUrls: String(f.sourceUrls).split('\n'), notes: f.notes };
+    statementDay: f.kind !== 'credit' || sd === '' ? null : (/^\d+$/.test(sd) ? Number(sd) : -1), dueDay: f.kind !== 'credit' || dd === '' ? null : (/^\d+$/.test(dd) ? Number(dd) : -1), sourceUrls: String(f.sourceUrls).split('\n'), notes: f.notes };
 }
 
 /* ---------- Freshness ---------- */
@@ -709,7 +712,7 @@ const STATUS_PILL = { completed: '', pending: ['st-soon', 'Pending'], cancelled:
 const cardById = (id) => state.cards.find((c) => c.id === id);
 
 function openLog(draft) {
-  state.logDraft = draft; state.logErrors = {}; state.logDup = null;
+  state.logDraft = draft; state.logErrors = {}; state.logDup = null; state.logConfirmDelete = false;
   render();
   document.getElementById('log-form')?.scrollIntoView({ block: 'start' });
 }
@@ -746,15 +749,14 @@ function logForm() {
       <div class="field"><label for="l-card">Card used</label><select id="l-card" name="cardId"><option value="">Choose…</option>${cards.map((c) => html`<option value="${c.id}" ${c.id === d.cardId ? 'selected' : ''}>${cardLabel(c)}</option>`)}</select>${err('cardId')}</div>
       <div class="field"><label for="l-date">Date</label><input id="l-date" name="date" type="date" value="${d.date || today()}">${err('date')}</div>
     </div>
-    <div class="two">
-      <div class="field"><label for="l-category">Category</label><select id="l-category" name="category">${cats.map((c) => html`<option value="${c}" ${c === d.category ? 'selected' : ''}>${CAT_LABEL[c]}</option>`)}</select>${err('category')}</div>
-      <div class="field"><label for="l-status">Status</label><select id="l-status" name="status">${[['completed', 'Paid'], ['pending', 'Pending'], ['refunded', 'Refunded'], ['cancelled', 'Cancelled']].map(([v, l]) => html`<option value="${v}" ${v === (d.status || 'completed') ? 'selected' : ''}>${l}</option>`)}</select></div>
-    </div>
-    <div class="field" id="refund-field" ${d.status === 'refunded' ? '' : 'hidden'}><label for="l-refund">Refund received (₹, blank = full refund)</label><input id="l-refund" name="refund" inputmode="decimal" value="${d.status === 'refunded' ? rup(d.refundPaise) : ''}">${err('refundPaise')}</div>
+    <div class="field"><label for="l-category">Category</label><select id="l-category" name="category">${cats.map((c) => html`<option value="${c}" ${c === d.category ? 'selected' : ''}>${CAT_LABEL[c]}</option>`)}</select>${err('category')}</div>
     ${renameBox(d)}
     <div class="field"><label for="l-notes">Notes (optional)</label><input id="l-notes" name="notes" value="${d.notes || ''}" autocomplete="off"></div>
     ${d.recommendedCardId && d.cardId && d.recommendedCardId !== d.cardId ? html`<p class="hint">EKFBA suggested ${cardLabel(cardById(d.recommendedCardId) || { nickname: 'another card' })}; this records the card you actually used.</p>` : ''}
-    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save purchase'}</button><button class="btn ghost" type="button" data-action="log-cancel">Cancel</button></div>
+    ${state.logConfirmDelete ? html`<div class="box bad">Delete this purchase? It will be removed from your totals.
+      <div class="actions" style="margin-top:8px"><button class="btn danger small" type="button" data-action="log-delete">Yes, delete</button><button class="btn ghost small" type="button" data-action="log-delete-no">Keep it</button></div></div>`
+    : html`<div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save purchase'}</button><button class="btn ghost" type="button" data-action="log-cancel">Cancel</button>
+      ${d.id ? html`<button class="btn ghost small danger-text push-right" type="button" data-action="log-delete-ask">Delete</button>` : ''}</div>`}
   </form>`;
 }
 
@@ -765,7 +767,7 @@ function renameBox(d) {
   const name = formatShopName(orig.merchant);
   const others = allPurchases().filter((p) => p.id !== d.id && formatShopName(p.merchant) === name).length;
   if (!others) return '';
-  return html`<label class="check"><input type="checkbox" name="renameAll" checked> If I change the name, also rename the ${others} other purchase${others === 1 ? '' : 's'} called “${name}”</label>`;
+  return html`<label class="check" id="rename-box" data-original="${name}" hidden><input type="checkbox" name="renameAll" checked> Also rename the ${others} other purchase${others === 1 ? '' : 's'} called “${name}”</label>`;
 }
 
 function billLine(c, ps, t) {
@@ -790,10 +792,25 @@ function readLogForm() {
   const f = Object.fromEntries(new FormData(document.getElementById('log-form')));
   const money = (v, blank = null) => (String(v ?? '').trim() === '' ? blank : parseRupeesToPaise(v) ?? -1);
   const amountPaise = money(f.amount, null);
-  const status = f.status;
+  const box = document.getElementById('rename-box');
   return { ...state.logDraft, merchant: f.merchant, amountPaise: amountPaise === null ? 0 : amountPaise, cardId: f.cardId, date: f.date, category: f.category,
-    status, refundPaise: status === 'refunded' ? money(f.refund, amountPaise) : 0, 
-    notes: f.notes, renameAll: f.renameAll === 'on' };
+    status: state.logDraft.status || 'completed', refundPaise: state.logDraft.refundPaise || 0,
+    notes: f.notes, renameAll: !!box && !box.hidden && f.renameAll === 'on' };
+}
+
+async function deletePurchase() {
+  const id = state.logDraft?.id;
+  const existing = id ? allPurchases().find((p) => p.id === id) : null;
+  if (!existing || state.busy || !state.db) return;
+  state.busy = true; render();
+  try {
+    const k = monthKey(existing.date);
+    const m = state.months.find((x) => x.id === k);
+    await state.db.collection('purchaseMonths').doc(k).set({ ...m, id: k, purchases: (m.purchases || []).filter((x) => x.id !== id), updatedAt: Date.now() });
+    state.logDraft = null; state.logConfirmDelete = false;
+    toast(`Deleted: ${formatShopName(existing.merchant)} ${formatPaise(existing.amountPaise)}`);
+  } catch (e) { state.logErrors = { _form: friendly(e) }; }
+  state.busy = false; render();
 }
 
 async function savePurchase(confirmedDuplicate) {
@@ -936,7 +953,12 @@ function afterRender() {
   };
   shop?.addEventListener('change', pickCategory);
   shop?.addEventListener('input', () => { if (categoryForShop(shop.value)) pickCategory(); });
-  document.getElementById('l-status')?.addEventListener('change', (ev) => { const r = document.getElementById('refund-field'); if (r) r.hidden = ev.target.value !== 'refunded'; });
+  const renameBoxEl = document.getElementById('rename-box');
+  shop?.addEventListener('input', () => { if (renameBoxEl) renameBoxEl.hidden = formatShopName(shop.value) === renameBoxEl.dataset.original || !shop.value.trim(); });
+  document.querySelectorAll('input[name=kind]').forEach((r) => r.addEventListener('change', () => {
+    const cf = document.getElementById('credit-fields');
+    if (cf) cf.hidden = document.querySelector('input[name=kind]:checked')?.value !== 'credit';
+  }));
 }
 
 $app.addEventListener('click', async (ev) => {
@@ -971,7 +993,10 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-new') openLog({ date: today(), cardId: state.spendCard || '', category: 'other', status: 'completed', source: 'manual' });
   else if (a === 'log-from-ask') logFromAsk(id);
   else if (a === 'log-edit') { const p = flattenMonths(state.months).find((x) => x.id === id); if (p) openLog({ ...p, merchant: formatShopName(p.merchant) }); }
-  else if (a === 'log-cancel') { state.logDraft = null; state.logErrors = {}; state.logDup = null; render(); }
+  else if (a === 'log-cancel') { state.logDraft = null; state.logErrors = {}; state.logDup = null; state.logConfirmDelete = false; render(); }
+  else if (a === 'log-delete-ask') { state.logDraft = readLogForm(); state.logConfirmDelete = true; render(); }
+  else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
+  else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
   else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.purchaseLimit = 10; render(); }
   else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; state.purchaseLimit = 10; render(); if (state.spendCard) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
