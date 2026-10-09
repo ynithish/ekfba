@@ -325,7 +325,7 @@ function cardRow(c) {
     <button class="row-head" data-action="toggle" data-id="${c.id}" aria-expanded="${open}">
       <div class="lead-line"><span class="mini-card ${c.kind}" aria-hidden="true">${c.last4 || ''}</span>
         <div><div class="ins">${c.nickname || c.name}</div>
-        <div class="meta">${c.bank} · ${c.name}${c.variant ? ' ' + c.variant : ''} · ${c.kind === 'credit' ? 'Credit' : 'Debit'}${c.last4 ? html` · <span class="mono">•••• ${c.last4}</span>` : ''}</div></div></div>
+        <div class="meta">${c.bank} · ${c.name} · ${c.kind === 'credit' ? 'Credit' : 'Debit'}${c.last4 ? html` · <span class="mono">•••• ${c.last4}</span>` : ''}</div></div></div>
       <div class="right">${right}</div>
     </button>
     ${open ? cardDetail(c, fee, pack) : ''}
@@ -362,7 +362,7 @@ function cardDetail(c, fee, pack) {
   const replacement = c.replacedById ? state.cards.find((x) => x.id === c.replacedById) : null;
   return html`<div class="detail">
     <dl class="kv">
-      <dt>Card</dt><dd>${c.bank} ${c.name}${c.variant ? ' · ' + c.variant : ''}</dd>
+      <dt>Card</dt><dd>${c.bank} ${c.name}</dd>
       <dt>Type</dt><dd>${c.kind === 'credit' ? 'Credit card' : 'Debit card'} · ${c.network}</dd>
       ${holder ? html`<dt>Card holder</dt><dd>${holder}</dd>` : ''}
       ${c.joiningFeePaise != null ? html`<dt>Joining fee</dt><dd class="num">${formatPaise(c.joiningFeePaise)}</dd>` : ''}
@@ -580,8 +580,8 @@ function cardForm() {
       <div class="field"><label for="f-name">Card name *</label><input id="f-name" name="name" value="${c.name || ''}" autocomplete="off" placeholder="Millennia">${err('name')}</div>
     </div>
     <div class="two">
-      <div class="field"><label for="f-variant">Variant / tier</label><input id="f-variant" name="variant" value="${c.variant || ''}" autocomplete="off" placeholder="Signature">${err('variant')}</div>
       <div class="field"><label for="f-network">Network *</label><select id="f-network" name="network">${opt('', c.network, 'Choose…')}${NETWORKS.map((n) => opt(n, c.network))}</select>${err('network')}</div>
+      <div class="field"></div>
     </div>
     <div class="two">
       <div class="field"><label for="f-nickname">Nickname</label><input id="f-nickname" name="nickname" value="${c.nickname || ''}" maxlength="40" autocomplete="off" placeholder="Shopping card">${err('nickname')}</div>
@@ -618,7 +618,7 @@ function readForm(form) {
   const sd = String(f.statementDay).trim();
   const dd = String(f.dueDay ?? '').trim();
   const base = state.editing === 'new' ? {} : state.cards.find((c) => c.id === state.editing) || {};
-  return { ...base, kind: f.kind, bank: f.bank, name: f.name, variant: f.variant, network: f.network, nickname: f.nickname, last4: f.last4,
+  return { ...base, kind: f.kind, bank: f.bank, name: f.name, network: f.network, nickname: f.nickname, last4: f.last4,
     holderName: f.holderName, holder: f.holder, joiningFeePaise: fee(f.joiningFee), annualFeePaise: fee(f.annualFee), issueDate: f.issueDate,
     statementDay: sd === '' ? null : (/^\d+$/.test(sd) ? Number(sd) : -1), dueDay: dd === '' ? null : (/^\d+$/.test(dd) ? Number(dd) : -1), sourceUrls: String(f.sourceUrls).split('\n'), notes: f.notes };
 }

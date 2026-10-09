@@ -60,7 +60,7 @@ def main():
 
         # Add a card that matches the example pack
         page.click('[data-action=new]')
-        page.fill('#f-bank', 'Example Bank'); page.fill('#f-name', 'Sample Rewards'); page.fill('#f-variant', 'Classic')
+        page.fill('#f-bank', 'Example Bank'); page.fill('#f-name', 'Sample Rewards');
         page.select_option('#f-network', 'Visa'); page.fill('#f-nickname', 'Everyday'); page.fill('#f-last4', '4417')
         page.fill('#f-holderName', 'Nithish'); page.fill('#f-annual', '500'); page.fill('#f-issue', '2024-11-20'); page.fill('#f-stmt', '15'); page.fill('#f-due', '4')
         page.fill('#f-notes', 'valid thru 08/29')
