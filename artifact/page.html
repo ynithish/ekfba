@@ -186,7 +186,10 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .strike { text-decoration: line-through; color: var(--muted); }
 .cat-list { gap: 10px; }
 .field select.auto-filled { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-bg); }
-.cat-row { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 10px; align-items: center; font-size: 14px; }
+.cat-row { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 10px; align-items: center; font-size: 14px; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; margin: -4px -10px; cursor: pointer; color: inherit; }
+.cat-row:hover { background: var(--bg); }
+.cat-row.selected { border-color: var(--accent); background: var(--accent-soft); }
+.filters { align-items: center; }
 .ms { display: flex; flex-direction: column; gap: 4px; }
 .ms-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -219,7 +222,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], ready: { cards: false, rulePacks: false, months: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -844,7 +847,7 @@ function spendsView() {
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard));
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory));
   const periodName = { month: new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)}`, year: String(t.slice(0, 4)) }[state.spendPeriod];
   const pct = (v) => (tot.totalPaise ? Math.round((v * 100) / tot.totalPaise) : 0);
 
@@ -882,9 +885,13 @@ function spendsView() {
         ${billLine(c, ps, t)}
       </button>`; })}</section>` : html`<div class="empty"><p>Add your cards in Cards first.</p></div>`}
     ${cats.length ? html`<h2>By category</h2><section class="panel plain cat-list">${cats.map(([k, v]) => html`
-      <div class="cat-row"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></div>`)}</section>` : ''}
+      <button class="cat-row ${state.spendCategory === k ? 'selected' : ''}" data-action="spend-cat" data-cat="${k}" aria-pressed="${state.spendCategory === k}"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></button>`)}</section>` : ''}
     ${progress.length ? html`<h2>Card milestones</h2><section class="list">${progress}</section>` : ''}
-    <h2>Purchases${state.spendCard ? ' · ' + cardLabel(cardById(state.spendCard) || {}) : ''}</h2>
+    <h2 id="purchases-h">Purchases</h2>
+    ${state.spendCard || state.spendCategory ? html`<div class="chips filters">
+      ${state.spendCard ? html`<button class="chip" aria-pressed="true" data-action="spend-card" data-id="${state.spendCard}">${cardLabel(cardById(state.spendCard) || {})} ✕</button>` : ''}
+      ${state.spendCategory ? html`<button class="chip" aria-pressed="true" data-action="spend-cat" data-cat="${state.spendCategory}">${CAT_LABEL[state.spendCategory] || state.spendCategory} ✕</button>` : ''}
+      <span class="meta">${list.length} purchase${list.length === 1 ? '' : 's'} · ${formatPaise(list.reduce((a, p) => a + netSpend(p), 0))} · tap one to change it</span></div>` : ''}
     ${!state.ready.months ? html`<div class="empty"><p>Loading purchases…</p></div>`
       : !list.length ? html`<div class="empty"><p>${ps.length ? 'No purchases in this period.' : 'No purchases logged yet. In Ask, tap “I paid with this card” after paying, or use Add purchase.'}</p></div>`
       : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
@@ -967,7 +974,8 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-cancel') { state.logDraft = null; state.logErrors = {}; state.logDup = null; render(); }
   else if (a === 'log-save-anyway') savePurchase(true);
   else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.purchaseLimit = 10; render(); }
-  else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; state.purchaseLimit = 10; render(); }
+  else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; state.purchaseLimit = 10; render(); if (state.spendCard) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+  else if (a === 'spend-cat') { const k = t.dataset.cat; state.spendCategory = state.spendCategory === k ? null : k; state.purchaseLimit = 10; render(); if (state.spendCategory) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'more-purchases') { state.purchaseLimit += 10; render(); }
 });
 
