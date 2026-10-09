@@ -65,6 +65,7 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Credit cards: bill generation day + payment due day; last/next bill with logged amounts; pay-by date and calendar reminders
 - ✅ Purchases list shows 10 at a time with "Show more"; Spends total no longer shows a saved amount
 - ⬜ Search purchases (owner: later phase)
+- ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
 - Tests: 41 unit tests; 32 page checks
 
 ## Phase 5 — Milestones & reminders ⬜

@@ -166,7 +166,7 @@ def main():
         check('discount, paid and offer fields removed', page.locator('#l-discount, #l-channel, [name=offerUsed]').count() == 0)
         check('categories capitalised', 'Food Delivery' in page.inner_text('#l-category'))
         check('no Cash Withdrawal category', 'Cash Withdrawal' not in page.inner_text('#l-category'))
-        check('categories sorted by spend', page.locator('#l-category option').first.inner_text() == 'Electronics')
+        check('categories in alphabetical order', page.locator('#l-category option').first.inner_text() == 'Apparel')
         page.click('#log-form [data-action=log-cancel]')
         page.click('.cat-row:has-text("Electronics")')
         check('category filter shows only that category', page.locator('.purchase').count() == 1 and 'Croma' in page.inner_text('.purchase'))
