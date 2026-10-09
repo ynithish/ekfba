@@ -7,7 +7,7 @@
     "kind": "credit"
   },
   "checkedAt": "2026-10-09",
-  "notes": "The Axis product page loads its details with scripts and could not be read, so this pack comes from Axis's Horizon terms and conditions PDF, which appears to date from mid-2024. Lounge access in particular may since have gained a spend condition; those rules are marked unverified. The cardholder confirms there is no annual-fee waiver. The PDF gives no forex mark-up and no rupee value for EDGE Miles (they transfer 1:1 to partner programmes).",
+  "notes": "The Axis product page loads its details with scripts and could not be read, so this pack comes from Axis's Horizon terms and conditions PDF, which appears to date from mid-2024. Lounge access in particular may since have gained a spend condition; those rules are marked unverified. The cardholder confirms there is no annual-fee waiver and that other spends earn 1 EDGE Mile per ₹100 (the 2024 PDF said 2). The PDF gives no forex mark-up and no rupee value for EDGE Miles (they transfer 1:1 to partner programmes).",
   "sources": [
     {
       "id": "s1",
@@ -53,18 +53,18 @@
   },
   "earnRules": [
     {
-      "id": "base-2",
-      "label": "2 EDGE Miles per ₹100 on other spends",
+      "id": "base-1",
+      "label": "1 EDGE Mile per ₹100 on other spends",
       "kind": "points",
       "pointsPer": {
-        "points": 2,
+        "points": 1,
         "perPaise": 10000
       },
       "appliesTo": {
         "channel": "any"
       },
-      "sourceId": "s1",
-      "clause": "2 EDGE Miles for every INR 100 spent on other spends",
+      "sourceId": "owner",
+      "clause": "Axis: 1 mile per 100 for others",
       "verified": true
     },
     {
@@ -87,7 +87,7 @@
     },
     {
       "id": "airline-direct-5",
-      "label": "5 EDGE Miles per ₹100 booking directly with airlines (travel agents and OTAs earn only 2)",
+      "label": "5 EDGE Miles per ₹100 booking directly with airlines (travel agents and OTAs earn less)",
       "kind": "points",
       "pointsPer": {
         "points": 5,

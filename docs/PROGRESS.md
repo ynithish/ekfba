@@ -50,12 +50,17 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
   most-specific earn rule, point value, per-transaction caps, forex mark-up, milestones the spend counts toward
 - ✅ Ranking with amount (net saving in ₹) and without (offer value, then reward rate); explanation per card; freshness/unverified labels
 - ✅ 10 portable test vectors (spec/test-vectors/recommend) + parser tests; 31 page checks
-- ⬜ Value for Axis EDGE Miles (needed before Horizon can be compared in rupees)
+- ✅ Axis other spends = 1 EDGE Mile per ₹100 (owner); ⬜ rupee value per mile still not set
 - ⬜ Scenario 2 (offline) waits for the Flutter app, per ADR-008
 
-## Phase 4 — Purchase tracking ⬜
-- ⬜ Post-recommendation confirm/log; manual entry; edit/cancel/refund events; duplicate detection (Scenarios 7, 8)
-- ⬜ Purchase history with filters; CSV/JSON export
+## Phase 4 — Purchase tracking ✅ (9 Oct 2026, Claude page)
+- ✅ "I paid with this card" after every recommendation (prefilled; records the card actually used)
+- ✅ Manual "Add purchase"; edit; pending / refunded (partial) / cancelled; duplicate warning (Scenarios 7, 8)
+- ✅ Storage: one document per month (purchaseMonths/YYYY-MM), per the NLNLALD roadmap
+- ✅ Spends tab (opens first): month / quarter / year totals, by card, by category, purchase list filtered by card
+- ✅ Card milestones with progress bars (fee waiver needs issue date; lounge unlock shows this and last quarter) (Scenarios 3, 5)
+- Owner decisions: Backup and Offers tabs removed; no Apple Pay setting
+- Tests: 41 unit tests; 32 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)

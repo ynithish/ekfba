@@ -37,3 +37,9 @@ Supersedes the hosting part of ADR-002 and the sync plan in ADR-004 for now.
 ## ADR-009 Page is built from the tested core (9 Oct 2026)
 `tools/build-artifact.mjs` inlines src/core modules into artifact/page.html → artifact/dist/ekfba.html, so the page runs
 exactly the code the unit tests cover. Republish by running the build and publishing the same file.
+
+## ADR-010 Focus on spend tracking; Backup and Offers tabs removed (9 Oct 2026, owner decided)
+The page opens on Spends (totals by period, card and category, milestones). Offers are visible on each card and inside
+recommendations, so the separate Offers tab was redundant. The Backup tab was removed; data stays in the page's database
+and Claude can export it on request (the NLNLALD backup envelope code remains in src/core for the Flutter move).
+No Apple Pay or payment-method setting on cards.

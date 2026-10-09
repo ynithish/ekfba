@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
-const MODULES = ['ids', 'money', 'sensitive', 'schema', 'card', 'backup', 'rulepack', 'feedates', 'merchants', 'recommend', '../ui/html'];
+const MODULES = ['ids', 'money', 'sensitive', 'schema', 'card', 'backup', 'rulepack', 'feedates', 'purchases', 'merchants', 'recommend', '../ui/html'];
 
 function bundleModule(name) {
   const file = join(root, 'src/core', name + '.js');

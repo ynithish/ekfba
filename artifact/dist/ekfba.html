@@ -65,7 +65,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .btn.small { min-height: 38px; padding: 0 14px; font-size: 14px; }
 .btn[disabled] { opacity: .5; cursor: default; }
 
-.tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
 .tab { border: 0; background: transparent; border-radius: 9px; min-height: 40px; font-weight: 600; font-size: 14px; color: var(--muted); }
 .tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
 
@@ -166,6 +166,25 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .why { font-size: 13.5px; color: var(--muted); }
 .notes-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .alt-net { font-family: var(--display); font-size: 18px; font-variant-numeric: tabular-nums; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink); }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.total { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 2px; }
+.total-n { font-family: var(--display); font-size: 36px; line-height: 1.1; }
+.bar { height: 8px; border-radius: 99px; background: var(--quiet-bg); overflow: hidden; }
+.bar.thin { height: 6px; }
+.bar span { display: block; height: 100%; border-radius: 99px; background: var(--accent); min-width: 0; }
+.spend-row, .purchase { width: 100%; text-align: left; padding: 12px 14px; display: flex; gap: 8px; cursor: pointer; }
+.spend-row { flex-direction: column; }
+.spend-row.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.spend-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.spend-top .ins { min-width: 0; overflow-wrap: anywhere; }
+.purchase { justify-content: space-between; align-items: center; }
+.purchase > div:first-child { min-width: 0; }
+.strike { text-decoration: line-through; color: var(--muted); }
+.cat-list { gap: 10px; }
+.cat-row { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 10px; align-items: center; font-size: 14px; text-transform: capitalize; }
+.ms { display: flex; flex-direction: column; gap: 4px; }
+.ms-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -993,6 +1012,184 @@ function feeCalendarLink(card, feeDate, offset, today) {
 return { nextAnniversary, renewalStatus, REMINDER_OFFSETS, feeCalendarLink };
 })();
 
+const __m_purchases = (() => {
+// Purchase tracking: validation, duplicate detection, refunds, totals and milestone progress.
+// Storage follows the NLNLALD roadmap: one record per month ("purchaseMonths/2026-10") holding a list of
+// purchases, so the page never approaches the 25,000-document limit. Pure functions only.
+
+const { scanForSensitiveData } = __m_sensitive;
+const { CATEGORIES } = __m_rulepack;
+const PURCHASE_STATUSES = ['completed', 'pending', 'cancelled', 'refunded'];
+const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z')) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
+const MAX_PAISE = 1_00_00_000_00;
+
+const monthKey = (date) => date.slice(0, 7); // "2026-10"
+
+/**
+ * Validates a purchase draft. Returns { ok, purchase } or { ok: false, errors }.
+ * `existing` keeps id and createdAt on edit.
+ */
+function validatePurchase(d, existing = null, now = Date.now()) {
+  const errors = {};
+  const p = {
+    date: d.date,
+    merchant: String(d.merchant || '').trim(),
+    category: d.category || 'other',
+    channel: ['online', 'offline'].includes(d.channel) ? d.channel : null,
+    amountPaise: d.amountPaise,
+    cardId: d.cardId || '',
+    status: d.status || 'completed',
+    refundPaise: d.status === 'refunded' ? (d.refundPaise ?? d.amountPaise) : 0,
+    offerUsed: !!d.offerUsed,
+    discountPaise: d.discountPaise ?? null,
+    estimatedSavingPaise: d.estimatedSavingPaise ?? null,
+    recommendedCardId: d.recommendedCardId || null,
+    source: d.source === 'ask' ? 'ask' : 'manual',
+    orderRef: String(d.orderRef || '').trim(),
+    notes: String(d.notes || '').trim(),
+  };
+  if (!isDate(p.date)) errors.date = 'Pick the purchase date.';
+  if (!p.merchant) errors.merchant = 'Where did you spend?';
+  if (p.merchant.length > 80) errors.merchant = 'Keep the name under 80 characters.';
+  if (!CATEGORIES.includes(p.category)) errors.category = 'Pick a category.';
+  if (!(Number.isInteger(p.amountPaise) && p.amountPaise > 0 && p.amountPaise <= MAX_PAISE)) errors.amountPaise = 'Enter the amount paid.';
+  if (!p.cardId) errors.cardId = 'Which card did you use?';
+  if (!PURCHASE_STATUSES.includes(p.status)) errors.status = 'Invalid status.';
+  if (p.status === 'refunded' && !(Number.isInteger(p.refundPaise) && p.refundPaise > 0 && p.refundPaise <= (p.amountPaise || 0))) {
+    errors.refundPaise = 'Refund must be more than ₹0 and not more than the amount paid.';
+  }
+  if (p.discountPaise !== null && !(Number.isInteger(p.discountPaise) && p.discountPaise >= 0)) errors.discountPaise = 'Invalid discount.';
+  if (p.notes.length > 500) errors.notes = 'Notes are too long (500 characters).';
+  const s = scanForSensitiveData({ merchant: p.merchant, notes: p.notes, orderRef: p.orderRef });
+  if (s) errors[s.path] = `Not saved: ${s.reason}.`;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, purchase: { ...p, id: existing?.id || d.id, createdAt: existing?.createdAt || d.createdAt || now, updatedAt: now } };
+}
+
+/** Purchases that look like the same one entered twice: same date, card, amount and merchant, not cancelled. */
+function findDuplicates(p, all) {
+  const key = (x) => `${x.date}|${x.cardId}|${x.amountPaise}|${x.merchant.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  return all.filter((x) => x.id !== p.id && x.status !== 'cancelled' && key(x) === key(p));
+}
+
+/** Amount that actually counts as spent: completed or refunded purchases minus refunds. Pending and cancelled count 0. */
+function netSpend(p) {
+  if (p.status === 'completed') return p.amountPaise;
+  if (p.status === 'refunded') return Math.max(0, p.amountPaise - (p.refundPaise || 0));
+  return 0;
+}
+
+/** Flattens month records into one list, newest first. */
+function flattenMonths(months) {
+  return months.flatMap((m) => m.purchases || []).sort((a, b) => (b.date.localeCompare(a.date)) || (b.createdAt - a.createdAt));
+}
+
+/* ---------------- Periods ---------------- */
+
+const pad = (n) => String(n).padStart(2, '0');
+const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+function addDays(date, n) { return new Date(Date.parse(date + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10); }
+
+/**
+ * The period of `type` containing `date`. Returns { start, end } (inclusive) or null when the card lacks
+ * the date it needs (card_year needs issueDate; statement_cycle needs statementDay).
+ */
+function periodContaining(type, date, card = {}) {
+  const [y, m, d] = date.split('-').map(Number);
+  switch (type) {
+    case 'calendar_month': return { start: ymd(y, m, 1), end: ymd(y, m, lastDay(y, m)) };
+    case 'calendar_quarter': { const q = Math.floor((m - 1) / 3); const sm = q * 3 + 1; return { start: ymd(y, sm, 1), end: ymd(y, sm + 2, lastDay(y, sm + 2)) }; }
+    case 'calendar_year': return { start: ymd(y, 1, 1), end: ymd(y, 12, 31) };
+    case 'card_year': {
+      if (!isDate(card.issueDate)) return null;
+      const [, im, id] = card.issueDate.split('-').map(Number);
+      const anniv = (yy) => ymd(yy, im, Math.min(id, lastDay(yy, im)));
+      const start = anniv(y) <= date ? anniv(y) : anniv(y - 1);
+      const sy = Number(start.slice(0, 4));
+      return { start, end: addDays(anniv(sy + 1), -1) };
+    }
+    case 'statement_cycle': {
+      const sd = card.statementDay;
+      if (!(Number.isInteger(sd) && sd >= 1 && sd <= 31)) return null;
+      const dayIn = (yy, mm) => ymd(yy, mm, Math.min(sd, lastDay(yy, mm)));
+      // Cycle runs from the day after one statement date to the next statement date.
+      let endY = y, endM = m;
+      if (date > dayIn(y, m)) { endM = m + 1; if (endM > 12) { endM = 1; endY++; } }
+      const end = dayIn(endY, endM);
+      let pm = endM - 1, py = endY; if (pm < 1) { pm = 12; py--; }
+      return { start: addDays(dayIn(py, pm), 1), end };
+    }
+    default: return null;
+  }
+}
+
+/** The period just before the one containing `date`. */
+function previousPeriod(type, date, card = {}) {
+  const cur = periodContaining(type, date, card);
+  return cur ? periodContaining(type, addDays(cur.start, -1), card) : null;
+}
+
+/* ---------------- Totals ---------------- */
+
+/** Totals for purchases within [start, end]: { totalPaise, count, byCard: {id: paise}, byCategory: {cat: paise}, pendingPaise }. */
+function totals(purchases, start, end) {
+  const out = { totalPaise: 0, count: 0, byCard: {}, byCategory: {}, pendingPaise: 0, savedPaise: 0 };
+  for (const p of purchases) {
+    if (p.date < start || p.date > end) continue;
+    if (p.status === 'pending') { out.pendingPaise += p.amountPaise; continue; }
+    const v = netSpend(p);
+    if (!v) continue;
+    out.totalPaise += v;
+    out.count++;
+    out.byCard[p.cardId] = (out.byCard[p.cardId] || 0) + v;
+    out.byCategory[p.category] = (out.byCategory[p.category] || 0) + v;
+    if (p.status === 'completed') out.savedPaise += p.discountPaise ?? p.estimatedSavingPaise ?? 0;
+  }
+  return out;
+}
+
+/* ---------------- Milestone progress ---------------- */
+
+/** Whether a purchase counts toward a milestone under a card's rule pack. */
+function countsToward(p, milestone, pack) {
+  for (const x of pack.exclusions || []) {
+    if (!x.excludedFrom.includes('milestones')) continue;
+    if (x.appliesTo?.categories?.includes(p.category)) return false;
+  }
+  const c = milestone.counts;
+  if (c?.categories?.length && !c.categories.includes(p.category)) return false;
+  if (c?.channel && c.channel !== 'any' && p.channel && c.channel !== p.channel) return false;
+  return true;
+}
+
+/**
+ * Progress of every milestone in a card's pack on `today`.
+ * Returns [{ milestone, period, eligiblePaise, remainingPaise, percent, met, previous: {period, eligiblePaise, met}|null, missing }].
+ */
+function milestoneProgress(card, pack, purchases, today) {
+  const mine = purchases.filter((p) => p.cardId === card.id);
+  return (pack.milestones || []).map((m) => {
+    const period = periodContaining(m.period, today, card);
+    if (!period) return { milestone: m, period: null, missing: m.period === 'card_year' ? 'issueDate' : 'statementDay' };
+    const sum = (per) => mine.filter((p) => p.date >= per.start && p.date <= per.end && countsToward(p, m, pack)).reduce((a, p) => a + netSpend(p), 0);
+    const eligiblePaise = sum(period);
+    const prevPer = previousPeriod(m.period, today, card);
+    const prevSum = prevPer ? sum(prevPer) : 0;
+    return {
+      milestone: m, period, eligiblePaise,
+      remainingPaise: Math.max(0, m.thresholdPaise - eligiblePaise),
+      percent: Math.min(100, Math.floor((eligiblePaise * 1000) / m.thresholdPaise) / 10),
+      met: eligiblePaise >= m.thresholdPaise,
+      previous: prevPer ? { period: prevPer, eligiblePaise: prevSum, met: prevSum >= m.thresholdPaise } : null,
+      missing: null,
+    };
+  });
+}
+
+return { PURCHASE_STATUSES, monthKey, validatePurchase, findDuplicates, netSpend, flattenMonths, periodContaining, previousPeriod, totals, countsToward, milestoneProgress };
+})();
+
 const __m_merchants = (() => {
 // Merchant and category directory used to understand "where are you spending".
 // Data only — the Flutter app can load the same list. Categories come from the Rule Pack vocabulary.
@@ -1397,17 +1594,17 @@ const icon = (name) => raw(`<svg class="i" aria-hidden="true"><use href="#i-${es
 
 return { escapeHtml, raw, html, icon };
 })();
-const __core = Object.assign({}, __m_ids, __m_money, __m_sensitive, __m_schema, __m_card, __m_backup, __m_rulepack, __m_feedates, __m_merchants, __m_recommend, __m_uihtml);
+const __core = Object.assign({}, __m_ids, __m_money, __m_sensitive, __m_schema, __m_card, __m_backup, __m_rulepack, __m_feedates, __m_purchases, __m_merchants, __m_recommend, __m_uihtml);
 
 </script>
 <script>
 const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToPaise, formatPaise,
   validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
   CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid,
-  parseQuery, recommend, explain } = __core;
+  parseQuery, recommend, explain, MERCHANTS, validatePurchase, findDuplicates, netSpend, flattenMonths, monthKey,
+  periodContaining, totals, milestoneProgress } = __core;
 
-const APP_VERSION = '0.2.0';
-const COLLECTIONS = ['cards', 'rulePacks'];
+const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
   'HSBC', 'ICICI Bank', 'IDFC FIRST Bank', 'IndusInd Bank', 'Kotak Mahindra Bank', 'OneCard', 'Punjab National Bank', 'RBL Bank',
   'SBI Card', 'Standard Chartered', 'State Bank of India', 'Union Bank of India', 'Yes Bank'];
@@ -1418,9 +1615,10 @@ const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c.replace(/_/g, '
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'ask', askText: '', askResult: null, cards: [], packs: [], ready: { cards: false, rulePacks: false }, db: null, dl: null, canWrite: true,
+  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], ready: { cards: false, rulePacks: false, months: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
-  offerFilter: 'active', offerQuery: '', showArchived: false, busy: false, loadErr: '', backupPreview: null,
+  showArchived: false, busy: false, loadErr: '',
+  spendPeriod: 'month', spendCard: null, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -1473,19 +1671,20 @@ function feeInfo(card) {
 
 function render() {
   const cards = state.cards;
-  let h = html`<header><div><h1>EKFBA Cards</h1><div class="sub">Your credit and debit cards, their benefits and offers.</div></div>
-    ${state.canWrite && state.tab === 'wallet' && !state.editing ? html`<button class="btn" data-action="new">Add card</button>` : ''}</header>`;
+  let h = html`<header><div><h1>EKFBA Cards</h1><div class="sub">What you spend on each card, and which card to use next.</div></div>
+    ${state.canWrite && state.tab === 'wallet' && !state.editing ? html`<button class="btn" data-action="new">Add card</button>` : ''}
+    ${state.canWrite && state.tab === 'spends' && !state.logDraft ? html`<button class="btn" data-action="log-new">Add purchase</button>` : ''}</header>`;
   if (state.loadErr) h = html`${h}<div class="err" role="alert">${state.loadErr}</div>`;
   if (!state.canWrite) h = html`${h}<div class="hint">You can view this wallet but not change it.</div>`;
   h = html`${h}<nav class="tabs" role="tablist" aria-label="Sections">
-    ${[['ask', 'Ask'], ['wallet', 'Wallet'], ['offers', 'Offers'], ['fresh', 'Freshness'], ['backup', 'Backup']].map(([k, l]) =>
+    ${[['spends', 'Spends'], ['ask', 'Ask'], ['wallet', 'Cards'], ['fresh', 'Freshness']].map(([k, l]) =>
       html`<button class="tab" role="tab" data-action="tab" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`)}
   </nav>`;
-  const body = state.tab === 'ask' ? askView() : state.tab === 'wallet' ? walletView(cards) : state.tab === 'offers' ? offersView() : state.tab === 'fresh' ? freshView() : backupView();
+  const body = state.tab === 'spends' ? spendsView() : state.tab === 'ask' ? askView() : state.tab === 'wallet' ? walletView(cards) : freshView();
   $app.innerHTML = String(html`${h}${body}
     <div class="note">
       <span>Only the owner of this page can see or change it. Never enter full card numbers, expiry dates, CVV, PIN or OTP; the page refuses them.</span>
-      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchase logging and spend-milestone tracking come next.</span>
+      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchases you log stay in this page; ask in the project chat if you need an export.</span>
     </div>`);
   afterRender();
 }
@@ -1793,50 +1992,6 @@ function readForm(form) {
     statementDay: sd === '' ? null : (/^\d+$/.test(sd) ? Number(sd) : -1), sourceUrls: String(f.sourceUrls).split('\n'), notes: f.notes };
 }
 
-/* ---------- Offers ---------- */
-
-function allOffers() {
-  const out = [];
-  for (const c of state.cards.filter((x) => x.status === 'active')) {
-    const rec = activePack(c.id);
-    if (!rec) continue;
-    for (const o of offersForCard(rec.pack, c)) out.push({ o, card: c, pack: rec.pack });
-  }
-  return out;
-}
-
-function offersView() {
-  const items = allOffers();
-  const q = state.offerQuery.trim().toLowerCase();
-  const f = state.offerFilter;
-  const shown = items.filter(({ o, card }) => {
-    const st = offerStatus(o, today());
-    if (f === 'active' && !(st === 'active' || st === 'no_end_date')) return false;
-    if (f === 'upcoming' && st !== 'upcoming') return false;
-    if (f === 'expired' && st !== 'expired') return false;
-    if (!q) return true;
-    return [o.label, o.merchant, ...(o.appliesTo?.categories || []), card.bank, card.name, card.nickname].join(' ').toLowerCase().includes(q);
-  }).sort((a, b) => (a.o.validTo || '9999').localeCompare(b.o.validTo || '9999'));
-  const counts = { active: 0, upcoming: 0, expired: 0 };
-  items.forEach(({ o }) => { const st = offerStatus(o, today()); counts[st === 'no_end_date' ? 'active' : st]++; });
-  return html`
-    <div class="field"><label for="offer-q">Search a shop, platform or category</label><input id="offer-q" type="search" value="${state.offerQuery}" placeholder="Croma, Swiggy, grocery…" autocomplete="off"></div>
-    <div class="chips" role="group" aria-label="Offer status">
-      ${[['active', `Active (${counts.active})`], ['upcoming', `Upcoming (${counts.upcoming})`], ['expired', `Expired (${counts.expired})`], ['all', 'All']].map(([k, l]) =>
-        html`<button class="chip" data-action="offer-filter" data-f="${k}" aria-pressed="${f === k}">${l}</button>`)}
-    </div>
-    ${!items.length ? html`<div class="empty"><h2>No offers yet</h2><p>Offers appear here once you add rule packs to your cards. Each offer shows its card, conditions, end date and source.</p></div>`
-      : !shown.length ? html`<div class="empty"><p>No ${f === 'all' ? '' : f + ' '}offers${q ? ` matching “${state.offerQuery}”` : ''}.</p></div>`
-      : html`<section class="list" aria-label="Offers">${shown.map(({ o, card, pack }) => html`
-        <article class="row"><div class="detail flush">
-          <div class="rule-top"><div><div class="ins">${o.merchant || scopeText(o.appliesTo)}</div><div class="meta">${cardLabel(card)}</div></div>${badges(o, offerPill(o))}</div>
-          <p>${o.label}</p>
-          <small class="meta">${offerValueText(o)}${o.validFrom ? ` · from ${fmtDate(o.validFrom)}` : ''}${o.validTo ? ` · till ${fmtDate(o.validTo)}` : ''}</small>
-          ${packFreshness(pack, today()).offersStale ? html`<small class="meta">Last checked ${fmtDate(pack.checkedAt)}. The bank may have changed this offer.</small>` : ''}
-          ${sourceLine(pack, o)}
-        </div></article>`)}</section>`}`;
-}
-
 /* ---------- Freshness ---------- */
 
 function askView() {
@@ -1846,7 +2001,8 @@ function askView() {
     <form class="ask-form" id="ask-form" novalidate>
       <input id="ask-q" type="search" enterkeyhint="search" autocomplete="off" value="${state.askText}" placeholder="Croma 15000, Swiggy, petrol 2k" aria-label="Shop, app or category, and amount">
       <button class="btn" type="submit">Find card</button>
-    </form>`;
+    </form>
+    ${state.logDraft ? logForm() : ''}`;
   if (!r) {
     return html`${out}<div class="chips" aria-label="Try">${popular.map((p) => html`<button class="chip" data-action="ask-try" data-q="${p}">${p}</button>`)}</div>
       <p class="hint">Type a shop, outlet or app name, with or without the amount. Recommendations use the rules saved on your cards; offers are labelled when they may be out of date.</p>`;
@@ -1885,11 +2041,13 @@ function askView() {
       ${badges(w).some(Boolean) ? html`<div class="rule-badges left">${badges(w)}</div>` : ''}
       ${w.milestones.length ? html`<div class="why">Counts toward: ${w.milestones.map((m) => m.label).join('; ')}.</div>` : ''}
       ${w.notes.length ? html`<ul class="notes-list">${w.notes.map((n) => html`<li>${n}</li>`)}</ul>` : ''}
+      ${state.canWrite && !state.logDraft ? html`<div class="actions"><button class="btn" data-action="log-from-ask" data-id="${w.cardId}">I paid with this card</button></div>` : ''}
     </section>`;
   if (rest.length) {
     out = html`${out}<h2>Other cards</h2><section class="list">${rest.map((x) => html`<article class="row"><div class="row-head">
       <div><div class="ins">${cardLabel(x.card)}</div><div class="meta">${explain(x, w, amountKnown)}</div>
-        ${x.notes.length ? html`<div class="meta">${x.notes[0]}</div>` : ''}</div>
+        ${x.notes.length ? html`<div class="meta">${x.notes[0]}</div>` : ''}
+        ${state.canWrite && !state.logDraft ? html`<button class="btn ghost small" data-action="log-from-ask" data-id="${x.cardId}">I paid with this one</button>` : ''}</div>
       <div class="right">${amountKnown ? html`<span class="alt-net">${formatPaise(Math.max(0, x.netPaise))}</span>` : html`<span class="pill st-quiet">${x.reward.valueKnown && x.reward.rule ? `${(x.reward.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}%` : 'n/a'}</span>`}</div>
     </div></article>`)}</section>`;
   }
@@ -1897,13 +2055,176 @@ function askView() {
   return html`${out}<p class="hint">Estimates from your saved card rules. Period caps, the bank's own merchant classification and offers you have already used can change the real amount.</p>`;
 }
 
+function askWallet() {
+  return state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null }));
+}
 function runAsk(text, extraCategory = null) {
   state.askText = text;
-  const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null }));
+  state.logDraft = null;
   let q = parseQuery(text);
   if (extraCategory) q = { ...q, categories: [...q.categories, extraCategory] };
-  state.askResult = text.trim() || extraCategory ? recommend(wallet, q, today()) : null;
+  state.askResult = text.trim() || extraCategory ? recommend(askWallet(), q, today()) : null;
   render();
+}
+
+/* ---------- Purchases ---------- */
+
+const allPurchases = () => flattenMonths(state.months);
+const STATUS_PILL = { completed: '', pending: ['st-soon', 'Pending'], cancelled: ['st-quiet', 'Cancelled'], refunded: ['st-info', 'Refunded'] };
+const cardById = (id) => state.cards.find((c) => c.id === id);
+
+function openLog(draft) {
+  state.logDraft = draft; state.logErrors = {}; state.logDup = null;
+  render();
+  document.getElementById('log-form')?.scrollIntoView({ block: 'start' });
+}
+
+function logFromAsk(cardId) {
+  const r = state.askResult;
+  const x = r.results.find((y) => y.cardId === cardId);
+  const q = r.query;
+  openLog({ date: today(), cardId, merchant: q.merchant ? q.merchant.name : (q.merchantGuess || ''), amountPaise: q.amountPaise,
+    category: q.categories.find((c) => c !== 'international') || q.categories[0] || 'other', channel: q.channel, status: 'completed',
+    offerUsed: !!(x?.offer && !x.offer.minSpendShortPaise), estimatedSavingPaise: x?.netPaise ?? null,
+    recommendedCardId: r.results[0]?.cardId || null, source: 'ask' });
+}
+
+function logForm() {
+  const d = state.logDraft;
+  const e = state.logErrors;
+  const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
+  const cards = state.cards.filter((c) => c.status === 'active' || c.id === d.cardId);
+  const known = [...new Set([...allPurchases().map((p) => p.merchant), ...MERCHANTS.map((m) => m.name)])].slice(0, 400);
+  const rup = (p) => (p == null ? '' : String(p / 100));
+  const cats = [...CATEGORIES].sort();
+  return html`<form class="panel" id="log-form" novalidate>
+    <h2>${d.id ? 'Edit purchase' : 'Log purchase'}</h2>
+    ${state.logDup ? html`<div class="box warn"><strong>This looks already logged.</strong> ${state.logDup.length === 1 ? 'A purchase' : `${state.logDup.length} purchases`} with the same date, card, amount and shop exist${state.logDup.length === 1 ? 's' : ''}.
+      <div class="actions" style="margin-top:8px"><button class="btn small" type="button" data-action="log-save-anyway">Save anyway</button><button class="btn ghost small" type="button" data-action="log-cancel">Don't save</button></div></div>` : ''}
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <div class="two">
+      <div class="field"><label for="l-merchant">Shop, outlet or app</label><input id="l-merchant" name="merchant" list="merchant-list" value="${d.merchant || ''}" autocomplete="off">
+        <datalist id="merchant-list">${known.map((m) => html`<option value="${m}">`)}</datalist>${err('merchant')}</div>
+      <div class="field"><label for="l-amount">Amount paid (₹)</label><input id="l-amount" name="amount" inputmode="decimal" value="${rup(d.amountPaise)}" autocomplete="off">${err('amountPaise')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="l-card">Card used</label><select id="l-card" name="cardId"><option value="">Choose…</option>${cards.map((c) => html`<option value="${c.id}" ${c.id === d.cardId ? 'selected' : ''}>${cardLabel(c)}</option>`)}</select>${err('cardId')}</div>
+      <div class="field"><label for="l-date">Date</label><input id="l-date" name="date" type="date" value="${d.date || today()}">${err('date')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="l-category">Category</label><select id="l-category" name="category">${cats.map((c) => html`<option value="${c}" ${c === d.category ? 'selected' : ''}>${CAT_LABEL[c]}</option>`)}</select>${err('category')}</div>
+      <div class="field"><label for="l-status">Status</label><select id="l-status" name="status">${[['completed', 'Paid'], ['pending', 'Pending'], ['refunded', 'Refunded'], ['cancelled', 'Cancelled']].map(([v, l]) => html`<option value="${v}" ${v === (d.status || 'completed') ? 'selected' : ''}>${l}</option>`)}</select></div>
+    </div>
+    <div class="field" id="refund-field" ${d.status === 'refunded' ? '' : 'hidden'}><label for="l-refund">Refund received (₹, blank = full refund)</label><input id="l-refund" name="refund" inputmode="decimal" value="${d.status === 'refunded' ? rup(d.refundPaise) : ''}">${err('refundPaise')}</div>
+    <div class="two">
+      <div class="field"><label for="l-discount">Discount or cashback received (₹, optional)</label><input id="l-discount" name="discount" inputmode="decimal" value="${rup(d.discountPaise)}" placeholder="${d.estimatedSavingPaise ? 'Estimated ' + formatPaise(d.estimatedSavingPaise) : ''}">${err('discountPaise')}</div>
+      <div class="field"><label for="l-channel">Paid</label><select id="l-channel" name="channel">${[['', 'Not sure'], ['online', 'Online / in app'], ['offline', 'In store']].map(([v, l]) => html`<option value="${v}" ${v === (d.channel || '') ? 'selected' : ''}>${l}</option>`)}</select></div>
+    </div>
+    <label class="check"><input type="checkbox" name="offerUsed" ${d.offerUsed ? 'checked' : ''}> A bank offer or promo code was used</label>
+    <div class="field"><label for="l-notes">Notes (optional)</label><input id="l-notes" name="notes" value="${d.notes || ''}" autocomplete="off"></div>
+    ${d.recommendedCardId && d.cardId && d.recommendedCardId !== d.cardId ? html`<p class="hint">EKFBA suggested ${cardLabel(cardById(d.recommendedCardId) || { nickname: 'another card' })}; this records the card you actually used.</p>` : ''}
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save purchase'}</button><button class="btn ghost" type="button" data-action="log-cancel">Cancel</button></div>
+  </form>`;
+}
+
+function readLogForm() {
+  const f = Object.fromEntries(new FormData(document.getElementById('log-form')));
+  const money = (v, blank = null) => (String(v ?? '').trim() === '' ? blank : parseRupeesToPaise(v) ?? -1);
+  const amountPaise = money(f.amount, null);
+  const status = f.status;
+  return { ...state.logDraft, merchant: f.merchant, amountPaise: amountPaise === null ? 0 : amountPaise, cardId: f.cardId, date: f.date, category: f.category,
+    status, refundPaise: status === 'refunded' ? money(f.refund, amountPaise) : 0, discountPaise: money(f.discount, null),
+    channel: f.channel || null, offerUsed: f.offerUsed === 'on', notes: f.notes };
+}
+
+async function savePurchase(confirmedDuplicate) {
+  if (state.busy) return;
+  const draft = readLogForm();
+  const existing = draft.id ? allPurchases().find((p) => p.id === draft.id) : null;
+  const r = validatePurchase({ ...draft, id: draft.id || uuid() }, existing);
+  if (!r.ok) { state.logDraft = draft; state.logErrors = r.errors; return render(); }
+  const p = r.purchase;
+  const dups = findDuplicates(p, allPurchases());
+  if (dups.length && !confirmedDuplicate) { state.logDraft = draft; state.logDup = dups; state.logErrors = {}; return render(); }
+  if (!state.db) { state.logDraft = draft; state.logErrors = { _form: 'Saving is not available in this view.' }; return render(); }
+  state.busy = true; state.logDraft = draft; render();
+  try {
+    const now = Date.now();
+    const newKey = monthKey(p.date);
+    const oldKey = existing ? monthKey(existing.date) : null;
+    const monthDoc = (k) => state.months.find((m) => m.id === k);
+    if (oldKey && oldKey !== newKey) {
+      const old = monthDoc(oldKey);
+      await state.db.collection('purchaseMonths').doc(oldKey).set({ ...old, purchases: (old.purchases || []).filter((x) => x.id !== p.id), updatedAt: now });
+    }
+    const cur = monthDoc(newKey);
+    const list = (cur?.purchases || []).filter((x) => x.id !== p.id).concat(p);
+    await state.db.collection('purchaseMonths').doc(newKey).set({ id: newKey, month: newKey, purchases: list, createdAt: cur?.createdAt || now, updatedAt: now });
+    const card = cardById(p.cardId);
+    state.logDraft = null; state.logErrors = {}; state.logDup = null;
+    toast(existing ? 'Purchase updated' : `Saved: ${formatPaise(p.amountPaise)} on ${card ? cardLabel(card) : 'card'}`);
+  } catch (e) { state.logErrors = { _form: friendly(e) }; }
+  state.busy = false; render();
+}
+
+function spendsView() {
+  const t = today();
+  const range = periodContaining(state.spendPeriod === 'month' ? 'calendar_month' : state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year', t);
+  const ps = allPurchases();
+  const tot = totals(ps, range.start, range.end);
+  const active = state.cards.filter((c) => c.status === 'active');
+  const cardsShown = [...active, ...state.cards.filter((c) => c.status !== 'active' && tot.byCard[c.id])];
+  const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
+  const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
+  const maxCat = Math.max(1, ...cats.map((c) => c[1]));
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard));
+  const periodName = { month: new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)}`, year: String(t.slice(0, 4)) }[state.spendPeriod];
+  const pct = (v) => (tot.totalPaise ? Math.round((v * 100) / tot.totalPaise) : 0);
+
+  const progress = active.map((c) => {
+    const rec = activePack(c.id);
+    if (!rec) return null;
+    const items = milestoneProgress(c, rec.pack, ps, t);
+    if (!items.length) return null;
+    return html`<article class="row"><div class="detail flush">
+      <div class="ins">${cardLabel(c)}</div>
+      ${items.map((m) => m.missing ? html`<div class="ms"><div class="ms-top"><span>${m.milestone.label}</span></div><p class="hint">Add the card's ${m.missing === 'issueDate' ? 'issue date' : 'statement day'} to track this.</p></div>`
+        : html`<div class="ms">
+          <div class="ms-top"><span>${m.milestone.label}</span><span class="pill ${m.met ? 'st-ok' : 'st-quiet'}">${m.met ? 'Reached' : `${m.percent}%`}</span></div>
+          <div class="bar" role="img" aria-label="${m.percent}% of ${formatPaise(m.milestone.thresholdPaise)}"><span style="width:${m.percent}%"></span></div>
+          <div class="meta num">${formatPaise(m.eligiblePaise)} of ${formatPaise(m.milestone.thresholdPaise)}${m.met ? '' : ` · ${formatPaise(m.remainingPaise)} to go`} · ${fmtShort(m.period.start)} – ${fmtDate(m.period.end)}</div>
+          ${m.milestone.kind === 'lounge_unlock' && m.previous ? html`<div class="meta">${m.previous.met ? 'Unlocked for now: last period reached ' + formatPaise(m.previous.eligiblePaise) + '.' : 'Not unlocked for now: last period logged ' + formatPaise(m.previous.eligiblePaise) + '.'}</div>` : ''}
+        </div>`)}
+    </div></article>`;
+  }).filter(Boolean);
+
+  return html`
+    ${state.logDraft ? logForm() : ''}
+    <div class="chips" role="group" aria-label="Period">${[['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year']].map(([k, l]) =>
+      html`<button class="chip" data-action="spend-period" data-p="${k}" aria-pressed="${state.spendPeriod === k}">${l}</button>`)}</div>
+    <section class="total">
+      <div class="meta">${periodName}</div>
+      <div class="total-n num">${formatPaise(tot.totalPaise)}</div>
+      <div class="meta">${tot.count} purchase${tot.count === 1 ? '' : 's'}${tot.savedPaise ? ` · ${formatPaise(tot.savedPaise)} saved` : ''}${tot.pendingPaise ? ` · ${formatPaise(tot.pendingPaise)} pending` : ''}</div>
+    </section>
+    <h2>By card</h2>
+    ${active.length ? html`<section class="list">${cardsShown.map((c) => { const v = tot.byCard[c.id] || 0; return html`
+      <button class="row spend-row ${state.spendCard === c.id ? 'selected' : ''}" data-action="spend-card" data-id="${c.id}" aria-pressed="${state.spendCard === c.id}">
+        <div class="spend-top"><span class="ins">${cardLabel(c)}</span><span class="num">${formatPaise(v)}${v ? html` <small class="meta">${pct(v)}%</small>` : ''}</span></div>
+        <div class="bar"><span style="width:${Math.round((v * 100) / maxCard)}%"></span></div>
+      </button>`; })}</section>` : html`<div class="empty"><p>Add your cards in Cards first.</p></div>`}
+    ${cats.length ? html`<h2>By category</h2><section class="panel plain cat-list">${cats.map(([k, v]) => html`
+      <div class="cat-row"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></div>`)}</section>` : ''}
+    ${progress.length ? html`<h2>Card milestones</h2><section class="list">${progress}</section>` : ''}
+    <h2>Purchases${state.spendCard ? ' · ' + cardLabel(cardById(state.spendCard) || {}) : ''}</h2>
+    ${!state.ready.months ? html`<div class="empty"><p>Loading purchases…</p></div>`
+      : !list.length ? html`<div class="empty"><p>${ps.length ? 'No purchases in this period.' : 'No purchases logged yet. In Ask, tap “I paid with this card” after paying, or use Add purchase.'}</p></div>`
+      : html`<section class="list">${list.map((p) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
+        <button class="row purchase" data-action="log-edit" data-id="${p.id}">
+          <div><div class="ins">${p.merchant}</div><div class="meta">${fmtShort(p.date)} · ${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}</div></div>
+          <div class="right"><span class="num ${p.status === 'cancelled' ? 'strike' : ''}">${formatPaise(p.amountPaise)}</span>
+            ${st ? html`<span class="pill ${st[0]}">${p.status === 'refunded' ? `Refunded ${formatPaise(p.refundPaise)}` : st[1]}</span>` : ''}</div>
+        </button>`; })}</section>`}`;
 }
 
 function freshView() {
@@ -1922,62 +2243,6 @@ function freshView() {
     })}</section>`;
 }
 
-/* ---------- Backup ---------- */
-
-function backupView() {
-  const p = state.backupPreview;
-  return html`<section class="panel plain">
-      <h2>Download a backup</h2>
-      <p class="hint">A JSON file in the same format as NLNLALD Policies backups (module "credit_cards"). Keep it in your Google Drive. It is also how your cards will move into the mobile app later.</p>
-      <div class="actions"><button class="btn" data-action="export-json" ${state.dl && state.cards.length ? '' : 'disabled'}>Download backup (JSON)</button>
-        <button class="btn ghost" data-action="export-csv" ${state.dl && state.cards.length ? '' : 'disabled'}>Download card list (CSV)</button></div>
-      ${!state.dl ? html`<p class="hint">Downloads are not available in this view.</p>` : ''}
-    </section>
-    <section class="panel plain">
-      <h2>Restore from a backup</h2>
-      <p class="hint">Choose an EKFBA backup file. You'll see what it contains first. Restoring keeps whichever copy of each card or rule version is newer.</p>
-      <div class="field"><label for="backup-file">Backup file</label><input id="backup-file" type="file" accept=".json,application/json"></div>
-      ${p ? (p.ok ? html`<div class="box good">Backup from ${p.exportedAt ? fmtDate(p.exportedAt.slice(0, 10)) : 'unknown date'}: <strong>${p.summary.cards}</strong> cards, <strong>${p.summary.rulePacks}</strong> rule versions.</div>
-          <div class="actions"><button class="btn" data-action="restore" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Restoring…' : 'Restore'}</button><button class="btn ghost" data-action="cancel-restore">Cancel</button></div>`
-        : html`<div class="box bad"><strong>This file can't be restored.</strong><ul>${p.errors.slice(0, 8).map((x) => html`<li>${x}</li>`)}</ul></div>`) : ''}
-    </section>`;
-}
-
-function exportJson() {
-  const b = buildBackup({ cards: state.cards, rulePacks: state.packs }, APP_VERSION, COLLECTIONS);
-  state.dl.save({ filename: `ekfba-cards-backup-${today()}.json`, data: JSON.stringify(b, null, 2) }).then(() => toast('Backup saved')).catch(() => {});
-}
-function exportCsv() {
-  const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const rows = [['Bank', 'Card', 'Variant', 'Type', 'Network', 'Nickname', 'Last 4', 'Card holder', 'Annual fee (Rs)', 'Issue date', 'Status', 'Rules checked'].map(q).join(',')];
-  for (const c of state.cards) {
-    const rec = activePack(c.id);
-    rows.push([c.bank, c.name, c.variant, c.kind, c.network, c.nickname, c.last4, c.holderName, c.annualFeePaise == null ? '' : c.annualFeePaise / 100, c.issueDate, c.status, rec ? rec.pack.checkedAt : ''].map(q).join(','));
-  }
-  state.dl.save({ filename: 'ekfba-cards.csv', data: rows.join('\r\n') }).catch(() => {});
-}
-async function restore() {
-  const p = state.backupPreview;
-  if (!p?.ok || state.busy) return;
-  state.busy = true; render();
-  let added = 0, updated = 0;
-  try {
-    for (const name of COLLECTIONS) {
-      const existing = name === 'cards' ? state.cards : state.packs;
-      const m = mergeRecords(existing, p.stores[name] || []);
-      const byId = new Map(existing.map((r) => [r.id, r]));
-      for (const r of m.merged) {
-        if (byId.get(r.id) === r) continue;
-        await state.db.collection(name).doc(r.id).set(r);
-      }
-      added += m.added; updated += m.updated;
-    }
-    state.backupPreview = null;
-    toast(`Restored: ${added} added, ${updated} updated`);
-  } catch (e) { state.loadErr = friendly(e); }
-  state.busy = false; render();
-}
-
 /* ---------------- Events ---------------- */
 
 function afterRender() {
@@ -1987,22 +2252,7 @@ function afterRender() {
     if (file.size > 300000) { toast('That file is too large for a rule pack.'); return; }
     checkPack(state.importing, await file.text());
   });
-  document.getElementById('backup-file')?.addEventListener('change', async (ev) => {
-    const file = ev.target.files[0];
-    if (!file) return;
-    let obj;
-    try { obj = JSON.parse(await file.text()); } catch { state.backupPreview = { ok: false, errors: ['The file is not valid JSON.'] }; return render(); }
-    const v = validateBackup(obj, COLLECTIONS);
-    state.backupPreview = { ...v, exportedAt: obj.exportedAt };
-    render();
-  });
-  const q = document.getElementById('offer-q');
-  q?.addEventListener('input', () => {
-    state.offerQuery = q.value;
-    const pos = q.selectionStart;
-    render();
-    const n = document.getElementById('offer-q'); n.focus(); n.setSelectionRange(pos, pos);
-  });
+  document.getElementById('l-status')?.addEventListener('change', (ev) => { const r = document.getElementById('refund-field'); if (r) r.hidden = ev.target.value !== 'refunded'; });
 }
 
 $app.addEventListener('click', async (ev) => {
@@ -2034,15 +2284,18 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'check-pack') checkPack(id, document.getElementById('pack-text').value);
   else if (a === 'back-to-paste') { state.review = { cardId: state.review.cardId, ok: false, text: state.review.text, errors: [], warnings: [] }; render(); }
   else if (a === 'approve') approvePack(id);
-  else if (a === 'offer-filter') { state.offerFilter = t.dataset.f; render(); }
-  else if (a === 'export-json') exportJson();
-  else if (a === 'export-csv') exportCsv();
-  else if (a === 'restore') restore();
-  else if (a === 'cancel-restore') { state.backupPreview = null; render(); }
+  else if (a === 'log-new') openLog({ date: today(), cardId: state.spendCard || '', category: 'other', status: 'completed', source: 'manual' });
+  else if (a === 'log-from-ask') logFromAsk(id);
+  else if (a === 'log-edit') { const p = flattenMonths(state.months).find((x) => x.id === id); if (p) openLog({ ...p }); }
+  else if (a === 'log-cancel') { state.logDraft = null; state.logErrors = {}; state.logDup = null; render(); }
+  else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; render(); }
+  else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; render(); }
 });
 
 $app.addEventListener('submit', async (ev) => {
   if (ev.target.id === 'ask-form') { ev.preventDefault(); runAsk(document.getElementById('ask-q').value); return; }
+  if (ev.target.id === 'log-form') { ev.preventDefault(); savePurchase(false); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -2063,18 +2316,17 @@ $app.addEventListener('submit', async (ev) => {
 function safeRender() {
   if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
-  if (f && f.closest && (f.closest('#card-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 
 render();
 
 (async () => {
-  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
-  const [db, user, dl] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('downloads')]);
-  state.dl = dl;
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
   if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
-  if (!db) { state.ready = { cards: true, rulePacks: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  if (!db) { state.ready = { cards: true, rulePacks: true, months: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
   state.db = db;
   render();
   db.collection('cards').onSnapshot((snap) => {
@@ -2088,5 +2340,10 @@ render();
     state.ready.rulePacks = true;
     safeRender();
   }, () => { state.ready.rulePacks = true; });
+  db.collection('purchaseMonths').onSnapshot((snap) => {
+    state.months = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.months = true;
+    safeRender();
+  }, () => { state.ready.months = true; state.loadErr = 'Could not load your purchases. Reopen the page to try again.'; render(); });
 })();
 </script>
