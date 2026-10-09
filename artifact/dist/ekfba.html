@@ -2227,8 +2227,20 @@ function renameBox(d) {
   if (!orig) return '';
   const name = formatShopName(orig.merchant);
   const others = allPurchases().filter((p) => p.id !== d.id && formatShopName(p.merchant) === name).length;
-  if (!others) return '';
-  return html`<label class="check rename" id="rename-box" data-original="${name}" hidden><input type="checkbox" name="renameAll" checked> Also rename the ${others} other purchase${others === 1 ? '' : 's'} called “${name}”</label>`;
+  return html`<label class="check rename" id="rename-box" data-original="${name}" data-others="${others}" hidden>
+    <input type="checkbox" name="renameAll" checked ${others ? '' : 'hidden'}><span id="rename-text"></span></label>`;
+}
+
+/** Text for the rename option, given the original shop, the new name and how many other purchases share the original. */
+function renameText(orig, next, others) {
+  const shops = new Map();
+  for (const p of allPurchases()) { const n = formatShopName(p.merchant); shops.set(n, (shops.get(n) || 0) + 1); }
+  const existing = next !== orig && shops.has(next) ? shops.get(next) : 0;
+  const plural = (n) => `${n} purchase${n === 1 ? '' : 's'}`;
+  if (others) {
+    return existing ? `Move all ${plural(others + 1)} to shop “${next}”` : `Rename the ${others} other purchase${others === 1 ? '' : 's'} called “${orig}”`;
+  }
+  return existing ? `This purchase moves to shop “${next}” (${plural(existing)} there already)` : `This purchase will be saved under the new shop name “${next}”`;
 }
 
 function billLine(c, ps, t) {
@@ -2418,7 +2430,13 @@ function afterRender() {
   shop?.addEventListener('change', pickCategory);
   shop?.addEventListener('input', () => { if (categoryForShop(shop.value)) pickCategory(); });
   const renameBoxEl = document.getElementById('rename-box');
-  shop?.addEventListener('input', () => { if (renameBoxEl) renameBoxEl.hidden = formatShopName(shop.value) === renameBoxEl.dataset.original || !shop.value.trim(); });
+  shop?.addEventListener('input', () => {
+    if (!renameBoxEl) return;
+    const orig = renameBoxEl.dataset.original;
+    const next = formatShopName(shop.value);
+    renameBoxEl.hidden = !next || next === orig;
+    if (!renameBoxEl.hidden) document.getElementById('rename-text').textContent = renameText(orig, next, Number(renameBoxEl.dataset.others));
+  });
   document.querySelectorAll('input[name=kind]').forEach((r) => r.addEventListener('change', () => {
     const cf = document.getElementById('credit-fields');
     if (cf) cf.hidden = document.querySelector('input[name=kind]:checked')?.value !== 'credit';
