@@ -409,7 +409,7 @@ function rulesSection(card, rec) {
     ${group('Offers', offers.map((o) => ruleBox(o, o.label, [o.merchant, offerValueText(o)].filter(Boolean).join(' · '), offerPill(o), offerStatus(o, today()) === 'expired' ? 'expired' : '')))}
     ${group('Milestones', (pack.milestones || []).map((m) => ruleBox(m, m.label, `${formatPaise(m.thresholdPaise)} ${PERIOD_LABEL[m.period]} · ${m.benefit}${m.kind === 'fee_waiver' ? (m.feeReversal === 'auto' ? ' · reversed automatically' : ' · you must request it') : ''}`,
       html`<span class="pill st-info">${m.kind === 'fee_waiver' ? 'Fee waiver' : m.kind === 'lounge_unlock' ? 'Lounge' : 'Milestone'}</span>`)))}
-    ${group('Lounge access', (pack.lounge || []).map((l) => ruleBox(l, l.label, `${l.visits} ${l.scope} visit${l.visits === 1 ? '' : 's'} ${PERIOD_LABEL[l.period]}${l.requiresMilestoneId ? ' · needs the spend milestone above' : ''}`)))}
+    ${group('Lounge access', (pack.lounge || []).map((l) => ruleBox(l, l.label, `${l.unlimited ? `Unlimited ${l.scope} visits` : `${l.visits} ${l.scope} visit${l.visits === 1 ? '' : 's'} ${PERIOD_LABEL[l.period]}`}${l.requiresMilestoneId ? ' · needs the spend milestone above' : ''}`)))}
     ${group('Fees and charges', (pack.fees?.items || []).map((f) => ruleBox(f, f.label, scopeText(f.appliesTo))))}
     ${group('Other benefits', (pack.otherBenefits || []).map((b) => ruleBox(b, b.label, b.detail || '')))}
   </div>`;

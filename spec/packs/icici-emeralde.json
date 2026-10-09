@@ -1,0 +1,45 @@
+{
+  "format": "ekfba-rulepack",
+  "schemaVersion": 1,
+  "card": { "bank": "ICICI Bank", "name": "Emeralde", "kind": "credit" },
+  "checkedAt": "2026-10-09",
+  "notes": "Built only from the ICICI Emeralde product page. The page does not state the value of one reward point, reward caps, or which categories (fuel, rent, wallet loads, government, EMI) earn no points or don't count toward the fee waiver. Those need the MITC / T&C PDFs. Fees are shown before GST.",
+  "sources": [
+    { "id": "s1", "type": "bank_page", "title": "ICICI Bank – Emeralde Credit Card", "url": "https://www.icici.bank.in/personal-banking/cards/credit-card/emeralde-credit-card", "checkedAt": "2026-10-09" }
+  ],
+  "fees": {
+    "joiningFeePaise": 1200000,
+    "annualFeePaise": 1200000,
+    "sourceId": "s1",
+    "items": [
+      { "id": "forex-markup", "label": "Foreign currency mark-up 2%", "bps": 200, "appliesTo": { "categories": ["international"] }, "sourceId": "s1", "clause": "Forex markup: 2%", "verified": true },
+      { "id": "fuel-surcharge-waiver", "label": "1% fuel surcharge waived on fuel transactions up to ₹4,000", "bps": 0, "appliesTo": { "categories": ["fuel"] }, "sourceId": "s1", "clause": "1% waiver on fuel transactions on all fuel stations", "verified": true },
+      { "id": "interest-cash", "label": "Interest 3.75% a month on balances and ATM cash withdrawals", "bps": 375, "appliesTo": { "categories": ["cash_withdrawal"] }, "sourceId": "s1", "clause": "Pay 3.75% interest per month", "verified": true },
+      { "id": "late-fee", "label": "Late payment charge ₹100 to ₹1,300, depending on amount due", "sourceId": "s1", "clause": "Ranging from ₹100 to ₹1,300", "verified": true },
+      { "id": "no-overlimit", "label": "No over-limit fee", "sourceId": "s1", "clause": "No over limit fee", "verified": true }
+    ]
+  },
+  "earnRules": [
+    { "id": "base-4x", "label": "4 reward points per ₹100 on domestic and international spends", "kind": "points", "pointsPer": { "points": 4, "perPaise": 10000 }, "appliesTo": { "channel": "any" }, "sourceId": "s1", "clause": "Earn Points on every ₹100 spend: 4 points on domestic and international spend", "verified": true },
+    { "id": "utility-insurance-1x", "label": "1 reward point per ₹100 on utilities and insurance", "kind": "points", "pointsPer": { "points": 1, "perPaise": 10000 }, "appliesTo": { "categories": ["utilities", "insurance"] }, "sourceId": "s1", "clause": "1 point on utility and insurance spend per ₹100", "verified": true }
+  ],
+  "offers": [
+    { "id": "bookmyshow-bogo", "label": "BookMyShow: second ticket up to ₹750 off, 4 times a month, after ₹25,000 spend in the previous spends quarter", "merchant": "BookMyShow", "appliesTo": { "categories": ["entertainment"], "channel": "online" }, "benefitType": "instant_discount_flat", "valuePaise": 75000, "maxBenefitPaise": 75000, "usageCap": { "count": 4, "period": "calendar_month" }, "validFrom": "2026-04-01", "sourceId": "s1", "clause": "Buy one ticket and get up to ₹750 off on the second ticket. Four times every month.", "verified": true }
+  ],
+  "milestones": [
+    { "id": "fee-waiver-10l", "kind": "fee_waiver", "label": "Annual fee waived for the next year on spends over ₹10 lakh", "thresholdPaise": 100000000, "period": "card_year", "feeReversal": "auto", "benefit": "Next year's ₹12,000 + GST annual fee is waived.", "sourceId": "s1", "clause": "Spend over ₹10 lakh and get your Annual Fee waived for the next year", "verified": false },
+    { "id": "bookmyshow-unlock", "kind": "other", "label": "Spend ₹25,000 in a spends quarter to unlock BookMyShow offers next quarter", "thresholdPaise": 2500000, "period": "calendar_quarter", "benefit": "Buy-one-get-one on BookMyShow (up to ₹750 off the second ticket), 4 times a month in the next quarter.", "sourceId": "s1", "clause": "₹25,000 or more in the preceding spends quarter", "verified": false },
+    { "id": "golf-50k", "kind": "other", "label": "1 golf round or lesson for every ₹50,000 of retail spend in a month (up to 4)", "thresholdPaise": 5000000, "period": "calendar_month", "benefit": "1 round or lesson of golf per ₹50,000, credited by the 10th of the next month, usable for two months; maximum 4 a month.", "sourceId": "s1", "clause": "one round or lesson of golf for every ₹ 50,000 spent on retail purchases in the previous calendar month", "verified": true }
+  ],
+  "lounge": [
+    { "id": "intl-lounge", "label": "Unlimited international lounge visits with Priority Pass (primary cardholder)", "scope": "international", "unlimited": true, "sourceId": "s1", "clause": "Unlimited access to international airport lounges", "verified": true },
+    { "id": "dom-lounge", "label": "Unlimited domestic lounge visits by swiping the card (primary cardholder)", "scope": "domestic", "unlimited": true, "sourceId": "s1", "clause": "unlimited complimentary lounge access", "verified": true }
+  ],
+  "otherBenefits": [
+    { "id": "travel-cancellation", "label": "No cancellation charges on domestic flight and hotel bookings, up to ₹12,000, twice a year", "detail": "Claim process is in the bank's cancellation (CFAR) document.", "sourceId": "s1", "clause": "No cancellation charges on domestic flight and hotel bookings, up to ₹12,000", "verified": true },
+    { "id": "birthday-voucher", "label": "Birthday voucher worth ₹5,000 (TATA CLiQ on Amex, PostCard Hotels on Mastercard)", "detail": "Which voucher you get depends on your card's network.", "sourceId": "s1", "clause": "Shopping voucher from TATA CLiQ worth ₹5,000", "verified": true },
+    { "id": "air-accident", "label": "Air accident cover up to ₹3 crore (primary cardholder)", "detail": "International travel with tickets bought on the card; the card must have been used in the 60 days before.", "sourceId": "s1", "clause": "Air Accident cover up to ₹3 crore", "verified": true },
+    { "id": "fraud-cover", "label": "Counterfeit card liability and account takeover cover", "sourceId": "s1", "clause": "Counterfeit Card Liability and Account Takeover Cover", "verified": true },
+    { "id": "concierge", "label": "24x7 concierge", "detail": "Restaurant reservations, gifts, travel bookings, car rentals and more. Phone: 1800 26 70731 (toll-free on MTNL/BSNL) or 022 67872016.", "sourceId": "s1", "verified": true }
+  ]
+}

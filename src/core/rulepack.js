@@ -241,8 +241,14 @@ export function validateRulePack(pack, today = localDate()) {
     if (!isObj(l)) return err(p, 'Must be an object.');
     checkProvenance(l, p, lgIds);
     if (!['domestic', 'international'].includes(l.scope)) err(`${p}.scope`, 'Scope must be domestic or international.');
-    if (!(Number.isInteger(l.visits) && l.visits >= 0 && l.visits <= 100)) err(`${p}.visits`, 'Visits must be a whole number.');
-    checkPeriod(l.period, `${p}.period`);
+    if (l.unlimited !== undefined && typeof l.unlimited !== 'boolean') err(`${p}.unlimited`, 'unlimited must be true or false.');
+    if (l.unlimited === true) {
+      if (l.visits !== undefined) err(`${p}.visits`, 'Leave visits out when access is unlimited.');
+      checkPeriod(l.period, `${p}.period`, false);
+    } else {
+      if (!(Number.isInteger(l.visits) && l.visits >= 0 && l.visits <= 100)) err(`${p}.visits`, 'Visits must be a whole number (or set "unlimited": true).');
+      checkPeriod(l.period, `${p}.period`);
+    }
     if (l.requiresMilestoneId !== undefined && !msIds.has(l.requiresMilestoneId)) err(`${p}.requiresMilestoneId`, `No milestone with id "${l.requiresMilestoneId}".`);
   });
 

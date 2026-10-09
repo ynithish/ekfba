@@ -86,7 +86,7 @@ Status on a day: `expired` (validTo < today), `upcoming` (validFrom > today), `n
 `counts?` scope of spend that counts · `benefit` text · `feeReversal` ("auto" | "on_request", required for fee_waiver).
 
 ### `lounge[]`
-`scope` (domestic | international) · `visits` · `period` · `requiresMilestoneId?` (must exist in `milestones`).
+`scope` (domestic | international) · `visits` + `period`, or `unlimited: true` (then no `visits`; `period` optional) · `requiresMilestoneId?` (must exist in `milestones`).
 
 ## Freshness
 Days since `checkedAt`: offers are **stale after 30 days**, baseline rules **after 180 days**. Stale and
