@@ -58,5 +58,12 @@ Design constraints, to be re-checked when Stage 3 starts:
 - Duplicate check (existing findDuplicates) so a message plus a manual entry don't double count.
 - Android: SMS read permission. Google Play restricts it to default SMS apps, so a family-only app installed
   outside Play (or via internal testing) is the likely route; alternative is reading bank app notifications.
-- iOS: apps cannot read SMS. Options: a Shortcuts automation on message received that passes the text to the
-  app, or bank e-mail alerts read via Gmail with the owner's consent.
+- iOS (owner decided): Shortcuts automation, provided it is secured as follows:
+  - Trigger "When I get a message" limited to the banks' sender IDs (e.g. ICICI, Axis), with an OTP exclusion.
+  - The only action hands the text to the app through an App Intent that runs on the phone: no web request,
+    URL scheme, clipboard, file or shared note in between, so the message never leaves the device.
+  - The app re-checks the sender and the bank pattern, drops OTP or anything that is not a transaction,
+    stores only the parsed fields (never the raw message), and saves it as "pending review" so a spoofed
+    message cannot add a purchase silently.
+  - App data protected by the app lock and Google storage encryption from Phase 6.
+  - We ship step-by-step setup instructions and a test message to check the automation.
