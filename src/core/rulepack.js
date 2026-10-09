@@ -8,7 +8,7 @@ export const RULEPACK_FORMAT = 'ekfba-rulepack';
 export const RULEPACK_SCHEMA_VERSION = 1;
 
 export const CATEGORIES = [
-  'grocery', 'dining', 'food_delivery', 'fuel', 'travel', 'flights', 'hotels', 'electronics', 'apparel',
+  'grocery', 'dining', 'food_delivery', 'fuel', 'travel', 'flights', 'hotels', 'transport', 'electronics', 'apparel',
   'online_shopping', 'department_store', 'utilities', 'telecom', 'rent', 'wallet_load', 'insurance',
   'education', 'government', 'tax', 'emi', 'jewellery', 'entertainment', 'healthcare', 'cash_withdrawal',
   'international', 'other',

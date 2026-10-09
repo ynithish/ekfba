@@ -42,7 +42,7 @@ Every rule object has `id`, `label` (one line a person understands), `sourceId`,
 
 ### Scope (`appliesTo`, `counts`)
 `{ categories?: [category], merchants?: [names], channel?: "online"|"offline"|"any" }`. Missing = applies to everything.
-Categories (closed list): grocery, dining, food_delivery, fuel, travel, flights, hotels, electronics, apparel,
+Categories (closed list): grocery, dining, food_delivery, fuel, travel, flights, hotels, transport (local transport and tolls), electronics, apparel,
 online_shopping, department_store, utilities, telecom, rent, wallet_load, insurance, education, government, tax,
 emi, jewellery, entertainment, healthcare, cash_withdrawal, international, other.
 
