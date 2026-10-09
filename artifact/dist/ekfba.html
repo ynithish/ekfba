@@ -2348,7 +2348,9 @@ function spendsView() {
   const ps = allPurchases();
   const tot = totals(ps, range.start, range.end);
   const active = state.cards.filter((c) => c.status === 'active');
-  const cardsShown = [...active, ...state.cards.filter((c) => c.status !== 'active' && tot.byCard[c.id])];
+  // Highest spend first; cards with no spend in the period follow, alphabetically.
+  const cardsShown = [...active, ...state.cards.filter((c) => c.status !== 'active' && tot.byCard[c.id])]
+    .sort((a, b) => (tot.byCard[b.id] || 0) - (tot.byCard[a.id] || 0) || cardLabel(a).localeCompare(cardLabel(b)));
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));

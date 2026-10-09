@@ -169,6 +169,7 @@ def main():
         page.fill('#l-merchant', 'Electricity bill'); page.fill('#l-amount', '1200'); page.select_option('#l-card', label='UPI')
         page.click('#log-form [type=submit]'); page.wait_for_selector('#log-form', state='detached')
         check('spend on UPI counted by card', '₹1,200' in page.inner_text('.spend-row:has-text("UPI")'))
+        check('By card sorted by spend', 'Everyday' in page.locator('.spend-row').first.inner_text())
         page.click('[data-tab=ask]'); page.fill('#ask-q', 'croma 1000'); page.click('#ask-form [type=submit]'); page.wait_for_selector('.winner')
         check('UPI not offered as a card to use', 'UPI' not in page.inner_text('main'))
         page.click('[data-tab=spends]'); page.wait_for_selector('.total-n')
