@@ -1313,15 +1313,19 @@ async function approvePack(cardId) {
   if (!rv?.ok || state.busy) return;
   const card = state.cards.find((c) => c.id === cardId);
   const prev = activePack(cardId);
+  // Capture the versions to retire BEFORE writing: live updates can add the new version to state.packs mid-save.
+  const toRetire = state.packs.filter((p) => p.cardId === cardId && p.status === 'active').map((p) => p.id);
+  const nextVersion = Math.max(0, ...state.packs.filter((p) => p.cardId === cardId).map((p) => p.version || 0)) + 1;
   const applyFees = document.getElementById('apply-fees')?.checked;
   state.busy = true; render();
   try {
     const now = Date.now();
     const id = uuid();
-    const rec = { id, cardId, version: (prev?.version || 0) + 1, status: 'active', pack: rv.pack, approvedAt: now, createdAt: now, updatedAt: now };
+    const rec = { id, cardId, version: nextVersion, status: 'active', pack: rv.pack, approvedAt: now, createdAt: now, updatedAt: now };
     await state.db.collection('rulePacks').doc(id).set(rec);
-    for (const old of state.packs.filter((p) => p.cardId === cardId && p.status === 'active')) {
-      await state.db.collection('rulePacks').doc(old.id).update({ status: 'superseded', updatedAt: Date.now() });
+    for (const oldId of toRetire) {
+      if (oldId === id) continue;
+      await state.db.collection('rulePacks').doc(oldId).update({ status: 'superseded', updatedAt: Date.now() });
     }
     const update = { ...card, lastVerifiedAt: Date.parse(rv.pack.checkedAt + 'T00:00:00') };
     if (applyFees) {

@@ -21,8 +21,8 @@ MOCK = """
   const snap = (col) => ({ docs: Object.entries(store[col] || {}).map(([id, v]) => ({ id, data: () => JSON.parse(JSON.stringify(v)) })) });
   const collection = (col) => ({
     doc: (id) => ({
-      set: async (d) => { (store[col] ||= {})[id] = JSON.parse(JSON.stringify(d)); setTimeout(() => notify(col)); },
-      update: async (d) => { Object.assign(store[col][id], d); setTimeout(() => notify(col)); },
+      set: async (d) => { (store[col] ||= {})[id] = JSON.parse(JSON.stringify(d)); notify(col); await new Promise((r) => setTimeout(r, 5)); },
+      update: async (d) => { Object.assign(store[col][id], d); notify(col); await new Promise((r) => setTimeout(r, 5)); },
       delete: async () => { delete store[col][id]; setTimeout(() => notify(col)); },
     }),
     onSnapshot: (cb) => { (listeners[col] ||= []).push(cb); setTimeout(() => cb(snap(col))); return () => {}; },
