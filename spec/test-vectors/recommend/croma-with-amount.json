@@ -1,5 +1,5 @@
 {
- "description": "Croma with an amount: Emeralde 4 pts/₹100 at 25p = 1% beats Coral 0.25%; Horizon miles have no rupee value set",
+ "description": "Croma ₹15,000: Horizon 2 miles/₹100 at ₹1 = 2% beats Emeralde 1% and Coral 0.25%",
  "today": "2026-10-09",
  "wallet": [
   {
@@ -44,14 +44,14 @@
   "merchant": "Croma",
   "amountPaise": 1500000,
   "order": [
+   "horizon",
    "emeralde",
-   "coral",
-   "horizon"
+   "coral"
   ],
   "netPaise": {
+   "horizon": 30000,
    "emeralde": 15000,
-   "coral": 3750,
-   "horizon": 0
+   "coral": 3750
   }
  }
 }

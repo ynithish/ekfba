@@ -1,5 +1,5 @@
 {
- "description": "BookMyShow ₹1,000 for two tickets: Emeralde buy-one-get-one ≈ 50% capped ₹750 + 1% points; Coral 25% capped ₹125 + 0.25% (5 blocks of ₹200)",
+ "description": "Flight ₹10,000 booked direct: Horizon 5 miles/₹100 at ₹1 = ₹500 beats Emeralde ₹100",
  "today": "2026-10-09",
  "wallet": [
   {
@@ -39,22 +39,18 @@
    "pack": "../../packs/axis-horizon.json"
   }
  ],
- "query": "bookmyshow 1000",
+ "query": "Flight 10k",
  "expect": {
-  "merchant": "BookMyShow",
+  "amountPaise": 1000000,
   "order": [
+   "horizon",
    "emeralde",
-   "coral",
-   "horizon"
+   "coral"
   ],
   "netPaise": {
-   "emeralde": 51000,
-   "coral": 12750,
-   "horizon": 2000
-  },
-  "offerId": {
-   "emeralde": "bookmyshow-bogo",
-   "coral": "bookmyshow-25"
+   "horizon": 50000,
+   "emeralde": 10000,
+   "coral": 2500
   }
  }
 }

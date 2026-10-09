@@ -1558,7 +1558,13 @@ function explain(result, winner, amountKnown) {
   }
   if (result.feesPaise) parts.push(`${formatPaise(result.feesPaise)} charges`);
   if (result !== winner && amountKnown && winner.netPaise !== null && result.netPaise !== null && winner.netPaise > result.netPaise) {
-    parts.push(`${formatPaise(winner.netPaise - result.netPaise)} less than the top card`);
+    if (!result.reward.valueKnown && result.reward.points > 0) {
+      // Points with no rupee value are not counted as ₹0 silently: say what they would need to be worth.
+      const needed = Math.ceil((winner.netPaise - result.netPaise) / result.reward.points);
+      parts.push(`better than the top card if a point is worth more than ${formatPaise(needed)}`);
+    } else {
+      parts.push(`${formatPaise(winner.netPaise - result.netPaise)} less than the top card`);
+    }
   }
   return parts.join(' · ');
 }

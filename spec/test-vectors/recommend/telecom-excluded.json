@@ -1,5 +1,5 @@
 {
- "description": "BookMyShow ₹1,000 for two tickets: Emeralde buy-one-get-one ≈ 50% capped ₹750 + 1% points; Coral 25% capped ₹125 + 0.25% (5 blocks of ₹200)",
+ "description": "Mobile recharge: Horizon excludes telecom",
  "today": "2026-10-09",
  "wallet": [
   {
@@ -39,22 +39,13 @@
    "pack": "../../packs/axis-horizon.json"
   }
  ],
- "query": "bookmyshow 1000",
+ "query": "airtel 500",
  "expect": {
-  "merchant": "BookMyShow",
-  "order": [
-   "emeralde",
-   "coral",
+  "rewardExcluded": [
    "horizon"
   ],
   "netPaise": {
-   "emeralde": 51000,
-   "coral": 12750,
-   "horizon": 2000
-  },
-  "offerId": {
-   "emeralde": "bookmyshow-bogo",
-   "coral": "bookmyshow-25"
+   "horizon": 0
   }
  }
 }

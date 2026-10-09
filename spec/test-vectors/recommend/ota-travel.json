@@ -1,5 +1,5 @@
 {
- "description": "BookMyShow ₹1,000 for two tickets: Emeralde buy-one-get-one ≈ 50% capped ₹750 + 1% points; Coral 25% capped ₹125 + 0.25% (5 blocks of ₹200)",
+ "description": "MakeMyTrip ₹10,000 (travel agent/OTA): Horizon earns only 2 miles/₹100 = ₹200",
  "today": "2026-10-09",
  "wallet": [
   {
@@ -39,22 +39,16 @@
    "pack": "../../packs/axis-horizon.json"
   }
  ],
- "query": "bookmyshow 1000",
+ "query": "makemytrip 10000",
  "expect": {
-  "merchant": "BookMyShow",
   "order": [
+   "horizon",
    "emeralde",
-   "coral",
-   "horizon"
+   "coral"
   ],
   "netPaise": {
-   "emeralde": 51000,
-   "coral": 12750,
-   "horizon": 2000
-  },
-  "offerId": {
-   "emeralde": "bookmyshow-bogo",
-   "coral": "bookmyshow-25"
+   "horizon": 20000,
+   "emeralde": 10000
   }
  }
 }

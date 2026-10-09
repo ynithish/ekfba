@@ -38,3 +38,13 @@ test('parseQuery: amounts, merchants, categories', () => {
   assert.ok(parseQuery('hotel in dubai international 20000').categories.includes('international'));
   assert.equal(parseQuery('ratnadeep').channel, 'offline');
 });
+
+test('unknown point value shows the break-even value instead of a rupee gap', async () => {
+  const { explain } = await import('../src/core/recommend.js');
+  const pack = JSON.parse(readFileSync(new URL('../spec/packs/axis-horizon.json', import.meta.url), 'utf8'));
+  delete pack.pointValue;
+  const em = JSON.parse(readFileSync(new URL('../spec/packs/icici-emeralde.json', import.meta.url), 'utf8'));
+  const r = recommend([{ card: { id: 'em', bank: 'ICICI Bank', name: 'Emerald', status: 'active' }, pack: em }, { card: { id: 'ax', bank: 'Axis Bank', name: 'Horizon', status: 'active' }, pack }], 'Flight 10k', '2026-10-09');
+  assert.equal(r.results[0].cardId, 'em');
+  assert.match(explain(r.results[1], r.results[0], true), /worth more than ₹0\.20/);
+});

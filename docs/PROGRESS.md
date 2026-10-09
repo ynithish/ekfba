@@ -50,7 +50,8 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
   most-specific earn rule, point value, per-transaction caps, forex mark-up, milestones the spend counts toward
 - ✅ Ranking with amount (net saving in ₹) and without (offer value, then reward rate); explanation per card; freshness/unverified labels
 - ✅ 10 portable test vectors (spec/test-vectors/recommend) + parser tests; 31 page checks
-- ✅ Axis other spends = 1 EDGE Mile per ₹100 (owner); ⬜ rupee value per mile still not set
+- ✅ Axis Horizon v4 from current terms: 2 miles/₹100 other, 5 direct airline/Travel EDGE; telecom + gift cards excluded; lounge verified; 1 mile = ₹1 (owner)
+- ✅ Unvalued points show the break-even value instead of counting as ₹0
 - ⬜ Scenario 2 (offline) waits for the Flutter app, per ADR-008
 
 ## Phase 4 — Purchase tracking ✅ (9 Oct 2026, Claude page)

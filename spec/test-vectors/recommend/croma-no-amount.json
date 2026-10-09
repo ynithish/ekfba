@@ -44,9 +44,9 @@
   "merchant": "Croma",
   "amountPaise": null,
   "order": [
+   "horizon",
    "emeralde",
-   "coral",
-   "horizon"
+   "coral"
   ]
  }
 }
