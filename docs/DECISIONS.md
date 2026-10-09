@@ -43,3 +43,20 @@ The page opens on Spends (totals by period, card and category, milestones). Offe
 recommendations, so the separate Offers tab was redundant. The Backup tab was removed; data stays in the page's database
 and Claude can export it on request (the NLNLALD backup envelope code remains in src/core for the Flutter move).
 No Apple Pay or payment-method setting on cards.
+
+## ADR-011 No backup in the Claude page; Google storage in the mobile app (9 Oct 2026, owner decided)
+Purchases and cards stay in the Claude page's private database while testing. Backup and sync come with the
+mobile app, using Google storage services (Phase 6 / Stage 3).
+
+## ADR-012 Mobile app reads purchases from bank messages (9 Oct 2026, owner guideline; build at Stage 3)
+Once the mobile app exists, purchases should be captured from bank transaction messages instead of typed in.
+Design constraints, to be re-checked when Stage 3 starts:
+- Parse on the phone with deterministic patterns per bank (amount, card last 4, merchant, date); never send
+  message text to an AI provider. Ignore OTP and other non-transaction messages and never store them.
+- Match the message's card last 4 to a wallet card; unknown last 4 → ask once. Message becomes a "pending
+  review" purchase the owner confirms, with category suggested from the shop name (existing categoryForShop).
+- Duplicate check (existing findDuplicates) so a message plus a manual entry don't double count.
+- Android: SMS read permission. Google Play restricts it to default SMS apps, so a family-only app installed
+  outside Play (or via internal testing) is the likely route; alternative is reading bank app notifications.
+- iOS: apps cannot read SMS. Options: a Shortcuts automation on message received that passes the text to the
+  app, or bank e-mail alerts read via Gmail with the owner's consent.
