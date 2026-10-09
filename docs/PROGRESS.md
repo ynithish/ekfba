@@ -29,7 +29,10 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Freshness view: offers stale after 30 days, other rules after 180 days; unverified counts (Scenario 10)
 - ✅ Privacy: page data readable and writable only by the owner (checked with a lower access level: nothing visible)
 - Tests: 23 unit tests; 26 functional checks of the page with a stand-in runtime
-- ⬜ First real cards' rule packs (needs official pages shared in the Project chat)
+- ✅ First real rule packs (spec/packs/): ICICI Emeralde (v2 active), ICICI Coral debit (on 2 cards), Axis Horizon — all approved in the page
+- ⬜ JSON Schema files and engine test vectors in spec/ (vectors move to Phase 3, where the engine they test is built)
+- ⬜ Gaps to close from official PDFs: point values, caps, exclusions (ICICI); fee waiver, forex, current lounge rules (Axis)
+- ⬜ Wallet data: no card has an issue date yet, so fee dates and calendar reminders are not showing
 
 ## Phase 2 (original PWA plan) — superseded by the Claude page above
 - ⬜ Card Rule Pack JSON schema + validator (sources, clause, fetched date, confidence, variant restrictions)
