@@ -2,8 +2,8 @@
 // whenever a store or index changes; never edit an existing migration.
 
 export const DB_NAME = 'ekfba';
-export const DB_VERSION = 1;
-export const SCHEMA_VERSION = 1; // version of the exported data format
+export const DB_VERSION = 2;
+export const SCHEMA_VERSION = 1; // schemaVersion of the credit_cards module backup envelope
 
 /** store name -> { keyPath, indexes: [[name, keyPath, options]] } */
 export const STORES = {
@@ -18,6 +18,7 @@ export const STORES = {
   reminders: { keyPath: 'id', indexes: [['dueDate', 'dueDate']] },
   outbox: { keyPath: 'id', indexes: [['createdAt', 'createdAt']] },
   settings: { keyPath: 'key', indexes: [] },
+  rulePacks: { keyPath: 'id', indexes: [['cardId', 'cardId']] }, // added in DB v2
 };
 
 /** Ordered migrations: index i upgrades from version i to i+1. */
@@ -29,6 +30,10 @@ export const MIGRATIONS = [
       const store = db.createObjectStore(name, { keyPath: def.keyPath });
       for (const [idx, path, opts] of def.indexes) store.createIndex(idx, path, opts || {});
     }
+  },
+  // v1 -> v2: approved rule-pack versions (Phase 2)
+  (db) => {
+    if (!db.objectStoreNames.contains('rulePacks')) db.createObjectStore('rulePacks', { keyPath: 'id' }).createIndex('cardId', 'cardId');
   },
 ];
 

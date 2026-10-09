@@ -1,8 +1,8 @@
 // Card model: validation and normalisation for wallet cards.
 // Benefit and offer rules are NOT stored on the card; they live in versioned rule records (Phase 2).
 
-import { scanForSensitiveData } from './sensitive.js';
-import { uuid, nowIso } from './ids.js';
+import { scanForSensitiveData, findExpiryDate } from './sensitive.js';
+import { uuid } from './ids.js';
 
 export const CARD_KINDS = ['credit', 'debit'];
 export const NETWORKS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Diners Club', 'Other'];
@@ -28,6 +28,7 @@ export function validateCard(draft, existing = null) {
     variant: trim(draft.variant) || '',
     tier: trim(draft.tier) || '',
     holder: draft.holder || 'primary',
+    holderName: trim(draft.holderName) || '',
     nickname: trim(draft.nickname) || '',
     last4: trim(draft.last4) || '',
     joiningFeePaise: draft.joiningFeePaise ?? null,
@@ -49,6 +50,7 @@ export function validateCard(draft, existing = null) {
   if (c.last4 && !/^\d{4}$/.test(c.last4)) errors.last4 = 'Enter exactly the last 4 digits — never the full number';
   if (!c.last4 && !c.nickname) errors.nickname = 'Give a nickname or the last 4 digits so you can tell cards apart';
   if (c.nickname.length > 40) errors.nickname = 'Keep the nickname under 40 characters';
+  if (c.holderName.length > 60) errors.holderName = 'Keep the name under 60 characters';
   if (!isPaise(c.joiningFeePaise)) errors.joiningFeePaise = 'Invalid amount';
   if (!isPaise(c.annualFeePaise)) errors.annualFeePaise = 'Invalid amount';
   if (c.issueDate && !isDate(c.issueDate)) errors.issueDate = 'Use a valid date';
@@ -59,11 +61,15 @@ export function validateCard(draft, existing = null) {
   if (c.notes.length > 2000) errors.notes = 'Notes are too long (max 2000 characters)';
 
   const sensitive = scanForSensitiveData(c);
-  if (sensitive) errors[sensitive.path] = `Not saved: ${sensitive.reason}. Never store full card numbers, CVV, PIN or OTP.`;
+  if (sensitive) errors[sensitive.path] = `Not saved: ${sensitive.reason}. Never store full card numbers, expiry dates, CVV, PIN or OTP.`;
+  for (const f of ['nickname', 'notes', 'variant', 'name']) {
+    const e = findExpiryDate(c[f]);
+    if (e && !errors[f]) errors[f] = `Not saved: ${e}. Card expiry dates are never stored.`;
+  }
 
   if (Object.keys(errors).length) return { ok: false, errors };
 
-  const ts = nowIso();
+  const ts = Date.now(); // milliseconds, same convention as the NLNLALD modules
   return {
     ok: true,
     card: {
@@ -72,7 +78,7 @@ export function validateCard(draft, existing = null) {
       createdAt: existing?.createdAt || draft.createdAt || ts,
       updatedAt: ts,
       version: (existing?.version || 0) + 1,
-      lastVerifiedAt: existing?.lastVerifiedAt ?? draft.lastVerifiedAt ?? null,
+      lastVerifiedAt: draft.lastVerifiedAt !== undefined ? draft.lastVerifiedAt : (existing?.lastVerifiedAt ?? null),
     },
   };
 }

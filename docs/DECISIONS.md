@@ -27,3 +27,13 @@ Purchase history and milestone audits must keep pointing at the card that was us
 
 ## ADR-007 Backups: AES-256-GCM, PBKDF2-SHA-256 310,000 iterations, passphrase ≥ 10 chars (9 Oct 2026)
 Browser-native WebCrypto, no libraries. Import re-validates every record and re-runs the sensitive-data scan.
+
+## ADR-008 Deliver as a Claude page first, Flutter app later (9 Oct 2026, owner decided)
+Follows the NLNLALD roadmap: each module is its own claude.ai page while testing; one Flutter app merges them later.
+Consequences: online only until the Flutter app; data in the page's database (owner-only read/write rules); the
+GitHub Pages PWA is not deployed. Portability comes from the shared backup envelope, Rule Pack spec and tests.
+Supersedes the hosting part of ADR-002 and the sync plan in ADR-004 for now.
+
+## ADR-009 Page is built from the tested core (9 Oct 2026)
+`tools/build-artifact.mjs` inlines src/core modules into artifact/page.html → artifact/dist/ekfba.html, so the page runs
+exactly the code the unit tests cover. Republish by running the build and publishing the same file.

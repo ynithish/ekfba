@@ -1,0 +1,45 @@
+{
+  "format": "ekfba-rulepack",
+  "schemaVersion": 1,
+  "card": { "bank": "Example Bank", "name": "Sample Rewards", "kind": "credit", "network": "Visa", "variants": ["Classic", "Signature"] },
+  "checkedAt": "2026-10-01",
+  "notes": "FICTIONAL example for testing the format. Not a real card or offer.",
+  "sources": [
+    { "id": "s1", "type": "bank_page", "title": "Example Bank – Sample Rewards card benefits", "url": "https://example.com/cards/sample-rewards", "checkedAt": "2026-10-01" },
+    { "id": "s2", "type": "tnc_pdf", "title": "Sample Rewards most important terms (PDF)", "document": "sample-rewards-mitc-2026.pdf", "checkedAt": "2026-10-01" },
+    { "id": "s3", "type": "offer_page", "title": "Example Bank festive offers", "url": "https://example.com/offers/festive", "checkedAt": "2026-10-01" }
+  ],
+  "fees": {
+    "joiningFeePaise": 50000,
+    "annualFeePaise": 50000,
+    "sourceId": "s2",
+    "items": [
+      { "id": "fx-markup", "label": "Foreign currency markup 3.5%", "bps": 350, "appliesTo": { "categories": ["international"] }, "sourceId": "s2", "clause": "Foreign currency transaction fee: 3.5% of the transaction amount.", "verified": true },
+      { "id": "fuel-waiver", "label": "1% fuel surcharge waiver on ₹400–₹4,000", "bps": 0, "appliesTo": { "categories": ["fuel"] }, "sourceId": "s1", "clause": "1% fuel surcharge waiver on transactions between Rs 400 and Rs 4,000.", "verified": true }
+    ]
+  },
+  "pointValue": { "paisePerPoint": 25, "sourceId": "s2", "clause": "1 reward point = Rs 0.25 when redeemed against statement balance.", "verified": true },
+  "earnRules": [
+    { "id": "base", "label": "2 points per ₹100 on all spends", "kind": "points", "pointsPer": { "points": 2, "perPaise": 10000 }, "appliesTo": { "channel": "any" }, "sourceId": "s1", "clause": "Earn 2 reward points for every Rs 100 spent.", "verified": true },
+    { "id": "online-5x", "label": "10 points per ₹100 online, up to 2,500 points a month", "kind": "points", "pointsPer": { "points": 10, "perPaise": 10000 }, "appliesTo": { "channel": "online" }, "capPoints": 2500, "capPeriod": "statement_cycle", "sourceId": "s1", "clause": "5X reward points on online spends, capped at 2,500 accelerated points per statement cycle.", "verified": true },
+    { "id": "grocery-cb", "label": "5% cashback on groceries, up to ₹500 a month", "kind": "cashback", "rateBps": 500, "appliesTo": { "categories": ["grocery"] }, "capPaise": 50000, "capPeriod": "calendar_month", "sourceId": "s1", "clause": "5% cashback on grocery spends, maximum Rs 500 per month.", "verified": false }
+  ],
+  "exclusions": [
+    { "id": "no-fuel-rent", "label": "No rewards or milestone credit on fuel, rent, wallet loads", "appliesTo": { "categories": ["fuel", "rent", "wallet_load"] }, "excludedFrom": ["rewards", "milestones"], "sourceId": "s2", "clause": "Fuel, rent and wallet load transactions are not eligible for reward points or spend milestones.", "verified": true }
+  ],
+  "offers": [
+    { "id": "croma-diwali", "label": "10% instant discount at Croma, up to ₹1,500", "merchant": "Croma", "appliesTo": { "categories": ["electronics"], "channel": "any" }, "benefitType": "instant_discount_percent", "valueBps": 1000, "maxBenefitPaise": 150000, "minSpendPaise": 1500000, "validFrom": "2026-10-01", "validTo": "2026-11-15", "usageCap": { "count": 1, "period": "card_year" }, "stackGroup": "croma-bank-offer", "sourceId": "s3", "clause": "10% instant discount up to Rs 1,500 on minimum transaction of Rs 15,000.", "verified": true },
+    { "id": "instamart-flat", "label": "₹100 off on Instamart orders above ₹999 (Signature only)", "merchant": "Swiggy Instamart", "appliesTo": { "categories": ["grocery", "food_delivery"], "channel": "online" }, "benefitType": "instant_discount_flat", "valuePaise": 10000, "minSpendPaise": 99900, "validTo": "2026-12-31", "usageCap": { "count": 2, "period": "calendar_month" }, "variantsOnly": ["Signature"], "sourceId": "s3", "clause": "Flat Rs 100 off on orders above Rs 999, twice a month, Signature variant only.", "verified": true },
+    { "id": "summer-old", "label": "Old summer travel offer", "merchant": "MakeMyTrip", "appliesTo": { "categories": ["travel"] }, "benefitType": "cashback_percent", "valueBps": 1200, "maxBenefitPaise": 200000, "validFrom": "2026-04-01", "validTo": "2026-06-30", "sourceId": "s3", "clause": "12% cashback up to Rs 2,000 on flights.", "verified": true }
+  ],
+  "milestones": [
+    { "id": "fee-waiver", "kind": "fee_waiver", "label": "Annual fee waived on ₹1,50,000 spend in a card year", "thresholdPaise": 15000000, "period": "card_year", "feeReversal": "auto", "benefit": "Next year's ₹500 annual fee is waived.", "sourceId": "s2", "clause": "Annual fee waived on spends of Rs 1,50,000 or more in the preceding card membership year.", "verified": true },
+    { "id": "lounge-unlock", "kind": "lounge_unlock", "label": "Spend ₹10,000 in the previous quarter to unlock lounge access", "thresholdPaise": 1000000, "period": "calendar_quarter", "benefit": "Unlocks 1 domestic lounge visit next quarter.", "sourceId": "s2", "clause": "Spend of Rs 10,000 in the previous calendar quarter is required for complimentary lounge access.", "verified": true }
+  ],
+  "lounge": [
+    { "id": "dom-lounge", "label": "1 domestic lounge visit per quarter", "scope": "domestic", "visits": 1, "period": "calendar_quarter", "requiresMilestoneId": "lounge-unlock", "sourceId": "s2", "clause": "1 complimentary domestic lounge visit per calendar quarter, subject to the spend condition.", "verified": true }
+  ],
+  "otherBenefits": [
+    { "id": "insurance", "label": "Card liability cover", "detail": "Covers fraudulent transactions reported within 48 hours, up to the limit in the terms.", "sourceId": "s2", "verified": false }
+  ]
+}

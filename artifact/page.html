@@ -1,0 +1,775 @@
+<title>EKFBA Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column, phone first — same system as NLNLALD Policies. Tabs, summary strip, then expandable rows. */
+:root {
+  --bg: #f2f5fa;
+  --surface: #ffffff;
+  --ink: #0e1a2e;
+  --muted: #566882;
+  --line: #d9e1ec;
+  --accent: #1a4fd6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6edfc;
+  --ok: #1d6f46;
+  --ok-bg: #e2f3e9;
+  --soon: #8f5600;
+  --soon-bg: #fcefd3;
+  --urgent: #ae231b;
+  --urgent-bg: #fce6e3;
+  --quiet-bg: #e9edf3;
+  --card-from: #1a2c55;
+  --card-to: #0e1a2e;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1120; --surface: #131b2d; --ink: #e8eef8; --muted: #93a3bb; --line: #25314a;
+    --accent: #7399ff; --accent-ink: #0b1120; --accent-soft: #1b2744;
+    --ok: #75d6a1; --ok-bg: #12301f; --soon: #f3c168; --soon-bg: #33260a; --urgent: #ff9189; --urgent-bg: #3a1512;
+    --quiet-bg: #1c263a; --card-from: #22386b; --card-to: #10192c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1120; --surface: #131b2d; --ink: #e8eef8; --muted: #93a3bb; --line: #25314a;
+  --accent: #7399ff; --accent-ink: #0b1120; --accent-soft: #1b2744;
+  --ok: #75d6a1; --ok-bg: #12301f; --soon: #f3c168; --soon-bg: #33260a; --urgent: #ff9189; --urgent-bg: #3a1512;
+  --quiet-bg: #1c263a; --card-from: #22386b; --card-to: #10192c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; padding-inline: 16px; padding-block: 20px 40px; }
+main { max-width: 680px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 26px; line-height: 1.1; letter-spacing: -0.01em; }
+h2 { font-size: 17px; }
+h3 { font-size: 15px; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--mono); letter-spacing: .03em; }
+.num { font-variant-numeric: tabular-nums; }
+
+header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; min-height: 44px; padding: 0 18px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+.btn.danger { background: var(--urgent); color: #fff; }
+.btn.small { min-height: 38px; padding: 0 14px; font-size: 14px; }
+.btn[disabled] { opacity: .5; cursor: default; }
+
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
+.tab { border: 0; background: transparent; border-radius: 9px; min-height: 40px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.stat b { display: block; font-family: var(--display); font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 12px; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; min-height: 36px; padding: 0 14px; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+.row { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.row.inactive { opacity: .7; }
+.row-head { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; background: none; border: 0; padding: 14px; min-height: 64px; }
+.row-head > div { min-width: 0; }
+.row-head > div:first-child { flex: 1; }
+.lead-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mini-card { flex: none; width: 44px; height: 28px; border-radius: 5px; background: linear-gradient(135deg, var(--card-from), var(--card-to)); color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: end start; padding: 3px 5px; letter-spacing: .04em; }
+.mini-card.debit { background: linear-gradient(135deg, #1d6f46, #0e3a26); }
+.ins { font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.right { text-align: right; flex: 0 0 auto; max-width: 42%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.when { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pill { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.st-ok { background: var(--ok-bg); color: var(--ok); }
+.st-soon { background: var(--soon-bg); color: var(--soon); }
+.st-urgent { background: var(--urgent-bg); color: var(--urgent); }
+.st-quiet { background: var(--quiet-bg); color: var(--muted); }
+.st-info { background: var(--accent-soft); color: var(--accent); }
+.detail.flush { border-top: 0; }
+.detail { border-top: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 16px; }
+.kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; margin: 0; }
+.kv dt { color: var(--muted); font-size: 13px; }
+.kv dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.rem { display: flex; flex-wrap: wrap; gap: 8px; }
+.rem a, .rem span { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; text-decoration: none; color: var(--accent); background: var(--accent-soft); }
+.rem span { color: var(--muted); background: transparent; text-decoration: line-through; }
+.label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.rules { display: flex; flex-direction: column; gap: 14px; }
+.rule-group { display: flex; flex-direction: column; gap: 6px; }
+.rule { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.rule-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.rule-top strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.rule-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex: none; max-width: 50%; }
+.rule small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.rule .src { font-size: 12px; }
+.rule.expired { opacity: .65; }
+.pack-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--muted); }
+
+.panel { background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.panel.plain { border-color: var(--line); }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label, .field .flabel { font-size: 13px; color: var(--muted); }
+.field input, .field select, .field textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-height: 44px; padding: 0 12px; width: 100%; font-size: 16px; }
+.field textarea { padding: 10px 12px; min-height: 80px; resize: vertical; }
+.field textarea.code { font-family: var(--mono); font-size: 13px; min-height: 160px; }
+.field .ferr { color: var(--urgent); font-size: 13px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px; background: var(--quiet-bg); border: 0; margin: 0; }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; }
+.seg span { display: block; text-align: center; padding: 9px; border-radius: 8px; font-weight: 600; color: var(--muted); }
+.seg input:checked + span { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+.err { color: var(--urgent); font-size: 13px; }
+.box { border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.box ul { margin: 6px 0 0; padding-left: 18px; }
+.box.bad { background: var(--urgent-bg); color: var(--urgent); }
+.box.warn { background: var(--soon-bg); color: var(--soon); }
+.box.good { background: var(--ok-bg); color: var(--ok); }
+.box.info { background: var(--accent-soft); color: var(--ink); }
+.diff { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.diff li { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+.diff li span:last-child { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 460px) { .two { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; gap: 0; } .kv dd { margin-bottom: 8px; } .tab { font-size: 13px; } }
+.empty { text-align: center; background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.empty p { color: var(--muted); max-width: 42ch; }
+.note { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main id="app" aria-live="polite"></main>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+/*@@CORE@@*/
+</script>
+<script>
+const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToPaise, formatPaise,
+  validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
+  CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid } = __core;
+
+const APP_VERSION = '0.2.0';
+const COLLECTIONS = ['cards', 'rulePacks'];
+const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
+  'HSBC', 'ICICI Bank', 'IDFC FIRST Bank', 'IndusInd Bank', 'Kotak Mahindra Bank', 'OneCard', 'Punjab National Bank', 'RBL Bank',
+  'SBI Card', 'Standard Chartered', 'State Bank of India', 'Union Bank of India', 'Yes Bank'];
+const STATUS_LABEL = { active: 'Active', deactivated: 'Deactivated', replaced: 'Replaced', archived: 'Archived' };
+const PERIOD_LABEL = { transaction: 'per transaction', statement_cycle: 'per statement cycle', calendar_month: 'per month',
+  calendar_quarter: 'per quarter', calendar_year: 'per calendar year', card_year: 'per card year' };
+const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c.replace(/_/g, ' ')]));
+const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
+
+const state = {
+  tab: 'wallet', cards: [], packs: [], ready: { cards: false, rulePacks: false }, db: null, dl: null, canWrite: true,
+  open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
+  offerFilter: 'active', offerQuery: '', showArchived: false, busy: false, loadErr: '', backupPreview: null,
+};
+
+const $app = document.getElementById('app');
+const today = () => localDate();
+const fmtDate = (s) => { if (!s) return '–'; const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); };
+const fmtShort = (s) => new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+const rel = (days) => days === 0 ? 'today' : days === 1 ? 'tomorrow' : days > 0 ? `in ${days} days` : `${-days} day${days === -1 ? '' : 's'} ago`;
+const rupees = (p) => (p == null ? '' : formatPaise(p));
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 3200);
+}
+
+/* ---------------- Data access ---------------- */
+
+function activePack(cardId) {
+  const list = state.packs.filter((p) => p.cardId === cardId);
+  const active = list.filter((p) => p.status === 'active').sort((a, b) => b.version - a.version);
+  return active[0] || null; // if a save was interrupted, the highest active version wins
+}
+const packHistory = (cardId) => state.packs.filter((p) => p.cardId === cardId).sort((a, b) => b.version - a.version);
+
+function friendly(e) {
+  const c = e && e.code;
+  if (c === 'invalid_argument' || c === 'not_granted') return 'You do not have permission to change this wallet.';
+  if (c === 'quota_exceeded') return 'This page has reached its storage limit.';
+  if (c === 'resource_exhausted' || c === 'unavailable') return 'Too busy right now. Try again in a moment.';
+  return 'Could not save. Check your connection and try again.';
+}
+
+async function saveCard(draft) {
+  const existing = draft.id ? state.cards.find((c) => c.id === draft.id) : null;
+  const r = validateCard(draft, existing);
+  if (!r.ok) return r;
+  await state.db.collection('cards').doc(r.card.id).set(r.card);
+  return r;
+}
+
+/* ---------------- Rendering ---------------- */
+
+function feeInfo(card) {
+  if (card.kind !== 'credit' || !card.issueDate) return null;
+  const due = nextAnniversary(card.issueDate, today());
+  if (!due) return null;
+  const days = daysBetween(today(), due);
+  return { due, days, status: renewalStatus(days) };
+}
+
+function render() {
+  const cards = state.cards;
+  let h = html`<header><div><h1>EKFBA Cards</h1><div class="sub">Your credit and debit cards, their benefits and offers.</div></div>
+    ${state.canWrite && state.tab === 'wallet' && !state.editing ? html`<button class="btn" data-action="new">Add card</button>` : ''}</header>`;
+  if (state.loadErr) h = html`${h}<div class="err" role="alert">${state.loadErr}</div>`;
+  if (!state.canWrite) h = html`${h}<div class="hint">You can view this wallet but not change it.</div>`;
+  h = html`${h}<nav class="tabs" role="tablist" aria-label="Sections">
+    ${[['wallet', 'Wallet'], ['offers', 'Offers'], ['fresh', 'Freshness'], ['backup', 'Backup']].map(([k, l]) =>
+      html`<button class="tab" role="tab" data-action="tab" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`)}
+  </nav>`;
+  const body = state.tab === 'wallet' ? walletView(cards) : state.tab === 'offers' ? offersView() : state.tab === 'fresh' ? freshView() : backupView();
+  $app.innerHTML = String(html`${h}${body}
+    <div class="note">
+      <span>Only the owner of this page can see or change it. Never enter full card numbers, expiry dates, CVV, PIN or OTP; the page refuses them.</span>
+      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchase logging and "which card should I use" come in the next phases.</span>
+    </div>`);
+  afterRender();
+}
+
+function walletView(all) {
+  const loading = !state.ready.cards;
+  const active = all.filter((c) => c.status === 'active');
+  const shown = all.filter((c) => state.showArchived || c.status !== 'archived')
+    .sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || a.bank.localeCompare(b.bank) || a.name.localeCompare(b.name));
+  const feesSoon = active.filter((c) => { const f = feeInfo(c); return f && f.days <= 60; }).length;
+  const noRules = active.filter((c) => !activePack(c.id)).length;
+  const archivedCount = all.filter((c) => c.status === 'archived').length;
+
+  return html`
+    <section class="stats" aria-label="Summary">
+      <div class="stat"><b>${active.length}</b><span>Active cards</span></div>
+      <div class="stat"><b>${feesSoon}</b><span>Fees due in 60 days</span></div>
+      <div class="stat"><b>${noRules}</b><span>Cards without rules</span></div>
+    </section>
+    ${state.editing ? cardForm() : ''}
+    ${loading ? html`<div class="empty"><p>Loading your wallet…</p></div>`
+      : !all.length ? html`<div class="empty"><h2>Your wallet is empty</h2>
+          <p>Add each credit and debit card you own. Store a nickname and the last 4 digits only, never the full number.</p>
+          ${state.canWrite && !state.editing ? html`<button class="btn" data-action="new">Add your first card</button>` : ''}</div>`
+      : html`<section class="list" aria-label="Cards">${shown.map(cardRow)}</section>
+          ${archivedCount ? html`<div class="actions"><button class="btn ghost small" data-action="toggle-archived">${state.showArchived ? 'Hide' : 'Show'} ${archivedCount} archived</button></div>` : ''}`}`;
+}
+
+function cardRow(c) {
+  const open = state.open === c.id;
+  const fee = feeInfo(c);
+  const pack = activePack(c.id);
+  let right;
+  if (c.status !== 'active') right = html`<span class="pill st-quiet">${STATUS_LABEL[c.status]}</span>`;
+  else if (fee) right = html`<span class="pill ${PILL[fee.status.key]}">${fee.status.label}</span><span class="when">Fee ${fmtShort(fee.due)} · ${rel(fee.days)}</span>`;
+  else right = html`<span class="pill ${pack ? 'st-ok' : 'st-soon'}">${pack ? 'Rules added' : 'No rules yet'}</span>`;
+  return html`<article class="row ${c.status !== 'active' ? 'inactive' : ''}">
+    <button class="row-head" data-action="toggle" data-id="${c.id}" aria-expanded="${open}">
+      <div class="lead-line"><span class="mini-card ${c.kind}" aria-hidden="true">${c.last4 || ''}</span>
+        <div><div class="ins">${c.nickname || c.name}</div>
+        <div class="meta">${c.bank} · ${c.name}${c.variant ? ' ' + c.variant : ''} · ${c.kind === 'credit' ? 'Credit' : 'Debit'}${c.last4 ? html` · <span class="mono">•••• ${c.last4}</span>` : ''}</div></div></div>
+      <div class="right">${right}</div>
+    </button>
+    ${open ? cardDetail(c, fee, pack) : ''}
+  </article>`;
+}
+
+function cardDetail(c, fee, pack) {
+  const holder = c.holderName ? `${c.holderName}${c.holder === 'add-on' ? ' (add-on)' : ''}` : (c.holder === 'add-on' ? 'Add-on card' : '');
+  const others = state.cards.filter((x) => x.id !== c.id && x.status === 'active');
+  const replacement = c.replacedById ? state.cards.find((x) => x.id === c.replacedById) : null;
+  return html`<div class="detail">
+    <dl class="kv">
+      <dt>Card</dt><dd>${c.bank} ${c.name}${c.variant ? ' · ' + c.variant : ''}</dd>
+      <dt>Type</dt><dd>${c.kind === 'credit' ? 'Credit card' : 'Debit card'} · ${c.network}</dd>
+      ${holder ? html`<dt>Card holder</dt><dd>${holder}</dd>` : ''}
+      ${c.joiningFeePaise != null ? html`<dt>Joining fee</dt><dd class="num">${formatPaise(c.joiningFeePaise)}</dd>` : ''}
+      ${c.annualFeePaise != null ? html`<dt>Annual fee</dt><dd class="num">${formatPaise(c.annualFeePaise)}</dd>` : ''}
+      ${c.issueDate ? html`<dt>Issued</dt><dd>${fmtDate(c.issueDate)}</dd>` : ''}
+      ${c.statementDay ? html`<dt>Statement day</dt><dd>${c.statementDay}</dd>` : ''}
+      ${c.status !== 'active' ? html`<dt>Status</dt><dd>${STATUS_LABEL[c.status]}${replacement ? ' by ' + cardLabel(replacement) : ''}</dd>` : ''}
+      ${c.notes ? html`<dt>Notes</dt><dd>${c.notes}</dd>` : ''}
+    </dl>
+    ${fee ? html`<div><div class="label">Annual fee reminders · Add to Google Calendar</div><div class="rem">
+        ${REMINDER_OFFSETS.map((n) => { const l = feeCalendarLink(c, fee.due, n, today()); const t = n ? `${n} days before` : 'Fee day';
+          return l ? html`<a href="${l}" target="_blank" rel="noopener">${t}</a>` : html`<span>${t}</span>`; })}
+      </div></div>`
+      : c.kind === 'credit' ? html`<p class="hint">Add the card's issue date to track the annual fee date and get calendar reminders.</p>` : ''}
+    ${rulesSection(c, pack)}
+    ${state.importing === c.id ? importPanel(c) : ''}
+    ${state.canWrite ? html`<div class="actions">
+      <button class="btn small" data-action="edit" data-id="${c.id}">Edit</button>
+      ${state.importing !== c.id ? html`<button class="btn ghost small" data-action="import" data-id="${c.id}">${pack ? 'Update rules' : 'Add rules'}</button>` : ''}
+      ${state.confirm?.id === c.id ? confirmBox(c, others) : html`
+        ${c.status === 'active' ? html`<button class="btn ghost small" data-action="status" data-id="${c.id}" data-status="deactivated">Deactivate</button>`
+          : html`<button class="btn ghost small" data-action="status" data-id="${c.id}" data-status="active">Reactivate</button>`}
+        ${c.status !== 'replaced' && others.length ? html`<button class="btn ghost small" data-action="ask" data-id="${c.id}" data-what="replace">Replaced by…</button>` : ''}
+        ${c.status !== 'archived' ? html`<button class="btn ghost small" data-action="ask" data-id="${c.id}" data-what="archive">Archive</button>` : ''}`}
+    </div>` : ''}
+  </div>`;
+}
+
+function confirmBox(c, others) {
+  if (state.confirm.what === 'archive') {
+    return html`<span>Archive this card? It is hidden but its history is kept.</span>
+      <button class="btn danger small" data-action="status" data-id="${c.id}" data-status="archived">Archive</button>
+      <button class="btn ghost small" data-action="cancel-confirm">Cancel</button>`;
+  }
+  return html`<label class="field"><span class="flabel">Replaced by</span><select id="replace-with">${others.map((o) => html`<option value="${o.id}">${cardLabel(o)}</option>`)}</select></label>
+    <button class="btn small" data-action="replace" data-id="${c.id}">Mark replaced</button>
+    <button class="btn ghost small" data-action="cancel-confirm">Cancel</button>`;
+}
+
+/* ---------- Rules display ---------- */
+
+function badges(rule, extra = '') {
+  return html`<span class="rule-badges">${extra}${rule.verified === false ? html`<span class="pill st-soon">Unverified</span>` : ''}</span>`;
+}
+function sourceLine(pack, rule) {
+  const s = (pack.sources || []).find((x) => x.id === rule.sourceId);
+  if (!s) return '';
+  return html`<small class="src">Source: ${s.url ? html`<a href="${s.url}" target="_blank" rel="noopener">${s.title}</a>` : s.title + (s.document ? ' (' + s.document + ')' : '')}</small>`;
+}
+function scopeText(a) {
+  if (!a) return '';
+  const parts = [];
+  if (a.merchants?.length) parts.push(a.merchants.join(', '));
+  if (a.categories?.length) parts.push(a.categories.map((c) => CAT_LABEL[c] || c).join(', '));
+  if (a.channel && a.channel !== 'any') parts.push(a.channel);
+  return parts.join(' · ');
+}
+function earnText(r, pack) {
+  if (r.kind === 'cashback') return `${(r.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% cashback`;
+  const pp = r.pointsPer;
+  let t = `${pp.points} point${pp.points === 1 ? '' : 's'} per ${formatPaise(pp.perPaise)}`;
+  if (pack.pointValue) {
+    const eff = (pp.points * pack.pointValue.paisePerPoint * 100) / pp.perPaise;
+    t += ` ≈ ${eff.toFixed(2)}% back at ${pack.pointValue.paisePerPoint} paise a point${pack.pointValue.verified === false ? ' (unverified value)' : ''}`;
+  }
+  return t;
+}
+function offerValueText(o) {
+  const v = o.benefitType.endsWith('_percent') ? `${o.valueBps / 100}%` : o.benefitType.endsWith('_flat') ? formatPaise(o.valuePaise) : `${o.valuePoints} bonus points`;
+  const kind = o.benefitType.startsWith('instant') ? ' instant discount' : o.benefitType.startsWith('cashback') ? ' cashback' : '';
+  const bits = [v + kind];
+  if (o.maxBenefitPaise) bits.push(`up to ${formatPaise(o.maxBenefitPaise)}`);
+  if (o.minSpendPaise) bits.push(`min spend ${formatPaise(o.minSpendPaise)}`);
+  if (o.usageCap) bits.push(`${o.usageCap.count}× ${PERIOD_LABEL[o.usageCap.period] || ''}`);
+  if (o.promoCode) bits.push(`code ${o.promoCode}`);
+  return bits.join(' · ');
+}
+function offerPill(o) {
+  const st = offerStatus(o, today());
+  if (st === 'expired') return html`<span class="pill st-quiet">Expired ${fmtDate(o.validTo)}</span>`;
+  if (st === 'upcoming') return html`<span class="pill st-info">Starts ${fmtDate(o.validFrom)}</span>`;
+  if (st === 'no_end_date') return html`<span class="pill st-soon">End date unknown</span>`;
+  const d = daysBetween(today(), o.validTo);
+  return html`<span class="pill ${d <= 7 ? 'st-soon' : 'st-ok'}">${d === 0 ? 'Ends today' : `Ends ${fmtDate(o.validTo)}`}</span>`;
+}
+
+function rulesSection(card, rec) {
+  if (!rec) {
+    return html`<div class="box warn"><strong>No verified rules for this card yet.</strong> Share its official benefits page or terms PDF in the Card Manager project chat and ask for a rule pack, then tap <em>Add rules</em> and paste it.</div>`;
+  }
+  const pack = rec.pack;
+  const fr = packFreshness(pack, today());
+  const offers = offersForCard(pack, card).sort((a, b) => (offerStatus(a, today()) === 'expired') - (offerStatus(b, today()) === 'expired'));
+  const group = (title, items) => items.length ? html`<div class="rule-group"><h3>${title}</h3>${items}</div>` : '';
+  const ruleBox = (r, title, sub, extra = '', cls = '') => html`<div class="rule ${cls}"><div class="rule-top"><strong>${title}</strong>${badges(r, extra)}</div>
+    ${sub ? html`<small>${sub}</small>` : ''}${sourceLine(pack, r)}</div>`;
+  const hist = packHistory(card.id);
+  return html`<div class="rules">
+    <div class="pack-meta"><span class="pill ${fr.offersStale ? 'st-soon' : 'st-ok'}">Checked ${fmtDate(pack.checkedAt)}</span>
+      <span>Rules version ${rec.version}${hist.length > 1 ? ` of ${hist.length}` : ''}</span>
+      ${fr.unverifiedCount ? html`<span>${fr.unverifiedCount} unverified</span>` : ''}
+      ${fr.offersStale ? html`<span>Offers may be out of date (${fr.ageDays} days old)</span>` : ''}</div>
+    ${pack.card.variants?.length && card.variant && packMatchesCard(pack, card) === 'variant_mismatch' ? html`<div class="box warn">These rules are for ${pack.card.variants.join(', ')}; this card is ${card.variant}.</div>` : ''}
+    ${group('Rewards', [
+      ...(pack.earnRules || []).map((r) => ruleBox(r, r.label, [earnText(r, pack), scopeText(r.appliesTo),
+        r.capPaise ? `cap ${formatPaise(r.capPaise)} ${PERIOD_LABEL[r.capPeriod]}` : r.capPoints ? `cap ${r.capPoints.toLocaleString('en-IN')} points ${PERIOD_LABEL[r.capPeriod]}` : ''].filter(Boolean).join(' · '))),
+      ...(pack.exclusions || []).map((x) => ruleBox(x, x.label, `Excluded from ${x.excludedFrom.join(', ')} · ${scopeText(x.appliesTo)}`, html`<span class="pill st-quiet">Exclusion</span>`)),
+    ])}
+    ${group('Offers', offers.map((o) => ruleBox(o, o.label, [o.merchant, offerValueText(o)].filter(Boolean).join(' · '), offerPill(o), offerStatus(o, today()) === 'expired' ? 'expired' : '')))}
+    ${group('Milestones', (pack.milestones || []).map((m) => ruleBox(m, m.label, `${formatPaise(m.thresholdPaise)} ${PERIOD_LABEL[m.period]} · ${m.benefit}${m.kind === 'fee_waiver' ? (m.feeReversal === 'auto' ? ' · reversed automatically' : ' · you must request it') : ''}`,
+      html`<span class="pill st-info">${m.kind === 'fee_waiver' ? 'Fee waiver' : m.kind === 'lounge_unlock' ? 'Lounge' : 'Milestone'}</span>`)))}
+    ${group('Lounge access', (pack.lounge || []).map((l) => ruleBox(l, l.label, `${l.visits} ${l.scope} visit${l.visits === 1 ? '' : 's'} ${PERIOD_LABEL[l.period]}${l.requiresMilestoneId ? ' · needs the spend milestone above' : ''}`)))}
+    ${group('Fees and charges', (pack.fees?.items || []).map((f) => ruleBox(f, f.label, scopeText(f.appliesTo))))}
+    ${group('Other benefits', (pack.otherBenefits || []).map((b) => ruleBox(b, b.label, b.detail || '')))}
+  </div>`;
+}
+
+/* ---------- Rule import + review ---------- */
+
+function importPanel(card) {
+  const rv = state.review;
+  if (rv && rv.cardId === card.id && rv.ok) {
+    const prev = activePack(card.id);
+    const feeChange = rv.pack.fees && ['annualFeePaise', 'joiningFeePaise'].some((k) => rv.pack.fees[k] !== undefined && rv.pack.fees[k] !== card[k]);
+    return html`<section class="panel" aria-label="Review rules">
+      <h2>Review before saving</h2>
+      <div class="pack-meta"><span>${rv.pack.card.bank} ${rv.pack.card.name}${rv.pack.card.variants?.length ? ' · ' + rv.pack.card.variants.join(', ') : ''}</span><span>Checked ${fmtDate(rv.pack.checkedAt)}</span><span>${rv.pack.sources.length} source${rv.pack.sources.length === 1 ? '' : 's'}</span></div>
+      ${rv.match === 'mismatch' ? html`<div class="box bad">This pack is for <strong>${rv.pack.card.bank} ${rv.pack.card.name}</strong>, not ${card.bank} ${card.name}. Check you picked the right card.</div>` : ''}
+      ${rv.match === 'variant_mismatch' ? html`<div class="box warn">This pack covers ${rv.pack.card.variants.join(', ')}; your card's variant is ${card.variant}. Variant-only offers will not apply.</div>` : ''}
+      ${rv.warnings.length ? html`<div class="box warn"><strong>${rv.warnings.length} thing${rv.warnings.length === 1 ? '' : 's'} to check</strong><ul>${rv.warnings.slice(0, 8).map((w) => html`<li>${w.path}: ${w.message}</li>`)}</ul></div>` : ''}
+      <div><div class="label">${prev ? `Changes from version ${prev.version}` : 'What will be added'}</div>
+        ${rv.diff.length ? html`<ul class="diff">${rv.diff.map((d) => html`<li><span class="pill ${d.kind === 'added' ? 'st-ok' : d.kind === 'removed' ? 'st-urgent' : 'st-soon'}">${d.kind === 'added' ? 'New' : d.kind === 'removed' ? 'Removed' : 'Changed'}</span>
+          <span><strong>${d.section}:</strong> ${d.label}${d.fields ? ' (' + d.fields.join(', ') + ')' : ''}${d.from !== undefined && d.id.endsWith('Paise') ? ` ${d.from == null ? '–' : formatPaise(d.from)} → ${d.to == null ? '–' : formatPaise(d.to)}` : ''}</span></li>`)}</ul>`
+        : html`<p class="hint">No changes from the current version. Saving only records that the sources were checked again on ${fmtDate(rv.pack.checkedAt)}.</p>`}</div>
+      ${feeChange ? html`<label class="actions"><input type="checkbox" id="apply-fees" checked> Update the card's fees to ${rupees(rv.pack.fees.annualFeePaise ?? card.annualFeePaise)} annual / ${rupees(rv.pack.fees.joiningFeePaise ?? card.joiningFeePaise)} joining</label>` : ''}
+      <div class="actions"><button class="btn" data-action="approve" data-id="${card.id}" ${state.busy || rv.match === 'mismatch' ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Approve and save'}</button>
+        <button class="btn ghost" data-action="back-to-paste">Back</button>
+        <button class="btn ghost" data-action="cancel-import">Cancel</button></div>
+    </section>`;
+  }
+  return html`<section class="panel" aria-label="Add rules">
+    <h2>${activePack(card.id) ? 'Update rules' : 'Add rules'} for ${cardLabel(card)}</h2>
+    <p class="hint">Paste the rule pack Claude made from this card's official pages, or choose the .json file. Nothing changes until you approve it.</p>
+    <div class="field"><label for="pack-text">Rule pack (JSON)</label><textarea id="pack-text" class="code" spellcheck="false" placeholder='{ "format": "ekfba-rulepack", … }'>${state.review?.text || ''}</textarea></div>
+    <div class="field"><label for="pack-file">Or choose a file</label><input id="pack-file" type="file" accept=".json,application/json"></div>
+    ${rv && rv.cardId === card.id && !rv.ok && rv.errors.length ? html`<div class="box bad" role="alert"><strong>This rule pack can't be used yet.</strong><ul>${rv.errors.slice(0, 12).map((e) => html`<li>${e.path ? e.path + ': ' : ''}${e.message}</li>`)}</ul>${rv.errors.length > 12 ? html`<p>…and ${rv.errors.length - 12} more.</p>` : ''}</div>` : ''}
+    <div class="actions"><button class="btn" data-action="check-pack" data-id="${card.id}">Check rules</button><button class="btn ghost" data-action="cancel-import">Cancel</button></div>
+  </section>`;
+}
+
+function checkPack(cardId, text) {
+  const card = state.cards.find((c) => c.id === cardId);
+  let pack;
+  try { pack = JSON.parse(text); } catch { state.review = { cardId, ok: false, text, errors: [{ path: '', message: 'This is not valid JSON. Copy the whole pack, from the first { to the last }.' }], warnings: [] }; return render(); }
+  const v = validateRulePack(pack, today());
+  if (!v.ok) { state.review = { cardId, ok: false, text, errors: v.errors, warnings: v.warnings }; return render(); }
+  const prev = activePack(cardId);
+  state.review = { cardId, ok: true, text, pack, warnings: v.warnings, match: packMatchesCard(pack, card), diff: diffRulePacks(prev ? prev.pack : null, pack) };
+  render();
+}
+
+async function approvePack(cardId) {
+  const rv = state.review;
+  if (!rv?.ok || state.busy) return;
+  const card = state.cards.find((c) => c.id === cardId);
+  const prev = activePack(cardId);
+  const applyFees = document.getElementById('apply-fees')?.checked;
+  state.busy = true; render();
+  try {
+    const now = Date.now();
+    const id = uuid();
+    const rec = { id, cardId, version: (prev?.version || 0) + 1, status: 'active', pack: rv.pack, approvedAt: now, createdAt: now, updatedAt: now };
+    await state.db.collection('rulePacks').doc(id).set(rec);
+    for (const old of state.packs.filter((p) => p.cardId === cardId && p.status === 'active')) {
+      await state.db.collection('rulePacks').doc(old.id).update({ status: 'superseded', updatedAt: Date.now() });
+    }
+    const update = { ...card, lastVerifiedAt: Date.parse(rv.pack.checkedAt + 'T00:00:00') };
+    if (applyFees) {
+      if (rv.pack.fees.annualFeePaise !== undefined) update.annualFeePaise = rv.pack.fees.annualFeePaise;
+      if (rv.pack.fees.joiningFeePaise !== undefined) update.joiningFeePaise = rv.pack.fees.joiningFeePaise;
+    }
+    const r = await saveCard(update);
+    if (!r.ok) throw new Error(Object.values(r.errors).join('; '));
+    state.importing = null; state.review = null;
+    toast(`Rules saved as version ${rec.version}`);
+  } catch (e) { state.loadErr = e.code ? friendly(e) : e.message; }
+  state.busy = false; render();
+}
+
+/* ---------- Card form ---------- */
+
+function cardForm() {
+  const c = state.formDraft || {};
+  const e = state.formErrors || {};
+  const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
+  const opt = (v, cur, label = v) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  const names = [...new Set(state.cards.map((x) => x.holderName).filter(Boolean))].sort();
+  const rup = (p) => (p == null ? '' : String(p / 100));
+  return html`<form class="panel" id="card-form" novalidate>
+    <h2>${c.id ? 'Edit card' : 'New card'}</h2>
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <fieldset class="seg" aria-label="Card type">
+      <label><input type="radio" name="kind" value="credit" ${c.kind !== 'debit' ? 'checked' : ''}><span>Credit card</span></label>
+      <label><input type="radio" name="kind" value="debit" ${c.kind === 'debit' ? 'checked' : ''}><span>Debit card</span></label>
+    </fieldset>
+    <div class="two">
+      <div class="field"><label for="f-bank">Bank *</label><input id="f-bank" name="bank" list="bank-list" value="${c.bank || ''}" autocomplete="off" placeholder="HDFC Bank">
+        <datalist id="bank-list">${BANKS.map((b) => html`<option value="${b}">`)}</datalist>${err('bank')}</div>
+      <div class="field"><label for="f-name">Card name *</label><input id="f-name" name="name" value="${c.name || ''}" autocomplete="off" placeholder="Millennia">${err('name')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-variant">Variant / tier</label><input id="f-variant" name="variant" value="${c.variant || ''}" autocomplete="off" placeholder="Signature">${err('variant')}</div>
+      <div class="field"><label for="f-network">Network *</label><select id="f-network" name="network">${opt('', c.network, 'Choose…')}${NETWORKS.map((n) => opt(n, c.network))}</select>${err('network')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-nickname">Nickname</label><input id="f-nickname" name="nickname" value="${c.nickname || ''}" maxlength="40" autocomplete="off" placeholder="Shopping card">${err('nickname')}</div>
+      <div class="field"><label for="f-last4">Last 4 digits</label><input id="f-last4" name="last4" value="${c.last4 || ''}" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="1234">${err('last4')}</div>
+    </div>
+    <p class="hint">Never the full card number, expiry date, CVV or PIN. The page refuses them.</p>
+    <div class="two">
+      <div class="field"><label for="f-holderName">Card holder</label><input id="f-holderName" name="holderName" list="holder-list" value="${c.holderName || ''}" autocomplete="off" placeholder="Same spelling as in Policies">
+        <datalist id="holder-list">${names.map((n) => html`<option value="${n}">`)}</datalist>${err('holderName')}</div>
+      <div class="field"><label for="f-holder">Primary or add-on</label><select id="f-holder" name="holder">${opt('primary', c.holder || 'primary', 'Primary card')}${opt('add-on', c.holder, 'Add-on card')}</select></div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-joining">Joining fee (₹)</label><input id="f-joining" name="joiningFee" value="${rup(c.joiningFeePaise)}" inputmode="decimal" placeholder="0">${err('joiningFeePaise')}</div>
+      <div class="field"><label for="f-annual">Annual fee (₹)</label><input id="f-annual" name="annualFee" value="${rup(c.annualFeePaise)}" inputmode="decimal" placeholder="0">${err('annualFeePaise')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-issue">Issue date (sets the fee date)</label><input id="f-issue" name="issueDate" type="date" value="${c.issueDate || ''}">${err('issueDate')}</div>
+      <div class="field"><label for="f-stmt">Statement day (credit)</label><input id="f-stmt" name="statementDay" value="${c.statementDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="15">${err('statementDay')}</div>
+    </div>
+    <div class="field"><label for="f-urls">Official benefit / T&amp;C links, one per line</label><textarea id="f-urls" name="sourceUrls" placeholder="https://…">${(c.sourceUrls || []).join('\n')}</textarea>
+      ${Object.keys(e).filter((k) => k.startsWith('sourceUrls')).map((k) => err(k))}</div>
+    <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes">${c.notes || ''}</textarea>${err('notes')}</div>
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save'}</button><button class="btn ghost" type="button" data-action="cancel">Cancel</button></div>
+  </form>`;
+}
+
+function readForm(form) {
+  const f = Object.fromEntries(new FormData(form));
+  const fee = (v) => (String(v).trim() === '' ? null : parseRupeesToPaise(v) ?? -1);
+  const sd = String(f.statementDay).trim();
+  const base = state.editing === 'new' ? {} : state.cards.find((c) => c.id === state.editing) || {};
+  return { ...base, kind: f.kind, bank: f.bank, name: f.name, variant: f.variant, network: f.network, nickname: f.nickname, last4: f.last4,
+    holderName: f.holderName, holder: f.holder, joiningFeePaise: fee(f.joiningFee), annualFeePaise: fee(f.annualFee), issueDate: f.issueDate,
+    statementDay: sd === '' ? null : (/^\d+$/.test(sd) ? Number(sd) : -1), sourceUrls: String(f.sourceUrls).split('\n'), notes: f.notes };
+}
+
+/* ---------- Offers ---------- */
+
+function allOffers() {
+  const out = [];
+  for (const c of state.cards.filter((x) => x.status === 'active')) {
+    const rec = activePack(c.id);
+    if (!rec) continue;
+    for (const o of offersForCard(rec.pack, c)) out.push({ o, card: c, pack: rec.pack });
+  }
+  return out;
+}
+
+function offersView() {
+  const items = allOffers();
+  const q = state.offerQuery.trim().toLowerCase();
+  const f = state.offerFilter;
+  const shown = items.filter(({ o, card }) => {
+    const st = offerStatus(o, today());
+    if (f === 'active' && !(st === 'active' || st === 'no_end_date')) return false;
+    if (f === 'upcoming' && st !== 'upcoming') return false;
+    if (f === 'expired' && st !== 'expired') return false;
+    if (!q) return true;
+    return [o.label, o.merchant, ...(o.appliesTo?.categories || []), card.bank, card.name, card.nickname].join(' ').toLowerCase().includes(q);
+  }).sort((a, b) => (a.o.validTo || '9999').localeCompare(b.o.validTo || '9999'));
+  const counts = { active: 0, upcoming: 0, expired: 0 };
+  items.forEach(({ o }) => { const st = offerStatus(o, today()); counts[st === 'no_end_date' ? 'active' : st]++; });
+  return html`
+    <div class="field"><label for="offer-q">Search a shop, platform or category</label><input id="offer-q" type="search" value="${state.offerQuery}" placeholder="Croma, Swiggy, grocery…" autocomplete="off"></div>
+    <div class="chips" role="group" aria-label="Offer status">
+      ${[['active', `Active (${counts.active})`], ['upcoming', `Upcoming (${counts.upcoming})`], ['expired', `Expired (${counts.expired})`], ['all', 'All']].map(([k, l]) =>
+        html`<button class="chip" data-action="offer-filter" data-f="${k}" aria-pressed="${f === k}">${l}</button>`)}
+    </div>
+    ${!items.length ? html`<div class="empty"><h2>No offers yet</h2><p>Offers appear here once you add rule packs to your cards. Each offer shows its card, conditions, end date and source.</p></div>`
+      : !shown.length ? html`<div class="empty"><p>No ${f === 'all' ? '' : f + ' '}offers${q ? ` matching “${state.offerQuery}”` : ''}.</p></div>`
+      : html`<section class="list" aria-label="Offers">${shown.map(({ o, card, pack }) => html`
+        <article class="row"><div class="detail flush">
+          <div class="rule-top"><div><div class="ins">${o.merchant || scopeText(o.appliesTo)}</div><div class="meta">${cardLabel(card)}</div></div>${badges(o, offerPill(o))}</div>
+          <p>${o.label}</p>
+          <small class="meta">${offerValueText(o)}${o.validFrom ? ` · from ${fmtDate(o.validFrom)}` : ''}${o.validTo ? ` · till ${fmtDate(o.validTo)}` : ''}</small>
+          ${packFreshness(pack, today()).offersStale ? html`<small class="meta">Last checked ${fmtDate(pack.checkedAt)}. The bank may have changed this offer.</small>` : ''}
+          ${sourceLine(pack, o)}
+        </div></article>`)}</section>`}`;
+}
+
+/* ---------- Freshness ---------- */
+
+function freshView() {
+  const active = state.cards.filter((c) => c.status === 'active');
+  if (!active.length) return html`<div class="empty"><p>Add cards to see how fresh their rules are.</p></div>`;
+  return html`<p class="hint">Offers are marked out of date 30 days after the bank pages were last checked, other rules after 180 days. To refresh, share the card's pages in the Card Manager project chat and ask for an updated rule pack.</p>
+    <section class="list">${active.map((c) => {
+      const rec = activePack(c.id);
+      if (!rec) return html`<article class="row"><div class="row-head"><div><div class="ins">${cardLabel(c)}</div><div class="meta">${c.sourceUrls.length} official link${c.sourceUrls.length === 1 ? '' : 's'} saved</div></div><div class="right"><span class="pill st-soon">No rules</span></div></div></article>`;
+      const fr = packFreshness(rec.pack, today());
+      const pill = fr.baselineStale ? ['st-urgent', 'Out of date'] : fr.offersStale ? ['st-soon', 'Offers out of date'] : ['st-ok', 'Fresh'];
+      return html`<article class="row"><div class="row-head"><div><div class="ins">${cardLabel(c)}</div>
+        <div class="meta">Checked ${fmtDate(rec.pack.checkedAt)} (${rel(-fr.ageDays)}) · version ${rec.version}${fr.unverifiedCount ? ` · ${fr.unverifiedCount} unverified` : ''}</div>
+        <div class="meta">${rec.pack.sources.map((s, i) => html`${i ? ' · ' : ''}${s.url ? html`<a href="${s.url}" target="_blank" rel="noopener">${s.title}</a>` : s.title}`)}</div></div>
+        <div class="right"><span class="pill ${pill[0]}">${pill[1]}</span></div></div></article>`;
+    })}</section>`;
+}
+
+/* ---------- Backup ---------- */
+
+function backupView() {
+  const p = state.backupPreview;
+  return html`<section class="panel plain">
+      <h2>Download a backup</h2>
+      <p class="hint">A JSON file in the same format as NLNLALD Policies backups (module "credit_cards"). Keep it in your Google Drive. It is also how your cards will move into the mobile app later.</p>
+      <div class="actions"><button class="btn" data-action="export-json" ${state.dl && state.cards.length ? '' : 'disabled'}>Download backup (JSON)</button>
+        <button class="btn ghost" data-action="export-csv" ${state.dl && state.cards.length ? '' : 'disabled'}>Download card list (CSV)</button></div>
+      ${!state.dl ? html`<p class="hint">Downloads are not available in this view.</p>` : ''}
+    </section>
+    <section class="panel plain">
+      <h2>Restore from a backup</h2>
+      <p class="hint">Choose an EKFBA backup file. You'll see what it contains first. Restoring keeps whichever copy of each card or rule version is newer.</p>
+      <div class="field"><label for="backup-file">Backup file</label><input id="backup-file" type="file" accept=".json,application/json"></div>
+      ${p ? (p.ok ? html`<div class="box good">Backup from ${p.exportedAt ? fmtDate(p.exportedAt.slice(0, 10)) : 'unknown date'}: <strong>${p.summary.cards}</strong> cards, <strong>${p.summary.rulePacks}</strong> rule versions.</div>
+          <div class="actions"><button class="btn" data-action="restore" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Restoring…' : 'Restore'}</button><button class="btn ghost" data-action="cancel-restore">Cancel</button></div>`
+        : html`<div class="box bad"><strong>This file can't be restored.</strong><ul>${p.errors.slice(0, 8).map((x) => html`<li>${x}</li>`)}</ul></div>`) : ''}
+    </section>`;
+}
+
+function exportJson() {
+  const b = buildBackup({ cards: state.cards, rulePacks: state.packs }, APP_VERSION, COLLECTIONS);
+  state.dl.save({ filename: `ekfba-cards-backup-${today()}.json`, data: JSON.stringify(b, null, 2) }).then(() => toast('Backup saved')).catch(() => {});
+}
+function exportCsv() {
+  const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['Bank', 'Card', 'Variant', 'Type', 'Network', 'Nickname', 'Last 4', 'Card holder', 'Annual fee (Rs)', 'Issue date', 'Status', 'Rules checked'].map(q).join(',')];
+  for (const c of state.cards) {
+    const rec = activePack(c.id);
+    rows.push([c.bank, c.name, c.variant, c.kind, c.network, c.nickname, c.last4, c.holderName, c.annualFeePaise == null ? '' : c.annualFeePaise / 100, c.issueDate, c.status, rec ? rec.pack.checkedAt : ''].map(q).join(','));
+  }
+  state.dl.save({ filename: 'ekfba-cards.csv', data: rows.join('\r\n') }).catch(() => {});
+}
+async function restore() {
+  const p = state.backupPreview;
+  if (!p?.ok || state.busy) return;
+  state.busy = true; render();
+  let added = 0, updated = 0;
+  try {
+    for (const name of COLLECTIONS) {
+      const existing = name === 'cards' ? state.cards : state.packs;
+      const m = mergeRecords(existing, p.stores[name] || []);
+      const byId = new Map(existing.map((r) => [r.id, r]));
+      for (const r of m.merged) {
+        if (byId.get(r.id) === r) continue;
+        await state.db.collection(name).doc(r.id).set(r);
+      }
+      added += m.added; updated += m.updated;
+    }
+    state.backupPreview = null;
+    toast(`Restored: ${added} added, ${updated} updated`);
+  } catch (e) { state.loadErr = friendly(e); }
+  state.busy = false; render();
+}
+
+/* ---------------- Events ---------------- */
+
+function afterRender() {
+  document.getElementById('pack-file')?.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    if (file.size > 300000) { toast('That file is too large for a rule pack.'); return; }
+    checkPack(state.importing, await file.text());
+  });
+  document.getElementById('backup-file')?.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    let obj;
+    try { obj = JSON.parse(await file.text()); } catch { state.backupPreview = { ok: false, errors: ['The file is not valid JSON.'] }; return render(); }
+    const v = validateBackup(obj, COLLECTIONS);
+    state.backupPreview = { ...v, exportedAt: obj.exportedAt };
+    render();
+  });
+  const q = document.getElementById('offer-q');
+  q?.addEventListener('input', () => {
+    state.offerQuery = q.value;
+    const pos = q.selectionStart;
+    render();
+    const n = document.getElementById('offer-q'); n.focus(); n.setSelectionRange(pos, pos);
+  });
+}
+
+$app.addEventListener('click', async (ev) => {
+  const t = ev.target.closest('[data-action]');
+  if (!t || t.disabled) return;
+  const a = t.dataset.action, id = t.dataset.id;
+  if (a === 'tab') { state.tab = t.dataset.tab; render(); }
+  else if (a === 'new') { state.editing = 'new'; state.formDraft = {}; state.formErrors = {}; render(); document.getElementById('f-bank')?.focus(); }
+  else if (a === 'edit') { state.editing = id; state.formDraft = { ...state.cards.find((c) => c.id === id) }; state.formErrors = {}; render(); document.getElementById('card-form')?.scrollIntoView({ block: 'start' }); }
+  else if (a === 'cancel') { state.editing = null; state.formDraft = null; state.formErrors = {}; render(); }
+  else if (a === 'toggle') { state.open = state.open === id ? null : id; state.confirm = null; if (state.importing !== state.open) { state.importing = null; state.review = null; } render(); }
+  else if (a === 'toggle-archived') { state.showArchived = !state.showArchived; render(); }
+  else if (a === 'ask') { state.confirm = { id, what: t.dataset.what }; render(); }
+  else if (a === 'cancel-confirm') { state.confirm = null; render(); }
+  else if (a === 'status' || a === 'replace') {
+    const card = state.cards.find((c) => c.id === id);
+    const status = a === 'replace' ? 'replaced' : t.dataset.status;
+    const replacedById = a === 'replace' ? document.getElementById('replace-with').value : null;
+    try {
+      const r = await saveCard({ ...card, status, replacedById });
+      if (r.ok) { state.confirm = null; toast(`Card ${STATUS_LABEL[status].toLowerCase()}`); }
+    } catch (e) { state.loadErr = friendly(e); }
+    render();
+  }
+  else if (a === 'import') { state.importing = id; state.review = null; render(); document.getElementById('pack-text')?.focus(); }
+  else if (a === 'cancel-import') { state.importing = null; state.review = null; render(); }
+  else if (a === 'check-pack') checkPack(id, document.getElementById('pack-text').value);
+  else if (a === 'back-to-paste') { state.review = { cardId: state.review.cardId, ok: false, text: state.review.text, errors: [], warnings: [] }; render(); }
+  else if (a === 'approve') approvePack(id);
+  else if (a === 'offer-filter') { state.offerFilter = t.dataset.f; render(); }
+  else if (a === 'export-json') exportJson();
+  else if (a === 'export-csv') exportCsv();
+  else if (a === 'restore') restore();
+  else if (a === 'cancel-restore') { state.backupPreview = null; render(); }
+});
+
+$app.addEventListener('submit', async (ev) => {
+  if (ev.target.id !== 'card-form') return;
+  ev.preventDefault();
+  if (state.busy) return;
+  const draft = readForm(ev.target);
+  if (!state.db) { state.formDraft = draft; state.formErrors = { _form: 'Saving is not available in this view.' }; return render(); }
+  state.busy = true;
+  try {
+    const r = await saveCard(draft);
+    if (!r.ok) { state.formDraft = draft; state.formErrors = r.errors; }
+    else { state.editing = null; state.formDraft = null; state.formErrors = {}; state.open = r.card.id; toast(draft.id ? 'Card updated' : 'Card added'); }
+  } catch (e) { state.formDraft = draft; state.formErrors = { _form: friendly(e) }; }
+  state.busy = false;
+  render();
+  document.querySelector('.ferr, #card-form .box.bad')?.scrollIntoView({ block: 'center' });
+});
+
+// Keep what the person is typing when live updates arrive.
+function safeRender() {
+  const f = document.activeElement;
+  if (f && f.closest && (f.closest('#card-form') || f.id === 'pack-text')) return;
+  render();
+}
+
+render();
+
+(async () => {
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  const [db, user, dl] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('downloads')]);
+  state.dl = dl;
+  if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
+  if (!db) { state.ready = { cards: true, rulePacks: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  state.db = db;
+  render();
+  db.collection('cards').onSnapshot((snap) => {
+    state.cards = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.cards = true; state.loadErr = '';
+    if (state.open && !state.cards.some((c) => c.id === state.open)) state.open = null;
+    safeRender();
+  }, () => { state.ready.cards = true; state.loadErr = 'Could not load your cards. Reopen the page to try again.'; render(); });
+  db.collection('rulePacks').onSnapshot((snap) => {
+    state.packs = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.rulePacks = true;
+    safeRender();
+  }, () => { state.ready.rulePacks = true; });
+})();
+</script>

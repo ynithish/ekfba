@@ -14,7 +14,24 @@ Legend: ✅ built and tested · 🟡 partly built · ⬜ not started. "Tested" m
 - Tests: 11 unit tests, 24 browser checks — all passing
 - ⬜ Not yet: PDF / screenshot / URL onboarding (Phase 2), installed-on-phone check by you after deploy
 
-## Phase 2 — Card intelligence ⬜
+## Delivery change (9 Oct 2026)
+EKFBA now runs as a Claude page ("EKFBA Cards", https://claude.ai/artifact/UAatcuEdJpQ4YNJspyPUVH) beside NLNLALD Policies,
+following the NLNLALD roadmap: online-only while testing, later merged into one Flutter app. The PWA code in this repo
+(index.html, sw.js, src/data, src/ui) stays as reference; src/core is shared by both and bundled into the page.
+
+## Phase 1 + 2 on the Claude page ✅ (9 Oct 2026)
+- ✅ Wallet: add, edit, deactivate/reactivate, replaced by, archive; card holder name; refuses card numbers, expiry dates, CVV, PIN, OTP
+- ✅ NLNLALD conventions: colours, fonts, statuses (On track / Renews soon / Urgent / Overdue), Google Calendar fee reminders 60/30/7/0 days
+- ✅ Backup envelope `{app:"NLNLALD", module:"credit_cards", schemaVersion:1, exportedAt, records, collections}`; ms timestamps; restore merges by id
+- ✅ Rule Pack v1: spec (spec/RULEPACK.md), validator, plain-language review diff, immutable versions (old ones superseded, kept)
+- ✅ Card details show rewards, exclusions, offers, milestones, lounge, fees with source links, Unverified badges
+- ✅ Offers explorer (search; Active / Upcoming / Expired); expired offers never shown as valid (Scenario 6); variant-only offers respected
+- ✅ Freshness view: offers stale after 30 days, other rules after 180 days; unverified counts (Scenario 10)
+- ✅ Privacy: page data readable and writable only by the owner (checked with a lower access level: nothing visible)
+- Tests: 23 unit tests; 26 functional checks of the page with a stand-in runtime
+- ⬜ First real cards' rule packs (needs official pages shared in the Project chat)
+
+## Phase 2 (original PWA plan) — superseded by the Claude page above
 - ⬜ Card Rule Pack JSON schema + validator (sources, clause, fetched date, confidence, variant restrictions)
 - ⬜ Import with human-readable diff and approve; immutable rule versions; change history
 - ⬜ Card details: benefits, offers, milestones with source + verification badges

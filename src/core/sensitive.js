@@ -25,7 +25,7 @@ export function findSensitiveData(text) {
   if (/\b(cvv|cvc|cvv2|card\s*verification)\b(?:\s*(?:is|no\.?|number))?\W{0,5}\d{3,4}\b/i.test(text)) return 'looks like a CVV';
   if (/\b(atm\s*pin|card\s*pin|pin)\b(?:\s*(?:is|no\.?|number))?\W{0,5}\d{4,6}\b/i.test(text)) return 'looks like a PIN';
   if (/\botp\b(?:\s*(?:is|code))?\W{0,5}\d{4,8}\b/i.test(text)) return 'looks like an OTP';
-  if (/\b(net\s*banking|internet\s*banking|login)?\s*password\b\W{0,5}\S{4,}/i.test(text)) return 'looks like a password';
+  if (/\bpass(?:word|code)\s*(?:is|:|=|-)\s*\S{4,}/i.test(text)) return 'looks like a password';
   return null;
 }
 
@@ -57,5 +57,12 @@ export function scanForSensitiveData(value, path = '', exemptKeys = ['orderRef',
       if (hit) return hit;
     }
   }
+  return null;
+}
+
+/** Returns a reason if the text looks like a card expiry date (e.g. "exp 08/29", "valid thru 08/2029"). */
+export function findExpiryDate(text) {
+  if (typeof text !== 'string') return null;
+  if (/\b(exp|expiry|expires|valid\s*thru|valid\s*through|good\s*thru)\b\W{0,6}(0[1-9]|1[0-2])\s*[/-]\s*(\d{2}|\d{4})\b/i.test(text)) return 'looks like a card expiry date';
   return null;
 }

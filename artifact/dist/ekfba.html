@@ -1,0 +1,1618 @@
+<title>EKFBA Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column, phone first — same system as NLNLALD Policies. Tabs, summary strip, then expandable rows. */
+:root {
+  --bg: #f2f5fa;
+  --surface: #ffffff;
+  --ink: #0e1a2e;
+  --muted: #566882;
+  --line: #d9e1ec;
+  --accent: #1a4fd6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e6edfc;
+  --ok: #1d6f46;
+  --ok-bg: #e2f3e9;
+  --soon: #8f5600;
+  --soon-bg: #fcefd3;
+  --urgent: #ae231b;
+  --urgent-bg: #fce6e3;
+  --quiet-bg: #e9edf3;
+  --card-from: #1a2c55;
+  --card-to: #0e1a2e;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1120; --surface: #131b2d; --ink: #e8eef8; --muted: #93a3bb; --line: #25314a;
+    --accent: #7399ff; --accent-ink: #0b1120; --accent-soft: #1b2744;
+    --ok: #75d6a1; --ok-bg: #12301f; --soon: #f3c168; --soon-bg: #33260a; --urgent: #ff9189; --urgent-bg: #3a1512;
+    --quiet-bg: #1c263a; --card-from: #22386b; --card-to: #10192c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1120; --surface: #131b2d; --ink: #e8eef8; --muted: #93a3bb; --line: #25314a;
+  --accent: #7399ff; --accent-ink: #0b1120; --accent-soft: #1b2744;
+  --ok: #75d6a1; --ok-bg: #12301f; --soon: #f3c168; --soon-bg: #33260a; --urgent: #ff9189; --urgent-bg: #3a1512;
+  --quiet-bg: #1c263a; --card-from: #22386b; --card-to: #10192c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.45; padding-inline: 16px; padding-block: 20px 40px; }
+main { max-width: 680px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 26px; line-height: 1.1; letter-spacing: -0.01em; }
+h2 { font-size: 17px; }
+h3 { font-size: 15px; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--mono); letter-spacing: .03em; }
+.num { font-variant-numeric: tabular-nums; }
+
+header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; min-height: 44px; padding: 0 18px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+.btn.danger { background: var(--urgent); color: #fff; }
+.btn.small { min-height: 38px; padding: 0 14px; font-size: 14px; }
+.btn[disabled] { opacity: .5; cursor: default; }
+
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
+.tab { border: 0; background: transparent; border-radius: 9px; min-height: 40px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.stat b { display: block; font-family: var(--display); font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--muted); font-size: 12px; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; min-height: 36px; padding: 0 14px; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+.row { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.row.inactive { opacity: .7; }
+.row-head { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; background: none; border: 0; padding: 14px; min-height: 64px; }
+.row-head > div { min-width: 0; }
+.row-head > div:first-child { flex: 1; }
+.lead-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mini-card { flex: none; width: 44px; height: 28px; border-radius: 5px; background: linear-gradient(135deg, var(--card-from), var(--card-to)); color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: end start; padding: 3px 5px; letter-spacing: .04em; }
+.mini-card.debit { background: linear-gradient(135deg, #1d6f46, #0e3a26); }
+.ins { font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.right { text-align: right; flex: 0 0 auto; max-width: 42%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.when { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pill { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.st-ok { background: var(--ok-bg); color: var(--ok); }
+.st-soon { background: var(--soon-bg); color: var(--soon); }
+.st-urgent { background: var(--urgent-bg); color: var(--urgent); }
+.st-quiet { background: var(--quiet-bg); color: var(--muted); }
+.st-info { background: var(--accent-soft); color: var(--accent); }
+.detail.flush { border-top: 0; }
+.detail { border-top: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 16px; }
+.kv { display: grid; grid-template-columns: 130px 1fr; gap: 6px 12px; margin: 0; }
+.kv dt { color: var(--muted); font-size: 13px; }
+.kv dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.rem { display: flex; flex-wrap: wrap; gap: 8px; }
+.rem a, .rem span { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; text-decoration: none; color: var(--accent); background: var(--accent-soft); }
+.rem span { color: var(--muted); background: transparent; text-decoration: line-through; }
+.label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.rules { display: flex; flex-direction: column; gap: 14px; }
+.rule-group { display: flex; flex-direction: column; gap: 6px; }
+.rule { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.rule-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.rule-top strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.rule-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex: none; max-width: 50%; }
+.rule small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.rule .src { font-size: 12px; }
+.rule.expired { opacity: .65; }
+.pack-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--muted); }
+
+.panel { background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.panel.plain { border-color: var(--line); }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label, .field .flabel { font-size: 13px; color: var(--muted); }
+.field input, .field select, .field textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-height: 44px; padding: 0 12px; width: 100%; font-size: 16px; }
+.field textarea { padding: 10px 12px; min-height: 80px; resize: vertical; }
+.field textarea.code { font-family: var(--mono); font-size: 13px; min-height: 160px; }
+.field .ferr { color: var(--urgent); font-size: 13px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px; background: var(--quiet-bg); border: 0; margin: 0; }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; }
+.seg span { display: block; text-align: center; padding: 9px; border-radius: 8px; font-weight: 600; color: var(--muted); }
+.seg input:checked + span { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+.err { color: var(--urgent); font-size: 13px; }
+.box { border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.box ul { margin: 6px 0 0; padding-left: 18px; }
+.box.bad { background: var(--urgent-bg); color: var(--urgent); }
+.box.warn { background: var(--soon-bg); color: var(--soon); }
+.box.good { background: var(--ok-bg); color: var(--ok); }
+.box.info { background: var(--accent-soft); color: var(--ink); }
+.diff { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.diff li { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+.diff li span:last-child { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 460px) { .two { grid-template-columns: 1fr; } .kv { grid-template-columns: 1fr; gap: 0; } .kv dd { margin-bottom: 8px; } .tab { font-size: 13px; } }
+.empty { text-align: center; background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; padding: 32px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.empty p { color: var(--muted); max-width: 42ch; }
+.note { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main id="app" aria-live="polite"></main>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+const __m_ids = (() => {
+// Identifier and time helpers. UUIDs make records safe to merge across devices later.
+
+function uuid() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const b = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+/** Local calendar date "YYYY-MM-DD" (India users: dates are what the user sees on their phone). */
+function todayLocal(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+return { uuid, nowIso, todayLocal };
+})();
+
+const __m_money = (() => {
+// Money is always stored as an integer number of paise (₹1 = 100 paise).
+// Never store or compute rupee amounts as floating-point numbers.
+
+const PAISE_PER_RUPEE = 100;
+
+/** Parse user input like "15,000", "₹1,50,000.50", "65k", "1.2L" into paise. Returns null if invalid. */
+function parseRupeesToPaise(input) {
+  if (typeof input === 'number') {
+    if (!Number.isFinite(input) || input < 0) return null;
+    return Math.round(input * PAISE_PER_RUPEE);
+  }
+  if (typeof input !== 'string') return null;
+  let s = input.trim().toLowerCase().replace(/₹|rs\.?|inr|,|\s/g, '');
+  if (!s) return null;
+  let multiplier = 1;
+  const suffix = s.match(/(k|l|lakh|lakhs|lac|cr|crore)$/);
+  if (suffix) {
+    const u = suffix[1];
+    multiplier = u === 'k' ? 1e3 : (u === 'cr' || u === 'crore') ? 1e7 : 1e5;
+    s = s.slice(0, -u.length);
+  }
+  if (!/^\d+(\.\d{1,2})?$/.test(s) && !(multiplier > 1 && /^\d+(\.\d+)?$/.test(s))) return null;
+  const [whole, frac = ''] = s.split('.');
+  // Exact integer arithmetic on the digit strings, avoiding float error.
+  const fracPaiseDigits = (frac + '00').slice(0, 2);
+  let paise = BigInt(whole) * 100n + BigInt(fracPaiseDigits);
+  if (multiplier > 1) {
+    // For suffixed values allow more decimals (e.g. 1.25L) and round to the paisa.
+    const scale = 10n ** BigInt(frac.length);
+    const units = BigInt(whole + frac);
+    const num = units * BigInt(multiplier) * 100n;
+    paise = (num + scale / 2n) / scale;
+  }
+  if (paise > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(paise);
+}
+
+/** Format paise as Indian-grouped rupees: 23500000 -> "₹2,35,000". Shows paise only when non-zero. */
+function formatPaise(paise, { showSign = false } = {}) {
+  if (!Number.isInteger(paise)) throw new TypeError('formatPaise expects integer paise');
+  const neg = paise < 0;
+  const abs = Math.abs(paise);
+  const rupees = Math.floor(abs / 100);
+  const rem = abs % 100;
+  const digits = String(rupees);
+  let grouped;
+  if (digits.length <= 3) grouped = digits;
+  else {
+    const last3 = digits.slice(-3);
+    const rest = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    grouped = `${rest},${last3}`;
+  }
+  const frac = rem ? '.' + String(rem).padStart(2, '0') : '';
+  const sign = neg ? '−' : (showSign && paise > 0 ? '+' : '');
+  return `${sign}₹${grouped}${frac}`;
+}
+
+/** Percentage of a paise amount, given in basis points (1% = 100 bps), rounded down to the paisa. */
+function percentOf(paise, basisPoints) {
+  return Math.floor((paise * basisPoints) / 10000);
+}
+
+/** Progress as a percentage with one decimal, capped to [0, 100]. */
+function progressPercent(achieved, required) {
+  if (required <= 0) return 100;
+  const p = Math.floor((achieved * 1000) / required) / 10;
+  return Math.max(0, Math.min(100, p));
+}
+
+return { PAISE_PER_RUPEE, parseRupeesToPaise, formatPaise, percentOf, progressPercent };
+})();
+
+const __m_sensitive = (() => {
+// Guards that stop sensitive card data from ever being stored.
+// The app must never hold full card numbers, CVVs, PINs, OTPs or banking passwords.
+
+function luhnValid(digits) {
+  let sum = 0;
+  let dbl = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let d = digits.charCodeAt(i) - 48;
+    if (dbl) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+    dbl = !dbl;
+  }
+  return sum % 10 === 0;
+}
+
+/** Returns a reason string if the text appears to contain sensitive card data, otherwise null. */
+function findSensitiveData(text) {
+  if (typeof text !== 'string' || !text) return null;
+  // Runs of 12–19 digits, allowing spaces or dashes between groups (how card numbers are written).
+  const runs = text.match(/\d(?:[ -]?\d){11,18}/g) || [];
+  for (const run of runs) {
+    const digits = run.replace(/[ -]/g, '');
+    if (digits.length >= 13 && luhnValid(digits)) return 'looks like a full card number';
+  }
+  if (/\b(cvv|cvc|cvv2|card\s*verification)\b(?:\s*(?:is|no\.?|number))?\W{0,5}\d{3,4}\b/i.test(text)) return 'looks like a CVV';
+  if (/\b(atm\s*pin|card\s*pin|pin)\b(?:\s*(?:is|no\.?|number))?\W{0,5}\d{4,6}\b/i.test(text)) return 'looks like a PIN';
+  if (/\botp\b(?:\s*(?:is|code))?\W{0,5}\d{4,8}\b/i.test(text)) return 'looks like an OTP';
+  if (/\bpass(?:word|code)\s*(?:is|:|=|-)\s*\S{4,}/i.test(text)) return 'looks like a password';
+  return null;
+}
+
+/**
+ * Walks any object/array and returns the first sensitive finding as {path, reason}, or null.
+ * `exemptKeys` lists fields whose free text may legitimately hold long numbers (e.g. order references);
+ * the forbidden-field-name check still applies to them.
+ */
+function scanForSensitiveData(value, path = '', exemptKeys = ['orderRef', 'transactionRef', 'contentHash', 'id']) {
+  const leaf = path.split('.').pop()?.replace(/\[\d+\]$/, '');
+  if (typeof value === 'string' && exemptKeys.includes(leaf)) return null;
+  if (typeof value === 'string') {
+    const reason = findSensitiveData(value);
+    return reason ? { path: path || '(value)', reason } : null;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const hit = scanForSensitiveData(value[i], `${path}[${i}]`, exemptKeys);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      if (/^(cvv|cvc|pin|otp|password|cardNumber|pan)$/i.test(k) && v != null && v !== '') {
+        return { path: path ? `${path}.${k}` : k, reason: `field "${k}" is not allowed` };
+      }
+      const hit = scanForSensitiveData(v, path ? `${path}.${k}` : k, exemptKeys);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/** Returns a reason if the text looks like a card expiry date (e.g. "exp 08/29", "valid thru 08/2029"). */
+function findExpiryDate(text) {
+  if (typeof text !== 'string') return null;
+  if (/\b(exp|expiry|expires|valid\s*thru|valid\s*through|good\s*thru)\b\W{0,6}(0[1-9]|1[0-2])\s*[/-]\s*(\d{2}|\d{4})\b/i.test(text)) return 'looks like a card expiry date';
+  return null;
+}
+
+return { findSensitiveData, scanForSensitiveData, findExpiryDate };
+})();
+
+const __m_schema = (() => {
+// Single source of truth for local database layout. Bump DB_VERSION and add a migration step
+// whenever a store or index changes; never edit an existing migration.
+
+const DB_NAME = 'ekfba';
+const DB_VERSION = 2;
+const SCHEMA_VERSION = 1; // schemaVersion of the credit_cards module backup envelope
+
+/** store name -> { keyPath, indexes: [[name, keyPath, options]] } */
+const STORES = {
+  cards: { keyPath: 'id', indexes: [['status', 'status'], ['bank', 'bank']] },
+  sources: { keyPath: 'id', indexes: [['cardId', 'cardId']] },
+  ruleVersions: { keyPath: 'id', indexes: [['cardId', 'cardId']] },
+  benefits: { keyPath: 'id', indexes: [['cardId', 'cardId'], ['ruleVersionId', 'ruleVersionId']] },
+  offers: { keyPath: 'id', indexes: [['cardId', 'cardId'], ['validTo', 'validTo']] },
+  milestones: { keyPath: 'id', indexes: [['cardId', 'cardId']] },
+  transactionEvents: { keyPath: 'id', indexes: [['transactionId', 'transactionId'], ['cardId', 'cardId'], ['dedupeKey', 'dedupeKey']] },
+  assessments: { keyPath: 'id', indexes: [['transactionId', 'transactionId'], ['milestoneId', 'milestoneId']] },
+  reminders: { keyPath: 'id', indexes: [['dueDate', 'dueDate']] },
+  outbox: { keyPath: 'id', indexes: [['createdAt', 'createdAt']] },
+  settings: { keyPath: 'key', indexes: [] },
+  rulePacks: { keyPath: 'id', indexes: [['cardId', 'cardId']] }, // added in DB v2
+};
+
+/** Ordered migrations: index i upgrades from version i to i+1. */
+const MIGRATIONS = [
+  // v0 -> v1: create every store above
+  (db) => {
+    for (const [name, def] of Object.entries(STORES)) {
+      if (db.objectStoreNames.contains(name)) continue;
+      const store = db.createObjectStore(name, { keyPath: def.keyPath });
+      for (const [idx, path, opts] of def.indexes) store.createIndex(idx, path, opts || {});
+    }
+  },
+  // v1 -> v2: approved rule-pack versions (Phase 2)
+  (db) => {
+    if (!db.objectStoreNames.contains('rulePacks')) db.createObjectStore('rulePacks', { keyPath: 'id' }).createIndex('cardId', 'cardId');
+  },
+];
+
+/** Stores included in a backup. The outbox is device-local and is never exported. */
+const BACKUP_STORES = Object.keys(STORES).filter((s) => s !== 'outbox');
+
+return { DB_NAME, DB_VERSION, SCHEMA_VERSION, STORES, MIGRATIONS, BACKUP_STORES };
+})();
+
+const __m_card = (() => {
+// Card model: validation and normalisation for wallet cards.
+// Benefit and offer rules are NOT stored on the card; they live in versioned rule records (Phase 2).
+
+const { scanForSensitiveData, findExpiryDate } = __m_sensitive;
+const { uuid } = __m_ids;
+const CARD_KINDS = ['credit', 'debit'];
+const NETWORKS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Diners Club', 'Other'];
+const HOLDER_TYPES = ['primary', 'add-on'];
+const CARD_STATUSES = ['active', 'deactivated', 'replaced', 'archived'];
+
+const trim = (v) => (typeof v === 'string' ? v.trim() : v);
+const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'));
+const isUrl = (s) => { try { const u = new URL(s); return u.protocol === 'https:' || u.protocol === 'http:'; } catch { return false; } };
+const isPaise = (v) => v === null || (Number.isInteger(v) && v >= 0 && v <= 1_00_00_000_00);
+
+/**
+ * Validates a card draft. Returns { ok: true, card } with a normalised record, or { ok: false, errors: {field: message} }.
+ * `existing` is the stored record when editing, so ids, timestamps and version are preserved.
+ */
+function validateCard(draft, existing = null) {
+  const errors = {};
+  const c = {
+    bank: trim(draft.bank) || '',
+    name: trim(draft.name) || '',
+    kind: draft.kind,
+    network: draft.network,
+    variant: trim(draft.variant) || '',
+    tier: trim(draft.tier) || '',
+    holder: draft.holder || 'primary',
+    holderName: trim(draft.holderName) || '',
+    nickname: trim(draft.nickname) || '',
+    last4: trim(draft.last4) || '',
+    joiningFeePaise: draft.joiningFeePaise ?? null,
+    annualFeePaise: draft.annualFeePaise ?? null,
+    issueDate: trim(draft.issueDate) || '',
+    statementDay: draft.statementDay ?? null,
+    status: draft.status || 'active',
+    replacedById: draft.replacedById || null,
+    sourceUrls: (draft.sourceUrls || []).map(trim).filter(Boolean),
+    notes: trim(draft.notes) || '',
+  };
+
+  if (!c.bank) errors.bank = 'Bank is required';
+  if (!c.name) errors.name = 'Card name is required';
+  if (!CARD_KINDS.includes(c.kind)) errors.kind = 'Choose credit or debit';
+  if (!NETWORKS.includes(c.network)) errors.network = 'Choose a card network';
+  if (!HOLDER_TYPES.includes(c.holder)) errors.holder = 'Invalid holder type';
+  if (!CARD_STATUSES.includes(c.status)) errors.status = 'Invalid status';
+  if (c.last4 && !/^\d{4}$/.test(c.last4)) errors.last4 = 'Enter exactly the last 4 digits — never the full number';
+  if (!c.last4 && !c.nickname) errors.nickname = 'Give a nickname or the last 4 digits so you can tell cards apart';
+  if (c.nickname.length > 40) errors.nickname = 'Keep the nickname under 40 characters';
+  if (c.holderName.length > 60) errors.holderName = 'Keep the name under 60 characters';
+  if (!isPaise(c.joiningFeePaise)) errors.joiningFeePaise = 'Invalid amount';
+  if (!isPaise(c.annualFeePaise)) errors.annualFeePaise = 'Invalid amount';
+  if (c.issueDate && !isDate(c.issueDate)) errors.issueDate = 'Use a valid date';
+  if (c.statementDay !== null && !(Number.isInteger(c.statementDay) && c.statementDay >= 1 && c.statementDay <= 31)) {
+    errors.statementDay = 'Statement day must be 1–31';
+  }
+  c.sourceUrls.forEach((u, i) => { if (!isUrl(u)) errors[`sourceUrls.${i}`] = 'Not a valid web address'; });
+  if (c.notes.length > 2000) errors.notes = 'Notes are too long (max 2000 characters)';
+
+  const sensitive = scanForSensitiveData(c);
+  if (sensitive) errors[sensitive.path] = `Not saved: ${sensitive.reason}. Never store full card numbers, expiry dates, CVV, PIN or OTP.`;
+  for (const f of ['nickname', 'notes', 'variant', 'name']) {
+    const e = findExpiryDate(c[f]);
+    if (e && !errors[f]) errors[f] = `Not saved: ${e}. Card expiry dates are never stored.`;
+  }
+
+  if (Object.keys(errors).length) return { ok: false, errors };
+
+  const ts = Date.now(); // milliseconds, same convention as the NLNLALD modules
+  return {
+    ok: true,
+    card: {
+      ...c,
+      id: existing?.id || draft.id || uuid(),
+      createdAt: existing?.createdAt || draft.createdAt || ts,
+      updatedAt: ts,
+      version: (existing?.version || 0) + 1,
+      lastVerifiedAt: draft.lastVerifiedAt !== undefined ? draft.lastVerifiedAt : (existing?.lastVerifiedAt ?? null),
+    },
+  };
+}
+
+/** Human label used across the UI, e.g. "HDFC Millennia ••4417" or the nickname. */
+function cardLabel(card) {
+  const base = card.nickname || `${card.bank} ${card.name}`.trim();
+  return card.last4 ? `${base} ••${card.last4}` : base;
+}
+
+return { CARD_KINDS, NETWORKS, HOLDER_TYPES, CARD_STATUSES, validateCard, cardLabel };
+})();
+
+const __m_backup = (() => {
+// Backup file format (pure logic, no storage access): build, validate and merge snapshots.
+
+const { BACKUP_STORES, SCHEMA_VERSION } = __m_schema;
+const { validateCard } = __m_card;
+const { scanForSensitiveData } = __m_sensitive;
+const { nowIso } = __m_ids;
+// Envelope shared by every NLNLALD module: { app, module, schemaVersion, exportedAt, records[] }.
+// records = cards. Other collections travel in `collections` so importers that only read records still work.
+const BACKUP_APP = 'NLNLALD';
+const BACKUP_MODULE = 'credit_cards';
+
+/** data: { storeName: record[] } */
+function buildBackup(data, appVersion, storeNames = BACKUP_STORES) {
+  const collections = {};
+  for (const s of storeNames) if (s !== 'cards') collections[s] = Array.isArray(data[s]) ? data[s] : [];
+  return {
+    app: BACKUP_APP, module: BACKUP_MODULE, schemaVersion: SCHEMA_VERSION, appVersion,
+    exportedAt: nowIso(), records: Array.isArray(data.cards) ? data.cards : [], collections,
+  };
+}
+
+/**
+ * Validates a parsed backup object. Returns { ok, stores, summary, errors }.
+ * Every card is re-validated; the whole file is scanned for sensitive data.
+ */
+function validateBackup(obj, storeNames = BACKUP_STORES) {
+  const errors = [];
+  if (!obj || obj.app !== BACKUP_APP || obj.module !== BACKUP_MODULE || !Array.isArray(obj.records)) {
+    return { ok: false, errors: [obj?.app === BACKUP_APP && obj?.module ? `This is a backup of the ${obj.module} module, not credit cards.` : 'This is not an EKFBA card backup file.'] };
+  }
+  const input = { cards: obj.records, ...(obj.collections || {}) };
+  if (!Number.isInteger(obj.schemaVersion) || obj.schemaVersion > SCHEMA_VERSION) {
+    return { ok: false, errors: [`Backup was made by a newer version of the app (format ${obj.schemaVersion}). Update the app first.`] };
+  }
+  const sensitive = scanForSensitiveData(input);
+  if (sensitive) return { ok: false, errors: [`Refused: ${sensitive.path} ${sensitive.reason}.`] };
+
+  const stores = {};
+  for (const s of storeNames) {
+    const rows = input[s] ?? [];
+    if (!Array.isArray(rows)) { errors.push(`"${s}" is not a list`); continue; }
+    stores[s] = [];
+    const seen = new Set();
+    rows.forEach((row, i) => {
+      const key = s === 'settings' ? row?.key : row?.id;
+      if (!key || typeof key !== 'string') { errors.push(`${s}[${i}] has no id`); return; }
+      if (seen.has(key)) { errors.push(`${s}[${i}] duplicate id ${key}`); return; }
+      seen.add(key);
+      if (s === 'cards') {
+        const r = validateCard(row);
+        if (!r.ok) { errors.push(`Card "${row.nickname || row.name || key}": ${Object.values(r.errors).join('; ')}`); return; }
+        stores[s].push({ ...r.card, id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt, version: row.version });
+      } else {
+        stores[s].push(row);
+      }
+    });
+  }
+  const summary = Object.fromEntries(Object.entries(stores).map(([k, v]) => [k, v.length]));
+  return { ok: errors.length === 0, stores, summary, errors };
+}
+
+/**
+ * Merges incoming records into existing ones by id. The record with the later updatedAt wins;
+ * ties keep the existing record. Returns { merged, added, updated, unchanged }.
+ */
+const stamp = (v) => (typeof v === 'number' ? v : Date.parse(v || '') || 0);
+
+function mergeRecords(existing, incoming, key = 'id') {
+  const map = new Map(existing.map((r) => [r[key], r]));
+  let added = 0, updated = 0, unchanged = 0;
+  for (const r of incoming) {
+    const cur = map.get(r[key]);
+    if (!cur) { map.set(r[key], r); added++; }
+    else if (stamp(r.updatedAt) > stamp(cur.updatedAt)) { map.set(r[key], r); updated++; }
+    else unchanged++;
+  }
+  return { merged: [...map.values()], added, updated, unchanged };
+}
+
+return { BACKUP_APP, BACKUP_MODULE, buildBackup, validateBackup, mergeRecords };
+})();
+
+const __m_rulepack = (() => {
+// Card Rule Pack v1 — validation, review diff and status helpers.
+// The format is specified in spec/RULEPACK.md; this file must stay consistent with it.
+// Pure functions only: no DOM, no storage, no network (portable to Dart line by line).
+
+const { findSensitiveData } = __m_sensitive;
+const RULEPACK_FORMAT = 'ekfba-rulepack';
+const RULEPACK_SCHEMA_VERSION = 1;
+
+const CATEGORIES = [
+  'grocery', 'dining', 'food_delivery', 'fuel', 'travel', 'flights', 'hotels', 'electronics', 'apparel',
+  'online_shopping', 'department_store', 'utilities', 'telecom', 'rent', 'wallet_load', 'insurance',
+  'education', 'government', 'tax', 'emi', 'jewellery', 'entertainment', 'healthcare', 'cash_withdrawal',
+  'international', 'other',
+];
+const CHANNELS = ['online', 'offline', 'any'];
+const PERIOD_TYPES = ['transaction', 'statement_cycle', 'calendar_month', 'calendar_quarter', 'calendar_year', 'card_year'];
+const OFFER_BENEFITS = ['instant_discount_percent', 'instant_discount_flat', 'cashback_percent', 'cashback_flat', 'bonus_points'];
+const EARN_KINDS = ['cashback', 'points'];
+const MILESTONE_KINDS = ['fee_waiver', 'lounge_unlock', 'spend_bonus', 'other'];
+const SOURCE_TYPES = ['bank_page', 'tnc_pdf', 'offer_page', 'network_page', 'statement', 'other'];
+
+const MAX_PAISE = 1_00_00_000_00; // ₹1 crore
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isStr = (v, max = 300) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
+const isDateStr = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'))
+  && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
+const isPaise = (v, min = 0) => Number.isInteger(v) && v >= min && v <= MAX_PAISE;
+const isHttps = (u) => typeof u === 'string' && /^https:\/\/[^\s]+$/i.test(u);
+
+/** Today's local date as YYYY-MM-DD. */
+function localDate(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Whole days from date a to date b (YYYY-MM-DD), b - a. */
+function daysBetween(a, b) {
+  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+}
+
+/**
+ * Validates a parsed rule pack. Returns { ok, errors: [{path, message}], warnings: [{path, message}] }.
+ * `today` (YYYY-MM-DD) is injectable so results are reproducible in tests.
+ */
+function validateRulePack(pack, today = localDate()) {
+  const errors = [];
+  const warnings = [];
+  const err = (path, message) => errors.push({ path, message });
+  const warn = (path, message) => warnings.push({ path, message });
+
+  if (!isObj(pack)) return { ok: false, errors: [{ path: '', message: 'Not a rule pack (expected a JSON object).' }], warnings };
+  if (pack.format !== RULEPACK_FORMAT) err('format', `Expected format "${RULEPACK_FORMAT}".`);
+  if (pack.schemaVersion !== RULEPACK_SCHEMA_VERSION) err('schemaVersion', `Unsupported schemaVersion ${pack.schemaVersion}; this app reads version ${RULEPACK_SCHEMA_VERSION}.`);
+
+  // Card identity
+  if (!isObj(pack.card)) err('card', 'Missing card identity.');
+  else {
+    if (!isStr(pack.card.bank, 80)) err('card.bank', 'Bank is required.');
+    if (!isStr(pack.card.name, 80)) err('card.name', 'Card name is required.');
+    if (pack.card.kind !== undefined && !['credit', 'debit'].includes(pack.card.kind)) err('card.kind', 'Must be credit or debit.');
+    if (pack.card.variants !== undefined && !(Array.isArray(pack.card.variants) && pack.card.variants.every((v) => isStr(v, 60)))) {
+      err('card.variants', 'Variants must be a list of names.');
+    }
+  }
+
+  // Dates
+  if (!isDateStr(pack.checkedAt)) err('checkedAt', 'checkedAt must be a date (YYYY-MM-DD).');
+  else if (pack.checkedAt > today) err('checkedAt', 'checkedAt is in the future.');
+
+  // Sources
+  const sourceIds = new Set();
+  if (!Array.isArray(pack.sources) || pack.sources.length === 0) err('sources', 'At least one source is required.');
+  else pack.sources.forEach((s, i) => {
+    const p = `sources[${i}]`;
+    if (!isObj(s)) return err(p, 'Must be an object.');
+    if (!isStr(s.id, 40)) err(`${p}.id`, 'Source id is required.');
+    else if (sourceIds.has(s.id)) err(`${p}.id`, `Duplicate source id "${s.id}".`);
+    else sourceIds.add(s.id);
+    if (!isStr(s.title, 200)) err(`${p}.title`, 'Source title is required.');
+    if (!SOURCE_TYPES.includes(s.type)) err(`${p}.type`, `Type must be one of: ${SOURCE_TYPES.join(', ')}.`);
+    if (s.url !== undefined && !isHttps(s.url)) err(`${p}.url`, 'URL must start with https://');
+    if (s.url === undefined && !isStr(s.document, 200)) err(`${p}`, 'Give a url or a document name.');
+    if (s.checkedAt !== undefined && !isDateStr(s.checkedAt)) err(`${p}.checkedAt`, 'Must be YYYY-MM-DD.');
+  });
+
+  // Every rule: id, sourceId, clause, verified
+  const checkProvenance = (r, p, ids) => {
+    if (!isStr(r.id, 60)) err(`${p}.id`, 'Rule id is required.');
+    else if (ids.has(r.id)) err(`${p}.id`, `Duplicate id "${r.id}".`);
+    else ids.add(r.id);
+    if (!isStr(r.label, 160)) err(`${p}.label`, 'A short label is required.');
+    if (!sourceIds.has(r.sourceId)) err(`${p}.sourceId`, `sourceId "${r.sourceId ?? ''}" does not match any source.`);
+    if (r.clause !== undefined && !(typeof r.clause === 'string' && r.clause.length <= 600)) err(`${p}.clause`, 'Clause must be text up to 600 characters.');
+    if (typeof r.verified !== 'boolean') err(`${p}.verified`, 'verified must be true or false.');
+    if (r.verified === true && !isStr(r.clause, 600)) warn(`${p}.clause`, 'Verified rule has no clause from the source.');
+  };
+  const checkScope = (a, p) => {
+    if (a === undefined) return;
+    if (!isObj(a)) return err(p, 'Must be an object.');
+    if (a.categories !== undefined) {
+      if (!Array.isArray(a.categories)) err(`${p}.categories`, 'Must be a list.');
+      else a.categories.forEach((c, j) => { if (!CATEGORIES.includes(c)) err(`${p}.categories[${j}]`, `Unknown category "${c}".`); });
+    }
+    if (a.merchants !== undefined && !(Array.isArray(a.merchants) && a.merchants.every((m) => isStr(m, 80)))) err(`${p}.merchants`, 'Must be a list of merchant names.');
+    if (a.channel !== undefined && !CHANNELS.includes(a.channel)) err(`${p}.channel`, `Channel must be one of: ${CHANNELS.join(', ')}.`);
+  };
+  const checkPeriod = (per, p, required = true) => {
+    if (per === undefined && !required) return;
+    if (!PERIOD_TYPES.includes(per)) err(p, `Period must be one of: ${PERIOD_TYPES.join(', ')}.`);
+  };
+  const list = (name) => {
+    const v = pack[name];
+    if (v === undefined) return [];
+    if (!Array.isArray(v)) { err(name, 'Must be a list.'); return []; }
+    return v;
+  };
+
+  // Fees
+  if (pack.fees !== undefined) {
+    if (!isObj(pack.fees)) err('fees', 'Must be an object.');
+    else {
+      for (const k of ['joiningFeePaise', 'annualFeePaise']) if (pack.fees[k] !== undefined && pack.fees[k] !== null && !isPaise(pack.fees[k])) err(`fees.${k}`, 'Must be whole paise (₹1 = 100).');
+      if (pack.fees.sourceId !== undefined && !sourceIds.has(pack.fees.sourceId)) err('fees.sourceId', 'Does not match any source.');
+      if (pack.fees.items !== undefined) {
+        const ids = new Set();
+        (Array.isArray(pack.fees.items) ? pack.fees.items : []).forEach((f, i) => {
+          const p = `fees.items[${i}]`;
+          checkProvenance(f, p, ids);
+          if (f.bps !== undefined && !(Number.isInteger(f.bps) && f.bps >= 0 && f.bps <= 10000)) err(`${p}.bps`, 'Percentage in basis points (1% = 100), 0–10000.');
+          if (f.flatPaise !== undefined && !isPaise(f.flatPaise)) err(`${p}.flatPaise`, 'Must be whole paise.');
+          checkScope(f.appliesTo, `${p}.appliesTo`);
+        });
+      }
+    }
+  }
+
+  // Reward point value
+  if (pack.pointValue !== undefined) {
+    const pv = pack.pointValue;
+    if (!isObj(pv)) err('pointValue', 'Must be an object.');
+    else {
+      if (!(typeof pv.paisePerPoint === 'number' && pv.paisePerPoint >= 0 && pv.paisePerPoint <= 1000 && Math.round(pv.paisePerPoint * 100) === pv.paisePerPoint * 100)) {
+        err('pointValue.paisePerPoint', 'Paise per point, 0–1000, at most 2 decimals.');
+      }
+      if (!sourceIds.has(pv.sourceId)) err('pointValue.sourceId', 'Does not match any source.');
+      if (typeof pv.verified !== 'boolean') err('pointValue.verified', 'verified must be true or false.');
+    }
+  }
+
+  // Earn rules
+  const earnIds = new Set();
+  list('earnRules').forEach((r, i) => {
+    const p = `earnRules[${i}]`;
+    if (!isObj(r)) return err(p, 'Must be an object.');
+    checkProvenance(r, p, earnIds);
+    if (!EARN_KINDS.includes(r.kind)) err(`${p}.kind`, `Kind must be one of: ${EARN_KINDS.join(', ')}.`);
+    if (r.kind === 'cashback') {
+      if (!(Number.isInteger(r.rateBps) && r.rateBps >= 0 && r.rateBps <= 10000)) err(`${p}.rateBps`, 'Cashback rate in basis points (1% = 100), 0–10000.');
+      else if (r.rateBps > 2500) warn(`${p}.rateBps`, `Unusually high cashback (${r.rateBps / 100}%). Check the source.`);
+    }
+    if (r.kind === 'points') {
+      const pp = r.pointsPer;
+      if (!isObj(pp) || !(typeof pp.points === 'number' && pp.points > 0 && pp.points <= 1000) || !isPaise(pp.perPaise, 1)) {
+        err(`${p}.pointsPer`, 'Use { "points": N, "perPaise": spend in paise }, e.g. 2 points per ₹100 = { "points": 2, "perPaise": 10000 }.');
+      } else if (pack.pointValue && typeof pack.pointValue.paisePerPoint === 'number') {
+        const effBps = (pp.points * pack.pointValue.paisePerPoint * 10000) / pp.perPaise;
+        if (effBps > 10000) err(`${p}.pointsPer`, 'Rewards would be worth more than 100% of spend.');
+        else if (effBps > 2500) warn(`${p}.pointsPer`, `Unusually high reward value (${(effBps / 100).toFixed(1)}%). Check the source.`);
+      }
+    }
+    checkScope(r.appliesTo, `${p}.appliesTo`);
+    if (r.capPaise !== undefined && !isPaise(r.capPaise)) err(`${p}.capPaise`, 'Cap must be whole paise.');
+    if (r.capPoints !== undefined && !(Number.isInteger(r.capPoints) && r.capPoints >= 0)) err(`${p}.capPoints`, 'Must be a whole number.');
+    if (r.capPaise !== undefined || r.capPoints !== undefined) checkPeriod(r.capPeriod, `${p}.capPeriod`);
+    if (r.minTransactionPaise !== undefined && !isPaise(r.minTransactionPaise)) err(`${p}.minTransactionPaise`, 'Must be whole paise.');
+  });
+
+  // Exclusions
+  const exIds = new Set();
+  list('exclusions').forEach((x, i) => {
+    const p = `exclusions[${i}]`;
+    if (!isObj(x)) return err(p, 'Must be an object.');
+    checkProvenance(x, p, exIds);
+    checkScope(x.appliesTo, `${p}.appliesTo`);
+    if (!Array.isArray(x.excludedFrom) || x.excludedFrom.length === 0 || !x.excludedFrom.every((e) => ['rewards', 'milestones', 'offers'].includes(e))) {
+      err(`${p}.excludedFrom`, 'List what it is excluded from: rewards, milestones, offers.');
+    }
+  });
+
+  // Offers
+  const offerIds = new Set();
+  list('offers').forEach((o, i) => {
+    const p = `offers[${i}]`;
+    if (!isObj(o)) return err(p, 'Must be an object.');
+    checkProvenance(o, p, offerIds);
+    if (!OFFER_BENEFITS.includes(o.benefitType)) err(`${p}.benefitType`, `Must be one of: ${OFFER_BENEFITS.join(', ')}.`);
+    if (o.benefitType?.endsWith('_percent')) {
+      if (!(Number.isInteger(o.valueBps) && o.valueBps > 0 && o.valueBps <= 10000)) err(`${p}.valueBps`, 'Percentage in basis points (10% = 1000), 1–10000.');
+      if (o.maxBenefitPaise === undefined) warn(`${p}.maxBenefitPaise`, 'Percentage offer has no maximum benefit. Most bank offers have one.');
+    }
+    if (o.benefitType?.endsWith('_flat') && !isPaise(o.valuePaise, 1)) err(`${p}.valuePaise`, 'Flat benefit in whole paise.');
+    if (o.benefitType === 'bonus_points' && !(Number.isInteger(o.valuePoints) && o.valuePoints > 0)) err(`${p}.valuePoints`, 'Bonus points must be a whole number.');
+    if (o.maxBenefitPaise !== undefined && !isPaise(o.maxBenefitPaise, 1)) err(`${p}.maxBenefitPaise`, 'Must be whole paise.');
+    if (o.minSpendPaise !== undefined && !isPaise(o.minSpendPaise)) err(`${p}.minSpendPaise`, 'Must be whole paise.');
+    if (!isStr(o.merchant, 80) && !(o.appliesTo && Array.isArray(o.appliesTo.categories) && o.appliesTo.categories.length)) {
+      err(`${p}.merchant`, 'Give a merchant or at least one category.');
+    }
+    checkScope(o.appliesTo, `${p}.appliesTo`);
+    if (o.validFrom !== undefined && !isDateStr(o.validFrom)) err(`${p}.validFrom`, 'Must be YYYY-MM-DD.');
+    if (o.validTo !== undefined && !isDateStr(o.validTo)) err(`${p}.validTo`, 'Must be YYYY-MM-DD.');
+    if (isDateStr(o.validFrom) && isDateStr(o.validTo) && o.validFrom > o.validTo) err(`${p}.validTo`, 'Ends before it starts.');
+    if (o.validTo === undefined) warn(`${p}.validTo`, 'No end date. The offer will be shown as "end date unknown".');
+    if (o.usageCap !== undefined) {
+      if (!isObj(o.usageCap) || !(Number.isInteger(o.usageCap.count) && o.usageCap.count > 0)) err(`${p}.usageCap`, 'Use { "count": N, "period": … }.');
+      else checkPeriod(o.usageCap.period, `${p}.usageCap.period`);
+    }
+    if (o.variantsOnly !== undefined && !(Array.isArray(o.variantsOnly) && o.variantsOnly.every((v) => isStr(v, 60)))) err(`${p}.variantsOnly`, 'Must be a list of variant names.');
+    if (o.promoCode !== undefined && !isStr(o.promoCode, 40)) err(`${p}.promoCode`, 'Promo code must be short text.');
+    if (o.stackGroup !== undefined && !isStr(o.stackGroup, 40)) err(`${p}.stackGroup`, 'Stack group must be short text.');
+  });
+
+  // Milestones
+  const msIds = new Set();
+  list('milestones').forEach((m, i) => {
+    const p = `milestones[${i}]`;
+    if (!isObj(m)) return err(p, 'Must be an object.');
+    checkProvenance(m, p, msIds);
+    if (!MILESTONE_KINDS.includes(m.kind)) err(`${p}.kind`, `Kind must be one of: ${MILESTONE_KINDS.join(', ')}.`);
+    if (!isPaise(m.thresholdPaise, 1)) err(`${p}.thresholdPaise`, 'Spend threshold in whole paise, greater than zero.');
+    checkPeriod(m.period, `${p}.period`);
+    if (m.period === 'transaction') err(`${p}.period`, 'A spend milestone cannot be per transaction.');
+    checkScope(m.counts, `${p}.counts`);
+    if (m.kind === 'fee_waiver' && !['auto', 'on_request'].includes(m.feeReversal)) err(`${p}.feeReversal`, 'Say whether the waiver is "auto" or "on_request".');
+    if (!isStr(m.benefit, 300)) err(`${p}.benefit`, 'Describe what is unlocked.');
+  });
+
+  // Lounge access
+  const lgIds = new Set();
+  list('lounge').forEach((l, i) => {
+    const p = `lounge[${i}]`;
+    if (!isObj(l)) return err(p, 'Must be an object.');
+    checkProvenance(l, p, lgIds);
+    if (!['domestic', 'international'].includes(l.scope)) err(`${p}.scope`, 'Scope must be domestic or international.');
+    if (!(Number.isInteger(l.visits) && l.visits >= 0 && l.visits <= 100)) err(`${p}.visits`, 'Visits must be a whole number.');
+    checkPeriod(l.period, `${p}.period`);
+    if (l.requiresMilestoneId !== undefined && !msIds.has(l.requiresMilestoneId)) err(`${p}.requiresMilestoneId`, `No milestone with id "${l.requiresMilestoneId}".`);
+  });
+
+  // Other benefits (text only)
+  const obIds = new Set();
+  list('otherBenefits').forEach((b, i) => {
+    const p = `otherBenefits[${i}]`;
+    if (!isObj(b)) return err(p, 'Must be an object.');
+    checkProvenance(b, p, obIds);
+    if (b.detail !== undefined && !isStr(b.detail, 400)) err(`${p}.detail`, 'Detail must be text up to 400 characters.');
+  });
+
+  // Sensitive data anywhere (card numbers, CVV, PIN, OTP, passwords)
+  const scan = (v, path) => {
+    if (typeof v === 'string') { const r = findSensitiveData(v); if (r) err(path, `Refused: ${r}.`); }
+    else if (Array.isArray(v)) v.forEach((x, i) => scan(x, `${path}[${i}]`));
+    else if (isObj(v)) Object.entries(v).forEach(([k, x]) => scan(x, path ? `${path}.${k}` : k));
+  };
+  scan(pack, '');
+
+  const size = JSON.stringify(pack).length;
+  if (size > 200_000) err('', `Pack is too large (${Math.round(size / 1000)} KB, max 200 KB).`);
+
+  return { ok: errors.length === 0, errors, warnings };
+}
+
+/* ---------------- Review diff ---------------- */
+
+const SECTIONS = [
+  ['earnRules', 'Reward'], ['exclusions', 'Exclusion'], ['offers', 'Offer'],
+  ['milestones', 'Milestone'], ['lounge', 'Lounge access'], ['otherBenefits', 'Benefit'],
+];
+
+function changedFields(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k])).sort();
+}
+
+/**
+ * Compares a previous approved pack (or null) with a new one.
+ * Returns a list of { kind: 'added'|'removed'|'changed', section, id, label, fields? } plus fee changes.
+ */
+function diffRulePacks(prev, next) {
+  const out = [];
+  const pf = prev?.fees || {};
+  const nf = next.fees || {};
+  for (const k of ['joiningFeePaise', 'annualFeePaise']) {
+    if ((pf[k] ?? null) !== (nf[k] ?? null)) out.push({ kind: prev ? 'changed' : 'added', section: 'Fees', id: k, label: k === 'annualFeePaise' ? 'Annual fee' : 'Joining fee', from: pf[k] ?? null, to: nf[k] ?? null });
+  }
+  if (JSON.stringify(prev?.pointValue ?? null) !== JSON.stringify(next.pointValue ?? null)) {
+    out.push({ kind: prev?.pointValue ? 'changed' : 'added', section: 'Reward value', id: 'pointValue', label: 'Value of one reward point', from: prev?.pointValue?.paisePerPoint ?? null, to: next.pointValue?.paisePerPoint ?? null });
+  }
+  for (const [key, name] of SECTIONS) {
+    const before = new Map((prev?.[key] || []).map((r) => [r.id, r]));
+    const after = new Map((next[key] || []).map((r) => [r.id, r]));
+    for (const [id, r] of after) {
+      if (!before.has(id)) out.push({ kind: 'added', section: name, id, label: r.label });
+      else {
+        const fields = changedFields(before.get(id), r);
+        if (fields.length) out.push({ kind: 'changed', section: name, id, label: r.label, fields });
+      }
+    }
+    for (const [id, r] of before) if (!after.has(id)) out.push({ kind: 'removed', section: name, id, label: r.label });
+  }
+  return out;
+}
+
+/* ---------------- Status helpers ---------------- */
+
+/** Offer status on a given day: 'expired' | 'upcoming' | 'active' | 'no_end_date'. */
+function offerStatus(offer, today = localDate()) {
+  if (offer.validTo && offer.validTo < today) return 'expired';
+  if (offer.validFrom && offer.validFrom > today) return 'upcoming';
+  if (!offer.validTo) return 'no_end_date';
+  return 'active';
+}
+
+const OFFER_STALE_DAYS = 30;
+const BASELINE_STALE_DAYS = 180;
+
+/** Freshness of a pack on a given day. */
+function packFreshness(pack, today = localDate()) {
+  const age = daysBetween(pack.checkedAt, today);
+  return {
+    ageDays: age,
+    offersStale: age > OFFER_STALE_DAYS,
+    baselineStale: age > BASELINE_STALE_DAYS,
+    unverifiedCount: countUnverified(pack),
+  };
+}
+
+function countUnverified(pack) {
+  let n = 0;
+  for (const [key] of SECTIONS) n += (pack[key] || []).filter((r) => r.verified === false).length;
+  if (pack.pointValue && pack.pointValue.verified === false) n++;
+  return n;
+}
+
+/** Does this pack describe this wallet card? Returns 'match' | 'variant_mismatch' | 'mismatch'. */
+function packMatchesCard(pack, card) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/\b(bank|card|credit|debit|ltd|limited)\b/g, '').replace(/[^a-z0-9]/g, '');
+  const bankOk = norm(pack.card.bank) === norm(card.bank) || norm(pack.card.bank).includes(norm(card.bank)) || norm(card.bank).includes(norm(pack.card.bank));
+  const nameOk = norm(pack.card.name) === norm(card.name) || norm(pack.card.name).includes(norm(card.name)) || norm(card.name).includes(norm(pack.card.name));
+  if (!bankOk || !nameOk) return 'mismatch';
+  const variants = pack.card.variants || [];
+  if (variants.length && card.variant && !variants.some((v) => norm(v) === norm(card.variant))) return 'variant_mismatch';
+  return 'match';
+}
+
+/** Offers that apply to this card's variant (offers marked variantsOnly exclude other variants). */
+function offersForCard(pack, card) {
+  const norm = (s) => String(s || '').toLowerCase().trim();
+  return (pack.offers || []).filter((o) => !o.variantsOnly?.length || o.variantsOnly.some((v) => norm(v) === norm(card.variant)));
+}
+
+return { RULEPACK_FORMAT, RULEPACK_SCHEMA_VERSION, CATEGORIES, CHANNELS, PERIOD_TYPES, OFFER_BENEFITS, EARN_KINDS, MILESTONE_KINDS, SOURCE_TYPES, localDate, daysBetween, validateRulePack, diffRulePacks, offerStatus, OFFER_STALE_DAYS, BASELINE_STALE_DAYS, packFreshness, countUnverified, packMatchesCard, offersForCard };
+})();
+
+const __m_feedates = (() => {
+// Annual-fee dates, using the same status rules and calendar links as NLNLALD policy renewals.
+
+/** Next card anniversary on or after `today` (both YYYY-MM-DD). Feb 29 falls on Feb 28 in other years. */
+function nextAnniversary(issueDate, today) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(issueDate || '');
+  if (!m) return null;
+  const [ty] = today.split('-').map(Number);
+  const make = (y) => {
+    const month = Number(m[2]);
+    let day = Number(m[3]);
+    const last = new Date(Date.UTC(y, month, 0)).getUTCDate();
+    if (day > last) day = last;
+    return `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+  let d = make(ty);
+  if (d < today) d = make(ty + 1);
+  if (d <= issueDate) d = make(Number(issueDate.slice(0, 4)) + 1); // first fee falls one year after issue
+  return d;
+}
+
+/** NLNLALD status vocabulary and thresholds. */
+function renewalStatus(days) {
+  if (days === null || days === undefined) return { key: 'none', label: 'No date' };
+  if (days < 0) return { key: 'urgent', label: 'Overdue' };
+  if (days <= 7) return { key: 'urgent', label: 'Urgent' };
+  if (days <= 60) return { key: 'soon', label: 'Renews soon' };
+  return { key: 'ok', label: 'On track' };
+}
+
+const REMINDER_OFFSETS = [60, 30, 7, 0];
+
+const compact = (d) => d.replace(/-/g, '');
+function addDays(date, n) {
+  const t = new Date(Date.parse(date + 'T00:00:00Z') + n * 86400000);
+  return t.toISOString().slice(0, 10);
+}
+
+/** Google Calendar "add event" link for a fee reminder, or null if that reminder day has passed. */
+function feeCalendarLink(card, feeDate, offset, today) {
+  if (!feeDate) return null;
+  const start = addDays(feeDate, -offset);
+  if (start < today) return null;
+  const end = addDays(start, 1);
+  const label = card.nickname || `${card.bank} ${card.name}`;
+  const text = `Card annual fee: ${label}${offset ? ` due in ${offset} days` : ' due today'}`;
+  const details = 'Check whether the fee-waiver spend was met, or ask the bank for a reversal. (EKFBA Card Manager)';
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(text)
+    + '&dates=' + compact(start) + '/' + compact(end) + '&details=' + encodeURIComponent(details);
+}
+
+return { nextAnniversary, renewalStatus, REMINDER_OFFSETS, feeCalendarLink };
+})();
+
+const __m_uihtml = (() => {
+// Safe HTML templating: every interpolated value is escaped unless wrapped in raw().
+// Imported data (backups, rule packs) can never inject markup or scripts.
+
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' };
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"'`]/g, (c) => ESC[c]);
+
+class Raw { constructor(s) { this.s = s; } toString() { return this.s; } }
+const raw = (s) => new Raw(String(s));
+
+function render(v) {
+  if (v instanceof Raw) return v.s;
+  if (Array.isArray(v)) return v.map(render).join('');
+  if (v === false || v === null || v === undefined) return '';
+  return escapeHtml(v);
+}
+
+/** Tagged template: html`<p>${userText}</p>` returns a Raw (already-safe) fragment. */
+function html(strings, ...values) {
+  let out = strings[0];
+  for (let i = 0; i < values.length; i++) out += render(values[i]) + strings[i + 1];
+  return new Raw(out);
+}
+
+const icon = (name) => raw(`<svg class="i" aria-hidden="true"><use href="#i-${escapeHtml(name)}"></use></svg>`);
+
+return { escapeHtml, raw, html, icon };
+})();
+const __core = Object.assign({}, __m_ids, __m_money, __m_sensitive, __m_schema, __m_card, __m_backup, __m_rulepack, __m_feedates, __m_uihtml);
+
+</script>
+<script>
+const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToPaise, formatPaise,
+  validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
+  CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid } = __core;
+
+const APP_VERSION = '0.2.0';
+const COLLECTIONS = ['cards', 'rulePacks'];
+const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
+  'HSBC', 'ICICI Bank', 'IDFC FIRST Bank', 'IndusInd Bank', 'Kotak Mahindra Bank', 'OneCard', 'Punjab National Bank', 'RBL Bank',
+  'SBI Card', 'Standard Chartered', 'State Bank of India', 'Union Bank of India', 'Yes Bank'];
+const STATUS_LABEL = { active: 'Active', deactivated: 'Deactivated', replaced: 'Replaced', archived: 'Archived' };
+const PERIOD_LABEL = { transaction: 'per transaction', statement_cycle: 'per statement cycle', calendar_month: 'per month',
+  calendar_quarter: 'per quarter', calendar_year: 'per calendar year', card_year: 'per card year' };
+const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c.replace(/_/g, ' ')]));
+const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
+
+const state = {
+  tab: 'wallet', cards: [], packs: [], ready: { cards: false, rulePacks: false }, db: null, dl: null, canWrite: true,
+  open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
+  offerFilter: 'active', offerQuery: '', showArchived: false, busy: false, loadErr: '', backupPreview: null,
+};
+
+const $app = document.getElementById('app');
+const today = () => localDate();
+const fmtDate = (s) => { if (!s) return '–'; const d = new Date(s + 'T00:00:00'); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); };
+const fmtShort = (s) => new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+const rel = (days) => days === 0 ? 'today' : days === 1 ? 'tomorrow' : days > 0 ? `in ${days} days` : `${-days} day${days === -1 ? '' : 's'} ago`;
+const rupees = (p) => (p == null ? '' : formatPaise(p));
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 3200);
+}
+
+/* ---------------- Data access ---------------- */
+
+function activePack(cardId) {
+  const list = state.packs.filter((p) => p.cardId === cardId);
+  const active = list.filter((p) => p.status === 'active').sort((a, b) => b.version - a.version);
+  return active[0] || null; // if a save was interrupted, the highest active version wins
+}
+const packHistory = (cardId) => state.packs.filter((p) => p.cardId === cardId).sort((a, b) => b.version - a.version);
+
+function friendly(e) {
+  const c = e && e.code;
+  if (c === 'invalid_argument' || c === 'not_granted') return 'You do not have permission to change this wallet.';
+  if (c === 'quota_exceeded') return 'This page has reached its storage limit.';
+  if (c === 'resource_exhausted' || c === 'unavailable') return 'Too busy right now. Try again in a moment.';
+  return 'Could not save. Check your connection and try again.';
+}
+
+async function saveCard(draft) {
+  const existing = draft.id ? state.cards.find((c) => c.id === draft.id) : null;
+  const r = validateCard(draft, existing);
+  if (!r.ok) return r;
+  await state.db.collection('cards').doc(r.card.id).set(r.card);
+  return r;
+}
+
+/* ---------------- Rendering ---------------- */
+
+function feeInfo(card) {
+  if (card.kind !== 'credit' || !card.issueDate) return null;
+  const due = nextAnniversary(card.issueDate, today());
+  if (!due) return null;
+  const days = daysBetween(today(), due);
+  return { due, days, status: renewalStatus(days) };
+}
+
+function render() {
+  const cards = state.cards;
+  let h = html`<header><div><h1>EKFBA Cards</h1><div class="sub">Your credit and debit cards, their benefits and offers.</div></div>
+    ${state.canWrite && state.tab === 'wallet' && !state.editing ? html`<button class="btn" data-action="new">Add card</button>` : ''}</header>`;
+  if (state.loadErr) h = html`${h}<div class="err" role="alert">${state.loadErr}</div>`;
+  if (!state.canWrite) h = html`${h}<div class="hint">You can view this wallet but not change it.</div>`;
+  h = html`${h}<nav class="tabs" role="tablist" aria-label="Sections">
+    ${[['wallet', 'Wallet'], ['offers', 'Offers'], ['fresh', 'Freshness'], ['backup', 'Backup']].map(([k, l]) =>
+      html`<button class="tab" role="tab" data-action="tab" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`)}
+  </nav>`;
+  const body = state.tab === 'wallet' ? walletView(cards) : state.tab === 'offers' ? offersView() : state.tab === 'fresh' ? freshView() : backupView();
+  $app.innerHTML = String(html`${h}${body}
+    <div class="note">
+      <span>Only the owner of this page can see or change it. Never enter full card numbers, expiry dates, CVV, PIN or OTP; the page refuses them.</span>
+      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchase logging and "which card should I use" come in the next phases.</span>
+    </div>`);
+  afterRender();
+}
+
+function walletView(all) {
+  const loading = !state.ready.cards;
+  const active = all.filter((c) => c.status === 'active');
+  const shown = all.filter((c) => state.showArchived || c.status !== 'archived')
+    .sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || a.bank.localeCompare(b.bank) || a.name.localeCompare(b.name));
+  const feesSoon = active.filter((c) => { const f = feeInfo(c); return f && f.days <= 60; }).length;
+  const noRules = active.filter((c) => !activePack(c.id)).length;
+  const archivedCount = all.filter((c) => c.status === 'archived').length;
+
+  return html`
+    <section class="stats" aria-label="Summary">
+      <div class="stat"><b>${active.length}</b><span>Active cards</span></div>
+      <div class="stat"><b>${feesSoon}</b><span>Fees due in 60 days</span></div>
+      <div class="stat"><b>${noRules}</b><span>Cards without rules</span></div>
+    </section>
+    ${state.editing ? cardForm() : ''}
+    ${loading ? html`<div class="empty"><p>Loading your wallet…</p></div>`
+      : !all.length ? html`<div class="empty"><h2>Your wallet is empty</h2>
+          <p>Add each credit and debit card you own. Store a nickname and the last 4 digits only, never the full number.</p>
+          ${state.canWrite && !state.editing ? html`<button class="btn" data-action="new">Add your first card</button>` : ''}</div>`
+      : html`<section class="list" aria-label="Cards">${shown.map(cardRow)}</section>
+          ${archivedCount ? html`<div class="actions"><button class="btn ghost small" data-action="toggle-archived">${state.showArchived ? 'Hide' : 'Show'} ${archivedCount} archived</button></div>` : ''}`}`;
+}
+
+function cardRow(c) {
+  const open = state.open === c.id;
+  const fee = feeInfo(c);
+  const pack = activePack(c.id);
+  let right;
+  if (c.status !== 'active') right = html`<span class="pill st-quiet">${STATUS_LABEL[c.status]}</span>`;
+  else if (fee) right = html`<span class="pill ${PILL[fee.status.key]}">${fee.status.label}</span><span class="when">Fee ${fmtShort(fee.due)} · ${rel(fee.days)}</span>`;
+  else right = html`<span class="pill ${pack ? 'st-ok' : 'st-soon'}">${pack ? 'Rules added' : 'No rules yet'}</span>`;
+  return html`<article class="row ${c.status !== 'active' ? 'inactive' : ''}">
+    <button class="row-head" data-action="toggle" data-id="${c.id}" aria-expanded="${open}">
+      <div class="lead-line"><span class="mini-card ${c.kind}" aria-hidden="true">${c.last4 || ''}</span>
+        <div><div class="ins">${c.nickname || c.name}</div>
+        <div class="meta">${c.bank} · ${c.name}${c.variant ? ' ' + c.variant : ''} · ${c.kind === 'credit' ? 'Credit' : 'Debit'}${c.last4 ? html` · <span class="mono">•••• ${c.last4}</span>` : ''}</div></div></div>
+      <div class="right">${right}</div>
+    </button>
+    ${open ? cardDetail(c, fee, pack) : ''}
+  </article>`;
+}
+
+function cardDetail(c, fee, pack) {
+  const holder = c.holderName ? `${c.holderName}${c.holder === 'add-on' ? ' (add-on)' : ''}` : (c.holder === 'add-on' ? 'Add-on card' : '');
+  const others = state.cards.filter((x) => x.id !== c.id && x.status === 'active');
+  const replacement = c.replacedById ? state.cards.find((x) => x.id === c.replacedById) : null;
+  return html`<div class="detail">
+    <dl class="kv">
+      <dt>Card</dt><dd>${c.bank} ${c.name}${c.variant ? ' · ' + c.variant : ''}</dd>
+      <dt>Type</dt><dd>${c.kind === 'credit' ? 'Credit card' : 'Debit card'} · ${c.network}</dd>
+      ${holder ? html`<dt>Card holder</dt><dd>${holder}</dd>` : ''}
+      ${c.joiningFeePaise != null ? html`<dt>Joining fee</dt><dd class="num">${formatPaise(c.joiningFeePaise)}</dd>` : ''}
+      ${c.annualFeePaise != null ? html`<dt>Annual fee</dt><dd class="num">${formatPaise(c.annualFeePaise)}</dd>` : ''}
+      ${c.issueDate ? html`<dt>Issued</dt><dd>${fmtDate(c.issueDate)}</dd>` : ''}
+      ${c.statementDay ? html`<dt>Statement day</dt><dd>${c.statementDay}</dd>` : ''}
+      ${c.status !== 'active' ? html`<dt>Status</dt><dd>${STATUS_LABEL[c.status]}${replacement ? ' by ' + cardLabel(replacement) : ''}</dd>` : ''}
+      ${c.notes ? html`<dt>Notes</dt><dd>${c.notes}</dd>` : ''}
+    </dl>
+    ${fee ? html`<div><div class="label">Annual fee reminders · Add to Google Calendar</div><div class="rem">
+        ${REMINDER_OFFSETS.map((n) => { const l = feeCalendarLink(c, fee.due, n, today()); const t = n ? `${n} days before` : 'Fee day';
+          return l ? html`<a href="${l}" target="_blank" rel="noopener">${t}</a>` : html`<span>${t}</span>`; })}
+      </div></div>`
+      : c.kind === 'credit' ? html`<p class="hint">Add the card's issue date to track the annual fee date and get calendar reminders.</p>` : ''}
+    ${rulesSection(c, pack)}
+    ${state.importing === c.id ? importPanel(c) : ''}
+    ${state.canWrite ? html`<div class="actions">
+      <button class="btn small" data-action="edit" data-id="${c.id}">Edit</button>
+      ${state.importing !== c.id ? html`<button class="btn ghost small" data-action="import" data-id="${c.id}">${pack ? 'Update rules' : 'Add rules'}</button>` : ''}
+      ${state.confirm?.id === c.id ? confirmBox(c, others) : html`
+        ${c.status === 'active' ? html`<button class="btn ghost small" data-action="status" data-id="${c.id}" data-status="deactivated">Deactivate</button>`
+          : html`<button class="btn ghost small" data-action="status" data-id="${c.id}" data-status="active">Reactivate</button>`}
+        ${c.status !== 'replaced' && others.length ? html`<button class="btn ghost small" data-action="ask" data-id="${c.id}" data-what="replace">Replaced by…</button>` : ''}
+        ${c.status !== 'archived' ? html`<button class="btn ghost small" data-action="ask" data-id="${c.id}" data-what="archive">Archive</button>` : ''}`}
+    </div>` : ''}
+  </div>`;
+}
+
+function confirmBox(c, others) {
+  if (state.confirm.what === 'archive') {
+    return html`<span>Archive this card? It is hidden but its history is kept.</span>
+      <button class="btn danger small" data-action="status" data-id="${c.id}" data-status="archived">Archive</button>
+      <button class="btn ghost small" data-action="cancel-confirm">Cancel</button>`;
+  }
+  return html`<label class="field"><span class="flabel">Replaced by</span><select id="replace-with">${others.map((o) => html`<option value="${o.id}">${cardLabel(o)}</option>`)}</select></label>
+    <button class="btn small" data-action="replace" data-id="${c.id}">Mark replaced</button>
+    <button class="btn ghost small" data-action="cancel-confirm">Cancel</button>`;
+}
+
+/* ---------- Rules display ---------- */
+
+function badges(rule, extra = '') {
+  return html`<span class="rule-badges">${extra}${rule.verified === false ? html`<span class="pill st-soon">Unverified</span>` : ''}</span>`;
+}
+function sourceLine(pack, rule) {
+  const s = (pack.sources || []).find((x) => x.id === rule.sourceId);
+  if (!s) return '';
+  return html`<small class="src">Source: ${s.url ? html`<a href="${s.url}" target="_blank" rel="noopener">${s.title}</a>` : s.title + (s.document ? ' (' + s.document + ')' : '')}</small>`;
+}
+function scopeText(a) {
+  if (!a) return '';
+  const parts = [];
+  if (a.merchants?.length) parts.push(a.merchants.join(', '));
+  if (a.categories?.length) parts.push(a.categories.map((c) => CAT_LABEL[c] || c).join(', '));
+  if (a.channel && a.channel !== 'any') parts.push(a.channel);
+  return parts.join(' · ');
+}
+function earnText(r, pack) {
+  if (r.kind === 'cashback') return `${(r.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% cashback`;
+  const pp = r.pointsPer;
+  let t = `${pp.points} point${pp.points === 1 ? '' : 's'} per ${formatPaise(pp.perPaise)}`;
+  if (pack.pointValue) {
+    const eff = (pp.points * pack.pointValue.paisePerPoint * 100) / pp.perPaise;
+    t += ` ≈ ${eff.toFixed(2)}% back at ${pack.pointValue.paisePerPoint} paise a point${pack.pointValue.verified === false ? ' (unverified value)' : ''}`;
+  }
+  return t;
+}
+function offerValueText(o) {
+  const v = o.benefitType.endsWith('_percent') ? `${o.valueBps / 100}%` : o.benefitType.endsWith('_flat') ? formatPaise(o.valuePaise) : `${o.valuePoints} bonus points`;
+  const kind = o.benefitType.startsWith('instant') ? ' instant discount' : o.benefitType.startsWith('cashback') ? ' cashback' : '';
+  const bits = [v + kind];
+  if (o.maxBenefitPaise) bits.push(`up to ${formatPaise(o.maxBenefitPaise)}`);
+  if (o.minSpendPaise) bits.push(`min spend ${formatPaise(o.minSpendPaise)}`);
+  if (o.usageCap) bits.push(`${o.usageCap.count}× ${PERIOD_LABEL[o.usageCap.period] || ''}`);
+  if (o.promoCode) bits.push(`code ${o.promoCode}`);
+  return bits.join(' · ');
+}
+function offerPill(o) {
+  const st = offerStatus(o, today());
+  if (st === 'expired') return html`<span class="pill st-quiet">Expired ${fmtDate(o.validTo)}</span>`;
+  if (st === 'upcoming') return html`<span class="pill st-info">Starts ${fmtDate(o.validFrom)}</span>`;
+  if (st === 'no_end_date') return html`<span class="pill st-soon">End date unknown</span>`;
+  const d = daysBetween(today(), o.validTo);
+  return html`<span class="pill ${d <= 7 ? 'st-soon' : 'st-ok'}">${d === 0 ? 'Ends today' : `Ends ${fmtDate(o.validTo)}`}</span>`;
+}
+
+function rulesSection(card, rec) {
+  if (!rec) {
+    return html`<div class="box warn"><strong>No verified rules for this card yet.</strong> Share its official benefits page or terms PDF in the Card Manager project chat and ask for a rule pack, then tap <em>Add rules</em> and paste it.</div>`;
+  }
+  const pack = rec.pack;
+  const fr = packFreshness(pack, today());
+  const offers = offersForCard(pack, card).sort((a, b) => (offerStatus(a, today()) === 'expired') - (offerStatus(b, today()) === 'expired'));
+  const group = (title, items) => items.length ? html`<div class="rule-group"><h3>${title}</h3>${items}</div>` : '';
+  const ruleBox = (r, title, sub, extra = '', cls = '') => html`<div class="rule ${cls}"><div class="rule-top"><strong>${title}</strong>${badges(r, extra)}</div>
+    ${sub ? html`<small>${sub}</small>` : ''}${sourceLine(pack, r)}</div>`;
+  const hist = packHistory(card.id);
+  return html`<div class="rules">
+    <div class="pack-meta"><span class="pill ${fr.offersStale ? 'st-soon' : 'st-ok'}">Checked ${fmtDate(pack.checkedAt)}</span>
+      <span>Rules version ${rec.version}${hist.length > 1 ? ` of ${hist.length}` : ''}</span>
+      ${fr.unverifiedCount ? html`<span>${fr.unverifiedCount} unverified</span>` : ''}
+      ${fr.offersStale ? html`<span>Offers may be out of date (${fr.ageDays} days old)</span>` : ''}</div>
+    ${pack.card.variants?.length && card.variant && packMatchesCard(pack, card) === 'variant_mismatch' ? html`<div class="box warn">These rules are for ${pack.card.variants.join(', ')}; this card is ${card.variant}.</div>` : ''}
+    ${group('Rewards', [
+      ...(pack.earnRules || []).map((r) => ruleBox(r, r.label, [earnText(r, pack), scopeText(r.appliesTo),
+        r.capPaise ? `cap ${formatPaise(r.capPaise)} ${PERIOD_LABEL[r.capPeriod]}` : r.capPoints ? `cap ${r.capPoints.toLocaleString('en-IN')} points ${PERIOD_LABEL[r.capPeriod]}` : ''].filter(Boolean).join(' · '))),
+      ...(pack.exclusions || []).map((x) => ruleBox(x, x.label, `Excluded from ${x.excludedFrom.join(', ')} · ${scopeText(x.appliesTo)}`, html`<span class="pill st-quiet">Exclusion</span>`)),
+    ])}
+    ${group('Offers', offers.map((o) => ruleBox(o, o.label, [o.merchant, offerValueText(o)].filter(Boolean).join(' · '), offerPill(o), offerStatus(o, today()) === 'expired' ? 'expired' : '')))}
+    ${group('Milestones', (pack.milestones || []).map((m) => ruleBox(m, m.label, `${formatPaise(m.thresholdPaise)} ${PERIOD_LABEL[m.period]} · ${m.benefit}${m.kind === 'fee_waiver' ? (m.feeReversal === 'auto' ? ' · reversed automatically' : ' · you must request it') : ''}`,
+      html`<span class="pill st-info">${m.kind === 'fee_waiver' ? 'Fee waiver' : m.kind === 'lounge_unlock' ? 'Lounge' : 'Milestone'}</span>`)))}
+    ${group('Lounge access', (pack.lounge || []).map((l) => ruleBox(l, l.label, `${l.visits} ${l.scope} visit${l.visits === 1 ? '' : 's'} ${PERIOD_LABEL[l.period]}${l.requiresMilestoneId ? ' · needs the spend milestone above' : ''}`)))}
+    ${group('Fees and charges', (pack.fees?.items || []).map((f) => ruleBox(f, f.label, scopeText(f.appliesTo))))}
+    ${group('Other benefits', (pack.otherBenefits || []).map((b) => ruleBox(b, b.label, b.detail || '')))}
+  </div>`;
+}
+
+/* ---------- Rule import + review ---------- */
+
+function importPanel(card) {
+  const rv = state.review;
+  if (rv && rv.cardId === card.id && rv.ok) {
+    const prev = activePack(card.id);
+    const feeChange = rv.pack.fees && ['annualFeePaise', 'joiningFeePaise'].some((k) => rv.pack.fees[k] !== undefined && rv.pack.fees[k] !== card[k]);
+    return html`<section class="panel" aria-label="Review rules">
+      <h2>Review before saving</h2>
+      <div class="pack-meta"><span>${rv.pack.card.bank} ${rv.pack.card.name}${rv.pack.card.variants?.length ? ' · ' + rv.pack.card.variants.join(', ') : ''}</span><span>Checked ${fmtDate(rv.pack.checkedAt)}</span><span>${rv.pack.sources.length} source${rv.pack.sources.length === 1 ? '' : 's'}</span></div>
+      ${rv.match === 'mismatch' ? html`<div class="box bad">This pack is for <strong>${rv.pack.card.bank} ${rv.pack.card.name}</strong>, not ${card.bank} ${card.name}. Check you picked the right card.</div>` : ''}
+      ${rv.match === 'variant_mismatch' ? html`<div class="box warn">This pack covers ${rv.pack.card.variants.join(', ')}; your card's variant is ${card.variant}. Variant-only offers will not apply.</div>` : ''}
+      ${rv.warnings.length ? html`<div class="box warn"><strong>${rv.warnings.length} thing${rv.warnings.length === 1 ? '' : 's'} to check</strong><ul>${rv.warnings.slice(0, 8).map((w) => html`<li>${w.path}: ${w.message}</li>`)}</ul></div>` : ''}
+      <div><div class="label">${prev ? `Changes from version ${prev.version}` : 'What will be added'}</div>
+        ${rv.diff.length ? html`<ul class="diff">${rv.diff.map((d) => html`<li><span class="pill ${d.kind === 'added' ? 'st-ok' : d.kind === 'removed' ? 'st-urgent' : 'st-soon'}">${d.kind === 'added' ? 'New' : d.kind === 'removed' ? 'Removed' : 'Changed'}</span>
+          <span><strong>${d.section}:</strong> ${d.label}${d.fields ? ' (' + d.fields.join(', ') + ')' : ''}${d.from !== undefined && d.id.endsWith('Paise') ? ` ${d.from == null ? '–' : formatPaise(d.from)} → ${d.to == null ? '–' : formatPaise(d.to)}` : ''}</span></li>`)}</ul>`
+        : html`<p class="hint">No changes from the current version. Saving only records that the sources were checked again on ${fmtDate(rv.pack.checkedAt)}.</p>`}</div>
+      ${feeChange ? html`<label class="actions"><input type="checkbox" id="apply-fees" checked> Update the card's fees to ${rupees(rv.pack.fees.annualFeePaise ?? card.annualFeePaise)} annual / ${rupees(rv.pack.fees.joiningFeePaise ?? card.joiningFeePaise)} joining</label>` : ''}
+      <div class="actions"><button class="btn" data-action="approve" data-id="${card.id}" ${state.busy || rv.match === 'mismatch' ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Approve and save'}</button>
+        <button class="btn ghost" data-action="back-to-paste">Back</button>
+        <button class="btn ghost" data-action="cancel-import">Cancel</button></div>
+    </section>`;
+  }
+  return html`<section class="panel" aria-label="Add rules">
+    <h2>${activePack(card.id) ? 'Update rules' : 'Add rules'} for ${cardLabel(card)}</h2>
+    <p class="hint">Paste the rule pack Claude made from this card's official pages, or choose the .json file. Nothing changes until you approve it.</p>
+    <div class="field"><label for="pack-text">Rule pack (JSON)</label><textarea id="pack-text" class="code" spellcheck="false" placeholder='{ "format": "ekfba-rulepack", … }'>${state.review?.text || ''}</textarea></div>
+    <div class="field"><label for="pack-file">Or choose a file</label><input id="pack-file" type="file" accept=".json,application/json"></div>
+    ${rv && rv.cardId === card.id && !rv.ok && rv.errors.length ? html`<div class="box bad" role="alert"><strong>This rule pack can't be used yet.</strong><ul>${rv.errors.slice(0, 12).map((e) => html`<li>${e.path ? e.path + ': ' : ''}${e.message}</li>`)}</ul>${rv.errors.length > 12 ? html`<p>…and ${rv.errors.length - 12} more.</p>` : ''}</div>` : ''}
+    <div class="actions"><button class="btn" data-action="check-pack" data-id="${card.id}">Check rules</button><button class="btn ghost" data-action="cancel-import">Cancel</button></div>
+  </section>`;
+}
+
+function checkPack(cardId, text) {
+  const card = state.cards.find((c) => c.id === cardId);
+  let pack;
+  try { pack = JSON.parse(text); } catch { state.review = { cardId, ok: false, text, errors: [{ path: '', message: 'This is not valid JSON. Copy the whole pack, from the first { to the last }.' }], warnings: [] }; return render(); }
+  const v = validateRulePack(pack, today());
+  if (!v.ok) { state.review = { cardId, ok: false, text, errors: v.errors, warnings: v.warnings }; return render(); }
+  const prev = activePack(cardId);
+  state.review = { cardId, ok: true, text, pack, warnings: v.warnings, match: packMatchesCard(pack, card), diff: diffRulePacks(prev ? prev.pack : null, pack) };
+  render();
+}
+
+async function approvePack(cardId) {
+  const rv = state.review;
+  if (!rv?.ok || state.busy) return;
+  const card = state.cards.find((c) => c.id === cardId);
+  const prev = activePack(cardId);
+  const applyFees = document.getElementById('apply-fees')?.checked;
+  state.busy = true; render();
+  try {
+    const now = Date.now();
+    const id = uuid();
+    const rec = { id, cardId, version: (prev?.version || 0) + 1, status: 'active', pack: rv.pack, approvedAt: now, createdAt: now, updatedAt: now };
+    await state.db.collection('rulePacks').doc(id).set(rec);
+    for (const old of state.packs.filter((p) => p.cardId === cardId && p.status === 'active')) {
+      await state.db.collection('rulePacks').doc(old.id).update({ status: 'superseded', updatedAt: Date.now() });
+    }
+    const update = { ...card, lastVerifiedAt: Date.parse(rv.pack.checkedAt + 'T00:00:00') };
+    if (applyFees) {
+      if (rv.pack.fees.annualFeePaise !== undefined) update.annualFeePaise = rv.pack.fees.annualFeePaise;
+      if (rv.pack.fees.joiningFeePaise !== undefined) update.joiningFeePaise = rv.pack.fees.joiningFeePaise;
+    }
+    const r = await saveCard(update);
+    if (!r.ok) throw new Error(Object.values(r.errors).join('; '));
+    state.importing = null; state.review = null;
+    toast(`Rules saved as version ${rec.version}`);
+  } catch (e) { state.loadErr = e.code ? friendly(e) : e.message; }
+  state.busy = false; render();
+}
+
+/* ---------- Card form ---------- */
+
+function cardForm() {
+  const c = state.formDraft || {};
+  const e = state.formErrors || {};
+  const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
+  const opt = (v, cur, label = v) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  const names = [...new Set(state.cards.map((x) => x.holderName).filter(Boolean))].sort();
+  const rup = (p) => (p == null ? '' : String(p / 100));
+  return html`<form class="panel" id="card-form" novalidate>
+    <h2>${c.id ? 'Edit card' : 'New card'}</h2>
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <fieldset class="seg" aria-label="Card type">
+      <label><input type="radio" name="kind" value="credit" ${c.kind !== 'debit' ? 'checked' : ''}><span>Credit card</span></label>
+      <label><input type="radio" name="kind" value="debit" ${c.kind === 'debit' ? 'checked' : ''}><span>Debit card</span></label>
+    </fieldset>
+    <div class="two">
+      <div class="field"><label for="f-bank">Bank *</label><input id="f-bank" name="bank" list="bank-list" value="${c.bank || ''}" autocomplete="off" placeholder="HDFC Bank">
+        <datalist id="bank-list">${BANKS.map((b) => html`<option value="${b}">`)}</datalist>${err('bank')}</div>
+      <div class="field"><label for="f-name">Card name *</label><input id="f-name" name="name" value="${c.name || ''}" autocomplete="off" placeholder="Millennia">${err('name')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-variant">Variant / tier</label><input id="f-variant" name="variant" value="${c.variant || ''}" autocomplete="off" placeholder="Signature">${err('variant')}</div>
+      <div class="field"><label for="f-network">Network *</label><select id="f-network" name="network">${opt('', c.network, 'Choose…')}${NETWORKS.map((n) => opt(n, c.network))}</select>${err('network')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-nickname">Nickname</label><input id="f-nickname" name="nickname" value="${c.nickname || ''}" maxlength="40" autocomplete="off" placeholder="Shopping card">${err('nickname')}</div>
+      <div class="field"><label for="f-last4">Last 4 digits</label><input id="f-last4" name="last4" value="${c.last4 || ''}" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="1234">${err('last4')}</div>
+    </div>
+    <p class="hint">Never the full card number, expiry date, CVV or PIN. The page refuses them.</p>
+    <div class="two">
+      <div class="field"><label for="f-holderName">Card holder</label><input id="f-holderName" name="holderName" list="holder-list" value="${c.holderName || ''}" autocomplete="off" placeholder="Same spelling as in Policies">
+        <datalist id="holder-list">${names.map((n) => html`<option value="${n}">`)}</datalist>${err('holderName')}</div>
+      <div class="field"><label for="f-holder">Primary or add-on</label><select id="f-holder" name="holder">${opt('primary', c.holder || 'primary', 'Primary card')}${opt('add-on', c.holder, 'Add-on card')}</select></div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-joining">Joining fee (₹)</label><input id="f-joining" name="joiningFee" value="${rup(c.joiningFeePaise)}" inputmode="decimal" placeholder="0">${err('joiningFeePaise')}</div>
+      <div class="field"><label for="f-annual">Annual fee (₹)</label><input id="f-annual" name="annualFee" value="${rup(c.annualFeePaise)}" inputmode="decimal" placeholder="0">${err('annualFeePaise')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="f-issue">Issue date (sets the fee date)</label><input id="f-issue" name="issueDate" type="date" value="${c.issueDate || ''}">${err('issueDate')}</div>
+      <div class="field"><label for="f-stmt">Statement day (credit)</label><input id="f-stmt" name="statementDay" value="${c.statementDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="15">${err('statementDay')}</div>
+    </div>
+    <div class="field"><label for="f-urls">Official benefit / T&amp;C links, one per line</label><textarea id="f-urls" name="sourceUrls" placeholder="https://…">${(c.sourceUrls || []).join('\n')}</textarea>
+      ${Object.keys(e).filter((k) => k.startsWith('sourceUrls')).map((k) => err(k))}</div>
+    <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes">${c.notes || ''}</textarea>${err('notes')}</div>
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save'}</button><button class="btn ghost" type="button" data-action="cancel">Cancel</button></div>
+  </form>`;
+}
+
+function readForm(form) {
+  const f = Object.fromEntries(new FormData(form));
+  const fee = (v) => (String(v).trim() === '' ? null : parseRupeesToPaise(v) ?? -1);
+  const sd = String(f.statementDay).trim();
+  const base = state.editing === 'new' ? {} : state.cards.find((c) => c.id === state.editing) || {};
+  return { ...base, kind: f.kind, bank: f.bank, name: f.name, variant: f.variant, network: f.network, nickname: f.nickname, last4: f.last4,
+    holderName: f.holderName, holder: f.holder, joiningFeePaise: fee(f.joiningFee), annualFeePaise: fee(f.annualFee), issueDate: f.issueDate,
+    statementDay: sd === '' ? null : (/^\d+$/.test(sd) ? Number(sd) : -1), sourceUrls: String(f.sourceUrls).split('\n'), notes: f.notes };
+}
+
+/* ---------- Offers ---------- */
+
+function allOffers() {
+  const out = [];
+  for (const c of state.cards.filter((x) => x.status === 'active')) {
+    const rec = activePack(c.id);
+    if (!rec) continue;
+    for (const o of offersForCard(rec.pack, c)) out.push({ o, card: c, pack: rec.pack });
+  }
+  return out;
+}
+
+function offersView() {
+  const items = allOffers();
+  const q = state.offerQuery.trim().toLowerCase();
+  const f = state.offerFilter;
+  const shown = items.filter(({ o, card }) => {
+    const st = offerStatus(o, today());
+    if (f === 'active' && !(st === 'active' || st === 'no_end_date')) return false;
+    if (f === 'upcoming' && st !== 'upcoming') return false;
+    if (f === 'expired' && st !== 'expired') return false;
+    if (!q) return true;
+    return [o.label, o.merchant, ...(o.appliesTo?.categories || []), card.bank, card.name, card.nickname].join(' ').toLowerCase().includes(q);
+  }).sort((a, b) => (a.o.validTo || '9999').localeCompare(b.o.validTo || '9999'));
+  const counts = { active: 0, upcoming: 0, expired: 0 };
+  items.forEach(({ o }) => { const st = offerStatus(o, today()); counts[st === 'no_end_date' ? 'active' : st]++; });
+  return html`
+    <div class="field"><label for="offer-q">Search a shop, platform or category</label><input id="offer-q" type="search" value="${state.offerQuery}" placeholder="Croma, Swiggy, grocery…" autocomplete="off"></div>
+    <div class="chips" role="group" aria-label="Offer status">
+      ${[['active', `Active (${counts.active})`], ['upcoming', `Upcoming (${counts.upcoming})`], ['expired', `Expired (${counts.expired})`], ['all', 'All']].map(([k, l]) =>
+        html`<button class="chip" data-action="offer-filter" data-f="${k}" aria-pressed="${f === k}">${l}</button>`)}
+    </div>
+    ${!items.length ? html`<div class="empty"><h2>No offers yet</h2><p>Offers appear here once you add rule packs to your cards. Each offer shows its card, conditions, end date and source.</p></div>`
+      : !shown.length ? html`<div class="empty"><p>No ${f === 'all' ? '' : f + ' '}offers${q ? ` matching “${state.offerQuery}”` : ''}.</p></div>`
+      : html`<section class="list" aria-label="Offers">${shown.map(({ o, card, pack }) => html`
+        <article class="row"><div class="detail flush">
+          <div class="rule-top"><div><div class="ins">${o.merchant || scopeText(o.appliesTo)}</div><div class="meta">${cardLabel(card)}</div></div>${badges(o, offerPill(o))}</div>
+          <p>${o.label}</p>
+          <small class="meta">${offerValueText(o)}${o.validFrom ? ` · from ${fmtDate(o.validFrom)}` : ''}${o.validTo ? ` · till ${fmtDate(o.validTo)}` : ''}</small>
+          ${packFreshness(pack, today()).offersStale ? html`<small class="meta">Last checked ${fmtDate(pack.checkedAt)}. The bank may have changed this offer.</small>` : ''}
+          ${sourceLine(pack, o)}
+        </div></article>`)}</section>`}`;
+}
+
+/* ---------- Freshness ---------- */
+
+function freshView() {
+  const active = state.cards.filter((c) => c.status === 'active');
+  if (!active.length) return html`<div class="empty"><p>Add cards to see how fresh their rules are.</p></div>`;
+  return html`<p class="hint">Offers are marked out of date 30 days after the bank pages were last checked, other rules after 180 days. To refresh, share the card's pages in the Card Manager project chat and ask for an updated rule pack.</p>
+    <section class="list">${active.map((c) => {
+      const rec = activePack(c.id);
+      if (!rec) return html`<article class="row"><div class="row-head"><div><div class="ins">${cardLabel(c)}</div><div class="meta">${c.sourceUrls.length} official link${c.sourceUrls.length === 1 ? '' : 's'} saved</div></div><div class="right"><span class="pill st-soon">No rules</span></div></div></article>`;
+      const fr = packFreshness(rec.pack, today());
+      const pill = fr.baselineStale ? ['st-urgent', 'Out of date'] : fr.offersStale ? ['st-soon', 'Offers out of date'] : ['st-ok', 'Fresh'];
+      return html`<article class="row"><div class="row-head"><div><div class="ins">${cardLabel(c)}</div>
+        <div class="meta">Checked ${fmtDate(rec.pack.checkedAt)} (${rel(-fr.ageDays)}) · version ${rec.version}${fr.unverifiedCount ? ` · ${fr.unverifiedCount} unverified` : ''}</div>
+        <div class="meta">${rec.pack.sources.map((s, i) => html`${i ? ' · ' : ''}${s.url ? html`<a href="${s.url}" target="_blank" rel="noopener">${s.title}</a>` : s.title}`)}</div></div>
+        <div class="right"><span class="pill ${pill[0]}">${pill[1]}</span></div></div></article>`;
+    })}</section>`;
+}
+
+/* ---------- Backup ---------- */
+
+function backupView() {
+  const p = state.backupPreview;
+  return html`<section class="panel plain">
+      <h2>Download a backup</h2>
+      <p class="hint">A JSON file in the same format as NLNLALD Policies backups (module "credit_cards"). Keep it in your Google Drive. It is also how your cards will move into the mobile app later.</p>
+      <div class="actions"><button class="btn" data-action="export-json" ${state.dl && state.cards.length ? '' : 'disabled'}>Download backup (JSON)</button>
+        <button class="btn ghost" data-action="export-csv" ${state.dl && state.cards.length ? '' : 'disabled'}>Download card list (CSV)</button></div>
+      ${!state.dl ? html`<p class="hint">Downloads are not available in this view.</p>` : ''}
+    </section>
+    <section class="panel plain">
+      <h2>Restore from a backup</h2>
+      <p class="hint">Choose an EKFBA backup file. You'll see what it contains first. Restoring keeps whichever copy of each card or rule version is newer.</p>
+      <div class="field"><label for="backup-file">Backup file</label><input id="backup-file" type="file" accept=".json,application/json"></div>
+      ${p ? (p.ok ? html`<div class="box good">Backup from ${p.exportedAt ? fmtDate(p.exportedAt.slice(0, 10)) : 'unknown date'}: <strong>${p.summary.cards}</strong> cards, <strong>${p.summary.rulePacks}</strong> rule versions.</div>
+          <div class="actions"><button class="btn" data-action="restore" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Restoring…' : 'Restore'}</button><button class="btn ghost" data-action="cancel-restore">Cancel</button></div>`
+        : html`<div class="box bad"><strong>This file can't be restored.</strong><ul>${p.errors.slice(0, 8).map((x) => html`<li>${x}</li>`)}</ul></div>`) : ''}
+    </section>`;
+}
+
+function exportJson() {
+  const b = buildBackup({ cards: state.cards, rulePacks: state.packs }, APP_VERSION, COLLECTIONS);
+  state.dl.save({ filename: `ekfba-cards-backup-${today()}.json`, data: JSON.stringify(b, null, 2) }).then(() => toast('Backup saved')).catch(() => {});
+}
+function exportCsv() {
+  const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['Bank', 'Card', 'Variant', 'Type', 'Network', 'Nickname', 'Last 4', 'Card holder', 'Annual fee (Rs)', 'Issue date', 'Status', 'Rules checked'].map(q).join(',')];
+  for (const c of state.cards) {
+    const rec = activePack(c.id);
+    rows.push([c.bank, c.name, c.variant, c.kind, c.network, c.nickname, c.last4, c.holderName, c.annualFeePaise == null ? '' : c.annualFeePaise / 100, c.issueDate, c.status, rec ? rec.pack.checkedAt : ''].map(q).join(','));
+  }
+  state.dl.save({ filename: 'ekfba-cards.csv', data: rows.join('\r\n') }).catch(() => {});
+}
+async function restore() {
+  const p = state.backupPreview;
+  if (!p?.ok || state.busy) return;
+  state.busy = true; render();
+  let added = 0, updated = 0;
+  try {
+    for (const name of COLLECTIONS) {
+      const existing = name === 'cards' ? state.cards : state.packs;
+      const m = mergeRecords(existing, p.stores[name] || []);
+      const byId = new Map(existing.map((r) => [r.id, r]));
+      for (const r of m.merged) {
+        if (byId.get(r.id) === r) continue;
+        await state.db.collection(name).doc(r.id).set(r);
+      }
+      added += m.added; updated += m.updated;
+    }
+    state.backupPreview = null;
+    toast(`Restored: ${added} added, ${updated} updated`);
+  } catch (e) { state.loadErr = friendly(e); }
+  state.busy = false; render();
+}
+
+/* ---------------- Events ---------------- */
+
+function afterRender() {
+  document.getElementById('pack-file')?.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    if (file.size > 300000) { toast('That file is too large for a rule pack.'); return; }
+    checkPack(state.importing, await file.text());
+  });
+  document.getElementById('backup-file')?.addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    let obj;
+    try { obj = JSON.parse(await file.text()); } catch { state.backupPreview = { ok: false, errors: ['The file is not valid JSON.'] }; return render(); }
+    const v = validateBackup(obj, COLLECTIONS);
+    state.backupPreview = { ...v, exportedAt: obj.exportedAt };
+    render();
+  });
+  const q = document.getElementById('offer-q');
+  q?.addEventListener('input', () => {
+    state.offerQuery = q.value;
+    const pos = q.selectionStart;
+    render();
+    const n = document.getElementById('offer-q'); n.focus(); n.setSelectionRange(pos, pos);
+  });
+}
+
+$app.addEventListener('click', async (ev) => {
+  const t = ev.target.closest('[data-action]');
+  if (!t || t.disabled) return;
+  const a = t.dataset.action, id = t.dataset.id;
+  if (a === 'tab') { state.tab = t.dataset.tab; render(); }
+  else if (a === 'new') { state.editing = 'new'; state.formDraft = {}; state.formErrors = {}; render(); document.getElementById('f-bank')?.focus(); }
+  else if (a === 'edit') { state.editing = id; state.formDraft = { ...state.cards.find((c) => c.id === id) }; state.formErrors = {}; render(); document.getElementById('card-form')?.scrollIntoView({ block: 'start' }); }
+  else if (a === 'cancel') { state.editing = null; state.formDraft = null; state.formErrors = {}; render(); }
+  else if (a === 'toggle') { state.open = state.open === id ? null : id; state.confirm = null; if (state.importing !== state.open) { state.importing = null; state.review = null; } render(); }
+  else if (a === 'toggle-archived') { state.showArchived = !state.showArchived; render(); }
+  else if (a === 'ask') { state.confirm = { id, what: t.dataset.what }; render(); }
+  else if (a === 'cancel-confirm') { state.confirm = null; render(); }
+  else if (a === 'status' || a === 'replace') {
+    const card = state.cards.find((c) => c.id === id);
+    const status = a === 'replace' ? 'replaced' : t.dataset.status;
+    const replacedById = a === 'replace' ? document.getElementById('replace-with').value : null;
+    try {
+      const r = await saveCard({ ...card, status, replacedById });
+      if (r.ok) { state.confirm = null; toast(`Card ${STATUS_LABEL[status].toLowerCase()}`); }
+    } catch (e) { state.loadErr = friendly(e); }
+    render();
+  }
+  else if (a === 'import') { state.importing = id; state.review = null; render(); document.getElementById('pack-text')?.focus(); }
+  else if (a === 'cancel-import') { state.importing = null; state.review = null; render(); }
+  else if (a === 'check-pack') checkPack(id, document.getElementById('pack-text').value);
+  else if (a === 'back-to-paste') { state.review = { cardId: state.review.cardId, ok: false, text: state.review.text, errors: [], warnings: [] }; render(); }
+  else if (a === 'approve') approvePack(id);
+  else if (a === 'offer-filter') { state.offerFilter = t.dataset.f; render(); }
+  else if (a === 'export-json') exportJson();
+  else if (a === 'export-csv') exportCsv();
+  else if (a === 'restore') restore();
+  else if (a === 'cancel-restore') { state.backupPreview = null; render(); }
+});
+
+$app.addEventListener('submit', async (ev) => {
+  if (ev.target.id !== 'card-form') return;
+  ev.preventDefault();
+  if (state.busy) return;
+  const draft = readForm(ev.target);
+  if (!state.db) { state.formDraft = draft; state.formErrors = { _form: 'Saving is not available in this view.' }; return render(); }
+  state.busy = true;
+  try {
+    const r = await saveCard(draft);
+    if (!r.ok) { state.formDraft = draft; state.formErrors = r.errors; }
+    else { state.editing = null; state.formDraft = null; state.formErrors = {}; state.open = r.card.id; toast(draft.id ? 'Card updated' : 'Card added'); }
+  } catch (e) { state.formDraft = draft; state.formErrors = { _form: friendly(e) }; }
+  state.busy = false;
+  render();
+  document.querySelector('.ferr, #card-form .box.bad')?.scrollIntoView({ block: 'center' });
+});
+
+// Keep what the person is typing when live updates arrive.
+function safeRender() {
+  const f = document.activeElement;
+  if (f && f.closest && (f.closest('#card-form') || f.id === 'pack-text')) return;
+  render();
+}
+
+render();
+
+(async () => {
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  const [db, user, dl] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('downloads')]);
+  state.dl = dl;
+  if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
+  if (!db) { state.ready = { cards: true, rulePacks: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  state.db = db;
+  render();
+  db.collection('cards').onSnapshot((snap) => {
+    state.cards = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.cards = true; state.loadErr = '';
+    if (state.open && !state.cards.some((c) => c.id === state.open)) state.open = null;
+    safeRender();
+  }, () => { state.ready.cards = true; state.loadErr = 'Could not load your cards. Reopen the page to try again.'; render(); });
+  db.collection('rulePacks').onSnapshot((snap) => {
+    state.packs = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.rulePacks = true;
+    safeRender();
+  }, () => { state.ready.rulePacks = true; });
+})();
+</script>

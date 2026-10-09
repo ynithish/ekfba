@@ -5,31 +5,40 @@ import { validateCard } from './card.js';
 import { scanForSensitiveData } from './sensitive.js';
 import { nowIso } from './ids.js';
 
-export const BACKUP_FORMAT = 'ekfba-backup';
+// Envelope shared by every NLNLALD module: { app, module, schemaVersion, exportedAt, records[] }.
+// records = cards. Other collections travel in `collections` so importers that only read records still work.
+export const BACKUP_APP = 'NLNLALD';
+export const BACKUP_MODULE = 'credit_cards';
 
 /** data: { storeName: record[] } */
-export function buildBackup(data, appVersion) {
-  const stores = {};
-  for (const s of BACKUP_STORES) stores[s] = Array.isArray(data[s]) ? data[s] : [];
-  return { format: BACKUP_FORMAT, schemaVersion: SCHEMA_VERSION, appVersion, exportedAt: nowIso(), stores };
+export function buildBackup(data, appVersion, storeNames = BACKUP_STORES) {
+  const collections = {};
+  for (const s of storeNames) if (s !== 'cards') collections[s] = Array.isArray(data[s]) ? data[s] : [];
+  return {
+    app: BACKUP_APP, module: BACKUP_MODULE, schemaVersion: SCHEMA_VERSION, appVersion,
+    exportedAt: nowIso(), records: Array.isArray(data.cards) ? data.cards : [], collections,
+  };
 }
 
 /**
  * Validates a parsed backup object. Returns { ok, stores, summary, errors }.
  * Every card is re-validated; the whole file is scanned for sensitive data.
  */
-export function validateBackup(obj) {
+export function validateBackup(obj, storeNames = BACKUP_STORES) {
   const errors = [];
-  if (!obj || obj.format !== BACKUP_FORMAT) return { ok: false, errors: ['This is not an EKFBA backup file.'] };
+  if (!obj || obj.app !== BACKUP_APP || obj.module !== BACKUP_MODULE || !Array.isArray(obj.records)) {
+    return { ok: false, errors: [obj?.app === BACKUP_APP && obj?.module ? `This is a backup of the ${obj.module} module, not credit cards.` : 'This is not an EKFBA card backup file.'] };
+  }
+  const input = { cards: obj.records, ...(obj.collections || {}) };
   if (!Number.isInteger(obj.schemaVersion) || obj.schemaVersion > SCHEMA_VERSION) {
     return { ok: false, errors: [`Backup was made by a newer version of the app (format ${obj.schemaVersion}). Update the app first.`] };
   }
-  const sensitive = scanForSensitiveData(obj.stores || {});
+  const sensitive = scanForSensitiveData(input);
   if (sensitive) return { ok: false, errors: [`Refused: ${sensitive.path} ${sensitive.reason}.`] };
 
   const stores = {};
-  for (const s of BACKUP_STORES) {
-    const rows = obj.stores?.[s] ?? [];
+  for (const s of storeNames) {
+    const rows = input[s] ?? [];
     if (!Array.isArray(rows)) { errors.push(`"${s}" is not a list`); continue; }
     stores[s] = [];
     const seen = new Set();
@@ -55,13 +64,15 @@ export function validateBackup(obj) {
  * Merges incoming records into existing ones by id. The record with the later updatedAt wins;
  * ties keep the existing record. Returns { merged, added, updated, unchanged }.
  */
+const stamp = (v) => (typeof v === 'number' ? v : Date.parse(v || '') || 0);
+
 export function mergeRecords(existing, incoming, key = 'id') {
   const map = new Map(existing.map((r) => [r[key], r]));
   let added = 0, updated = 0, unchanged = 0;
   for (const r of incoming) {
     const cur = map.get(r[key]);
     if (!cur) { map.set(r[key], r); added++; }
-    else if ((r.updatedAt || '') > (cur.updatedAt || '')) { map.set(r[key], r); updated++; }
+    else if (stamp(r.updatedAt) > stamp(cur.updatedAt)) { map.set(r[key], r); updated++; }
     else unchanged++;
   }
   return { merged: [...map.values()], added, updated, unchanged };
