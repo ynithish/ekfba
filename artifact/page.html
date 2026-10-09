@@ -65,7 +65,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .btn.small { min-height: 38px; padding: 0 14px; font-size: 14px; }
 .btn[disabled] { opacity: .5; cursor: default; }
 
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
+.tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
 .tab { border: 0; background: transparent; border-radius: 9px; min-height: 40px; font-weight: 600; font-size: 14px; color: var(--muted); }
 .tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
 
@@ -114,6 +114,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .rule-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .rule-top strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .rule-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex: none; max-width: 50%; }
+.rule-badges.left { justify-content: flex-start; max-width: none; }
 .rule small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .rule .src { font-size: 12px; }
 .rule.expired { opacity: .65; }
@@ -150,6 +151,21 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .empty p { color: var(--muted); max-width: 42ch; }
 .note { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
+.ask-form { display: flex; gap: 8px; }
+.ask-form input { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-height: 52px; padding: 0 14px; font-size: 17px; }
+.ask-form input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.ask-q { font-family: var(--display); font-size: 20px; line-height: 1.2; }
+.winner { background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.winner .use { font-size: 13px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.winner .big { font-family: var(--display); font-size: 24px; line-height: 1.15; }
+.save { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.save b { font-family: var(--display); font-size: 30px; color: var(--ok); font-variant-numeric: tabular-nums; }
+.breakdown { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; margin: 0; }
+.breakdown dt { color: var(--muted); }
+.breakdown dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.why { font-size: 13.5px; color: var(--muted); }
+.notes-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.alt-net { font-family: var(--display); font-size: 18px; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -162,7 +178,8 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 <script>
 const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToPaise, formatPaise,
   validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
-  CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid } = __core;
+  CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid,
+  parseQuery, recommend, explain } = __core;
 
 const APP_VERSION = '0.2.0';
 const COLLECTIONS = ['cards', 'rulePacks'];
@@ -176,7 +193,7 @@ const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c.replace(/_/g, '
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'wallet', cards: [], packs: [], ready: { cards: false, rulePacks: false }, db: null, dl: null, canWrite: true,
+  tab: 'ask', askText: '', askResult: null, cards: [], packs: [], ready: { cards: false, rulePacks: false }, db: null, dl: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   offerFilter: 'active', offerQuery: '', showArchived: false, busy: false, loadErr: '', backupPreview: null,
 };
@@ -236,14 +253,14 @@ function render() {
   if (state.loadErr) h = html`${h}<div class="err" role="alert">${state.loadErr}</div>`;
   if (!state.canWrite) h = html`${h}<div class="hint">You can view this wallet but not change it.</div>`;
   h = html`${h}<nav class="tabs" role="tablist" aria-label="Sections">
-    ${[['wallet', 'Wallet'], ['offers', 'Offers'], ['fresh', 'Freshness'], ['backup', 'Backup']].map(([k, l]) =>
+    ${[['ask', 'Ask'], ['wallet', 'Wallet'], ['offers', 'Offers'], ['fresh', 'Freshness'], ['backup', 'Backup']].map(([k, l]) =>
       html`<button class="tab" role="tab" data-action="tab" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`)}
   </nav>`;
-  const body = state.tab === 'wallet' ? walletView(cards) : state.tab === 'offers' ? offersView() : state.tab === 'fresh' ? freshView() : backupView();
+  const body = state.tab === 'ask' ? askView() : state.tab === 'wallet' ? walletView(cards) : state.tab === 'offers' ? offersView() : state.tab === 'fresh' ? freshView() : backupView();
   $app.innerHTML = String(html`${h}${body}
     <div class="note">
       <span>Only the owner of this page can see or change it. Never enter full card numbers, expiry dates, CVV, PIN or OTP; the page refuses them.</span>
-      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchase logging and "which card should I use" come in the next phases.</span>
+      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchase logging and spend-milestone tracking come next.</span>
     </div>`);
   afterRender();
 }
@@ -597,6 +614,73 @@ function offersView() {
 
 /* ---------- Freshness ---------- */
 
+function askView() {
+  const r = state.askResult;
+  const popular = ['Croma', 'Swiggy Instamart', 'Amazon', 'BookMyShow', 'Petrol', 'DMart'];
+  let out = html`<div class="ask-q">Where are you spending, and how much?</div>
+    <form class="ask-form" id="ask-form" novalidate>
+      <input id="ask-q" type="search" enterkeyhint="search" autocomplete="off" value="${state.askText}" placeholder="Croma 15000, Swiggy, petrol 2k" aria-label="Shop, app or category, and amount">
+      <button class="btn" type="submit">Find card</button>
+    </form>`;
+  if (!r) {
+    return html`${out}<div class="chips" aria-label="Try">${popular.map((p) => html`<button class="chip" data-action="ask-try" data-q="${p}">${p}</button>`)}</div>
+      <p class="hint">Type a shop, outlet or app name, with or without the amount. Recommendations use the rules saved on your cards; offers are labelled when they may be out of date.</p>`;
+  }
+  if (r.needs) {
+    const cats = ['grocery', 'dining', 'food_delivery', 'fuel', 'electronics', 'apparel', 'online_shopping', 'travel', 'flights', 'hotels', 'utilities', 'telecom', 'healthcare', 'entertainment', 'jewellery', 'rent', 'insurance', 'education', 'other'];
+    return html`${out}<section class="panel"><h2>What kind of spend is ${r.query.merchantGuess ? '“' + r.query.merchantGuess + '”' : 'this'}?</h2>
+      <p class="hint">I don't know this shop yet. Pick the closest type and I'll compare your cards.</p>
+      <div class="chips">${cats.map((c) => html`<button class="chip" data-action="ask-cat" data-cat="${c}">${CAT_LABEL[c] || c}</button>`)}</div></section>`;
+  }
+  const amountKnown = r.query.amountPaise !== null;
+  const what = [r.query.merchant ? r.query.merchant.name : r.query.categories.map((c) => CAT_LABEL[c] || c).join(', '), amountKnown ? formatPaise(r.query.amountPaise) : ''].filter(Boolean).join(' · ');
+  if (!r.results.length) {
+    return html`${out}<div class="empty"><h2>No card can be compared yet</h2><p>Add rules to your cards first. ${r.skipped.length ? `${r.skipped.length} card${r.skipped.length === 1 ? ' has' : 's have'} no rules.` : ''}</p></div>`;
+  }
+  const [w, ...rest] = r.results;
+  const rewardText = (x) => x.reward.excluded ? 'No rewards on this spend'
+    : !x.reward.rule ? 'No reward rule matches'
+    : x.reward.kind === 'cashback' ? `${(x.reward.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% cashback`
+    : amountKnown ? `${x.reward.points.toLocaleString('en-IN')} points${x.reward.valueKnown ? '' : ' (value not set)'}`
+    : `${x.reward.rule.pointsPer.points} points per ${formatPaise(x.reward.rule.pointsPer.perPaise)}${x.reward.valueKnown ? ` ≈ ${(x.reward.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% back` : ' (value not set)'}`;
+  const badges = (x) => [x.offer && x.offer.status === 'no_end_date' ? html`<span class="pill st-soon">Offer end date unknown</span>` : '',
+    x.offer && x.offer.verified === false ? html`<span class="pill st-soon">Offer unverified</span>` : '',
+    x.offer && x.freshness.offersStale ? html`<span class="pill st-soon">Offer last checked ${fmtDate(x.freshness.checkedAt)}</span>` : ''];
+  out = html`${out}<div class="meta">Showing results for <strong>${what}</strong>${r.query.channel ? ` · ${r.query.channel}` : ''}</div>
+    <section class="winner" aria-label="Best card">
+      <span class="use">Use this card</span>
+      <div class="big">${cardLabel(w.card)}</div>
+      ${amountKnown ? html`<div class="save"><b>${formatPaise(Math.max(0, w.netPaise))}</b><span class="meta">estimated saving${w.netComplete ? '' : ' (points without a value are not counted)'}</span></div>
+        <dl class="breakdown">
+          <dt>Offer</dt><dd>${w.offer ? (w.offer.minSpendShortPaise ? `needs ${formatPaise(w.offer.minSpendShortPaise)} more` : formatPaise(w.offerPaise || 0)) : '–'}</dd>
+          <dt>Rewards · ${rewardText(w)}</dt><dd>${w.reward.valueKnown && !w.reward.excluded ? formatPaise(w.reward.valuePaise || 0) : '–'}</dd>
+          ${w.feesPaise ? html`<dt>Charges</dt><dd>−${formatPaise(w.feesPaise)}</dd>` : ''}
+        </dl>` : html`<div class="why">${rewardText(w)}${w.offer ? html` · <strong>${w.offer.offer.label}</strong>` : ''}</div><p class="hint">Add the amount for an exact saving in rupees.</p>`}
+      ${w.offer && amountKnown && !w.offer.minSpendShortPaise ? html`<div class="why"><strong>Offer:</strong> ${w.offer.offer.label}</div>` : ''}
+      ${badges(w).some(Boolean) ? html`<div class="rule-badges left">${badges(w)}</div>` : ''}
+      ${w.milestones.length ? html`<div class="why">Counts toward: ${w.milestones.map((m) => m.label).join('; ')}.</div>` : ''}
+      ${w.notes.length ? html`<ul class="notes-list">${w.notes.map((n) => html`<li>${n}</li>`)}</ul>` : ''}
+    </section>`;
+  if (rest.length) {
+    out = html`${out}<h2>Other cards</h2><section class="list">${rest.map((x) => html`<article class="row"><div class="row-head">
+      <div><div class="ins">${cardLabel(x.card)}</div><div class="meta">${explain(x, w, amountKnown)}</div>
+        ${x.notes.length ? html`<div class="meta">${x.notes[0]}</div>` : ''}</div>
+      <div class="right">${amountKnown ? html`<span class="alt-net">${formatPaise(Math.max(0, x.netPaise))}</span>` : html`<span class="pill st-quiet">${x.reward.valueKnown && x.reward.rule ? `${(x.reward.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}%` : 'n/a'}</span>`}</div>
+    </div></article>`)}</section>`;
+  }
+  if (r.skipped.length) out = html`${out}<p class="hint">Not compared (no rules yet): ${r.skipped.map((s) => cardLabel(s.card)).join(', ')}.</p>`;
+  return html`${out}<p class="hint">Estimates from your saved card rules. Period caps, the bank's own merchant classification and offers you have already used can change the real amount.</p>`;
+}
+
+function runAsk(text, extraCategory = null) {
+  state.askText = text;
+  const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null }));
+  let q = parseQuery(text);
+  if (extraCategory) q = { ...q, categories: [...q.categories, extraCategory] };
+  state.askResult = text.trim() || extraCategory ? recommend(wallet, q, today()) : null;
+  render();
+}
+
 function freshView() {
   const active = state.cards.filter((c) => c.status === 'active');
   if (!active.length) return html`<div class="empty"><p>Add cards to see how fresh their rules are.</p></div>`;
@@ -701,6 +785,8 @@ $app.addEventListener('click', async (ev) => {
   if (!t || t.disabled) return;
   const a = t.dataset.action, id = t.dataset.id;
   if (a === 'tab') { state.tab = t.dataset.tab; render(); }
+  else if (a === 'ask-try') runAsk(t.dataset.q);
+  else if (a === 'ask-cat') runAsk(state.askText, t.dataset.cat);
   else if (a === 'new') { state.editing = 'new'; state.formDraft = {}; state.formErrors = {}; render(); document.getElementById('f-bank')?.focus(); }
   else if (a === 'edit') { state.editing = id; state.formDraft = { ...state.cards.find((c) => c.id === id) }; state.formErrors = {}; render(); document.getElementById('card-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'cancel') { state.editing = null; state.formDraft = null; state.formErrors = {}; render(); }
@@ -731,6 +817,7 @@ $app.addEventListener('click', async (ev) => {
 });
 
 $app.addEventListener('submit', async (ev) => {
+  if (ev.target.id === 'ask-form') { ev.preventDefault(); runAsk(document.getElementById('ask-q').value); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -749,8 +836,9 @@ $app.addEventListener('submit', async (ev) => {
 
 // Keep what the person is typing when live updates arrive.
 function safeRender() {
+  if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
-  if (f && f.closest && (f.closest('#card-form') || f.id === 'pack-text')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 

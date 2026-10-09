@@ -1,37 +1,193 @@
 {
   "format": "ekfba-rulepack",
   "schemaVersion": 1,
-  "card": { "bank": "Axis Bank", "name": "Horizon", "kind": "credit" },
+  "card": {
+    "bank": "Axis Bank",
+    "name": "Horizon",
+    "kind": "credit"
+  },
   "checkedAt": "2026-10-09",
-  "notes": "The Axis product page loads its details with scripts and could not be read, so this pack comes from Axis's Horizon terms and conditions PDF, which appears to date from mid-2024. Lounge access in particular may since have gained a spend condition; those rules are marked unverified. The PDF gives no annual-fee waiver condition, no forex mark-up and no rupee value for EDGE Miles (they transfer 1:1 to partner programmes).",
+  "notes": "The Axis product page loads its details with scripts and could not be read, so this pack comes from Axis's Horizon terms and conditions PDF, which appears to date from mid-2024. Lounge access in particular may since have gained a spend condition; those rules are marked unverified. The cardholder confirms there is no annual-fee waiver. The PDF gives no forex mark-up and no rupee value for EDGE Miles (they transfer 1:1 to partner programmes).",
   "sources": [
-    { "id": "s1", "type": "tnc_pdf", "title": "Axis Bank – Terms and conditions for HORIZON Credit Card (PDF)", "url": "https://a2622016.axisbank.com/docs/default-source/ld/terms-and-conditions-for-horizon-credit-card-(1).pdf", "checkedAt": "2026-10-09" },
-    { "id": "s2", "type": "bank_page", "title": "Axis Bank – HORIZON Credit Card (page could not be read)", "url": "https://www.axis.bank.in/cards/credit-card/axis-horizon-credit-card", "checkedAt": "2026-10-09" }
+    {
+      "id": "s1",
+      "type": "tnc_pdf",
+      "title": "Axis Bank – Terms and conditions for HORIZON Credit Card (PDF)",
+      "url": "https://a2622016.axisbank.com/docs/default-source/ld/terms-and-conditions-for-horizon-credit-card-(1).pdf",
+      "checkedAt": "2026-10-09"
+    },
+    {
+      "id": "s2",
+      "type": "bank_page",
+      "title": "Axis Bank – HORIZON Credit Card (page could not be read)",
+      "url": "https://www.axis.bank.in/cards/credit-card/axis-horizon-credit-card",
+      "checkedAt": "2026-10-09"
+    },
+    {
+      "id": "owner",
+      "type": "other",
+      "title": "Cardholder's own information (Card Manager chat, 9 Oct 2026)",
+      "document": "Stated by the cardholder",
+      "checkedAt": "2026-10-09"
+    }
   ],
   "fees": {
     "joiningFeePaise": 300000,
     "annualFeePaise": 300000,
     "sourceId": "s1",
     "items": [
-      { "id": "fuel-surcharge-waiver", "label": "1% fuel surcharge waived on ₹400–₹5,000 transactions, up to ₹400 a statement month", "bps": 0, "appliesTo": { "categories": ["fuel"] }, "sourceId": "s1", "clause": "with a max cap of INR 400 on wavier in the statement month", "verified": true }
+      {
+        "id": "fuel-surcharge-waiver",
+        "label": "1% fuel surcharge waived on ₹400–₹5,000 transactions, up to ₹400 a statement month",
+        "bps": 0,
+        "appliesTo": {
+          "categories": [
+            "fuel"
+          ]
+        },
+        "sourceId": "s1",
+        "clause": "with a max cap of INR 400 on wavier in the statement month",
+        "verified": true
+      }
     ]
   },
   "earnRules": [
-    { "id": "base-2", "label": "2 EDGE Miles per ₹100 on other spends", "kind": "points", "pointsPer": { "points": 2, "perPaise": 10000 }, "appliesTo": { "channel": "any" }, "sourceId": "s1", "clause": "2 EDGE Miles for every INR 100 spent on other spends", "verified": true },
-    { "id": "travel-edge-5", "label": "5 EDGE Miles per ₹100 on Axis Bank Travel EDGE", "kind": "points", "pointsPer": { "points": 5, "perPaise": 10000 }, "appliesTo": { "merchants": ["Axis Bank Travel EDGE"], "channel": "online" }, "sourceId": "s1", "clause": "5 EDGE Miles for every INR 100 spent", "verified": true },
-    { "id": "airline-direct-5", "label": "5 EDGE Miles per ₹100 booking directly with airlines (travel agents and OTAs earn only 2)", "kind": "points", "pointsPer": { "points": 5, "perPaise": 10000 }, "appliesTo": { "categories": ["flights"] }, "sourceId": "s1", "clause": "Bookings via travel agents ... shall be eligible for only 2 EDGE Miles for every INR 100 spent", "verified": true }
+    {
+      "id": "base-2",
+      "label": "2 EDGE Miles per ₹100 on other spends",
+      "kind": "points",
+      "pointsPer": {
+        "points": 2,
+        "perPaise": 10000
+      },
+      "appliesTo": {
+        "channel": "any"
+      },
+      "sourceId": "s1",
+      "clause": "2 EDGE Miles for every INR 100 spent on other spends",
+      "verified": true
+    },
+    {
+      "id": "travel-edge-5",
+      "label": "5 EDGE Miles per ₹100 on Axis Bank Travel EDGE",
+      "kind": "points",
+      "pointsPer": {
+        "points": 5,
+        "perPaise": 10000
+      },
+      "appliesTo": {
+        "merchants": [
+          "Axis Bank Travel EDGE"
+        ],
+        "channel": "online"
+      },
+      "sourceId": "s1",
+      "clause": "5 EDGE Miles for every INR 100 spent",
+      "verified": true
+    },
+    {
+      "id": "airline-direct-5",
+      "label": "5 EDGE Miles per ₹100 booking directly with airlines (travel agents and OTAs earn only 2)",
+      "kind": "points",
+      "pointsPer": {
+        "points": 5,
+        "perPaise": 10000
+      },
+      "appliesTo": {
+        "categories": [
+          "flights"
+        ]
+      },
+      "sourceId": "s1",
+      "clause": "Bookings via travel agents ... shall be eligible for only 2 EDGE Miles for every INR 100 spent",
+      "verified": true
+    }
   ],
   "exclusions": [
-    { "id": "no-miles-categories", "label": "No EDGE Miles on fuel, rent, wallet loads, utilities, insurance, education, government, transport and tolls", "appliesTo": { "categories": ["fuel", "rent", "wallet_load", "utilities", "insurance", "education", "government", "transport"] }, "excludedFrom": ["rewards"], "sourceId": "s1", "clause": "Transportation & tolls, utilities, insurance, educational institutions, government institutions, wallets, rent, and fuel", "verified": true }
+    {
+      "id": "no-miles-categories",
+      "label": "No EDGE Miles on fuel, rent, wallet loads, utilities, insurance, education, government, transport and tolls",
+      "appliesTo": {
+        "categories": [
+          "fuel",
+          "rent",
+          "wallet_load",
+          "utilities",
+          "insurance",
+          "education",
+          "government",
+          "transport"
+        ]
+      },
+      "excludedFrom": [
+        "rewards"
+      ],
+      "sourceId": "s1",
+      "clause": "Transportation & tolls, utilities, insurance, educational institutions, government institutions, wallets, rent, and fuel",
+      "verified": true
+    }
   ],
   "lounge": [
-    { "id": "intl-lounge", "label": "2 international lounge visits a calendar quarter", "scope": "international", "visits": 2, "period": "calendar_quarter", "sourceId": "s1", "clause": "2 complimentary lounge access per calendar quarter", "verified": false },
-    { "id": "dom-lounge", "label": "8 domestic lounge visits a calendar quarter on Visa Signature (6 on Mastercard World)", "scope": "domestic", "visits": 8, "period": "calendar_quarter", "sourceId": "s1", "clause": "8 complimentary visits per calendar quarter", "verified": false }
+    {
+      "id": "intl-lounge",
+      "label": "2 international lounge visits a calendar quarter",
+      "scope": "international",
+      "visits": 2,
+      "period": "calendar_quarter",
+      "sourceId": "s1",
+      "clause": "2 complimentary lounge access per calendar quarter",
+      "verified": false
+    },
+    {
+      "id": "dom-lounge",
+      "label": "8 domestic lounge visits a calendar quarter on Visa Signature (6 on Mastercard World)",
+      "scope": "domestic",
+      "visits": 8,
+      "period": "calendar_quarter",
+      "sourceId": "s1",
+      "clause": "8 complimentary visits per calendar quarter",
+      "verified": false
+    }
   ],
   "otherBenefits": [
-    { "id": "welcome", "label": "Welcome: 5,000 EDGE Miles on a first transaction above ₹1,000 within 30 days of issue", "detail": "Not for cards switched or migrated from another Axis card.", "sourceId": "s1", "clause": "5,000 EDGE Miles on the first transaction over INR 1,000 within 30 days", "verified": true },
-    { "id": "renewal", "label": "Renewal: 1,500 EDGE Miles each card anniversary from the second year (primary card)", "sourceId": "s1", "clause": "1,500 miles each anniversary, starting from the second anniversary year", "verified": true },
-    { "id": "miles-transfer", "label": "EDGE Miles transfer 1:1 to airline and hotel partner programmes (minimum 500)", "detail": "Also redeemable on Travel EDGE bookings and the rewards catalogue.", "sourceId": "s1", "clause": "1 Edge Mile = 1 Partner points", "verified": true },
-    { "id": "lost-card", "label": "Lost card liability cover up to ₹10 lakh", "detail": "Covers fraud up to 2 days before you block the card; needs a police complaint and claim within 30 days.", "sourceId": "s1", "clause": "up to a limit of INR 10 lacs", "verified": true }
+    {
+      "id": "welcome",
+      "label": "Welcome: 5,000 EDGE Miles on a first transaction above ₹1,000 within 30 days of issue",
+      "detail": "Not for cards switched or migrated from another Axis card.",
+      "sourceId": "s1",
+      "clause": "5,000 EDGE Miles on the first transaction over INR 1,000 within 30 days",
+      "verified": true
+    },
+    {
+      "id": "renewal",
+      "label": "Renewal: 1,500 EDGE Miles each card anniversary from the second year (primary card)",
+      "sourceId": "s1",
+      "clause": "1,500 miles each anniversary, starting from the second anniversary year",
+      "verified": true
+    },
+    {
+      "id": "miles-transfer",
+      "label": "EDGE Miles transfer 1:1 to airline and hotel partner programmes (minimum 500)",
+      "detail": "Also redeemable on Travel EDGE bookings and the rewards catalogue.",
+      "sourceId": "s1",
+      "clause": "1 Edge Mile = 1 Partner points",
+      "verified": true
+    },
+    {
+      "id": "lost-card",
+      "label": "Lost card liability cover up to ₹10 lakh",
+      "detail": "Covers fraud up to 2 days before you block the card; needs a police complaint and claim within 30 days.",
+      "sourceId": "s1",
+      "clause": "up to a limit of INR 10 lacs",
+      "verified": true
+    },
+    {
+      "id": "no-fee-waiver",
+      "label": "No annual-fee waiver on this card",
+      "detail": "The ₹3,000 + GST annual fee is charged every year regardless of spend.",
+      "sourceId": "owner",
+      "clause": "There is no fee-waiver for Axis",
+      "verified": true
+    }
   ]
 }

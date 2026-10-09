@@ -1,0 +1,37 @@
+{
+ "description": "Croma offer needs ₹15,000; at ₹10,000 it does not apply",
+ "today": "2026-10-09",
+ "wallet": [
+  {
+   "card": {
+    "id": "classic",
+    "bank": "Example Bank",
+    "name": "Sample Rewards",
+    "kind": "credit",
+    "variant": "Classic",
+    "status": "active"
+   },
+   "pack": "../../examples/example-pack.json"
+  },
+  {
+   "card": {
+    "id": "signature",
+    "bank": "Example Bank",
+    "name": "Sample Rewards",
+    "kind": "credit",
+    "variant": "Signature",
+    "status": "active"
+   },
+   "pack": "../../examples/example-pack.json"
+  }
+ ],
+ "query": "croma 10000",
+ "expect": {
+  "netPaise": {
+   "classic": 5000
+  },
+  "offerShort": {
+   "classic": 500000
+  }
+ }
+}

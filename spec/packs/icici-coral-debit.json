@@ -1,36 +1,158 @@
 {
   "format": "ekfba-rulepack",
   "schemaVersion": 1,
-  "card": { "bank": "ICICI Bank", "name": "Coral", "kind": "debit" },
+  "card": {
+    "bank": "ICICI Bank",
+    "name": "Coral",
+    "kind": "debit"
+  },
   "checkedAt": "2026-10-09",
-  "notes": "Built only from the ICICI Coral Debit Card product page. Fees shown are before GST and are stated for new cards issued from 1 July 2026; older cards may have different fees. The page does not state the value of a reward point, reward caps, excluded categories, insurance cover amounts, or which transaction limit is which. Those need the debit card T&C PDF.",
+  "notes": "Built only from the ICICI Coral Debit Card product page. Fees shown are before GST and are stated for new cards issued from 1 July 2026; older cards may have different fees. Reward point value (₹0.25) and no reward caps come from the cardholder. The page does not state excluded categories, insurance cover amounts, or which transaction limit is which. Those need the debit card T&C PDF.",
   "sources": [
-    { "id": "s1", "type": "bank_page", "title": "ICICI Bank – Coral Debit Card", "url": "https://www.icici.bank.in/personal-banking/cards/debit-card/coral-debit-card", "checkedAt": "2026-10-09" }
+    {
+      "id": "s1",
+      "type": "bank_page",
+      "title": "ICICI Bank – Coral Debit Card",
+      "url": "https://www.icici.bank.in/personal-banking/cards/debit-card/coral-debit-card",
+      "checkedAt": "2026-10-09"
+    },
+    {
+      "id": "owner",
+      "type": "other",
+      "title": "Cardholder's own information (Card Manager chat, 9 Oct 2026)",
+      "document": "Stated by the cardholder",
+      "checkedAt": "2026-10-09"
+    }
   ],
   "fees": {
     "joiningFeePaise": 74900,
     "annualFeePaise": 74900,
     "sourceId": "s1",
     "items": [
-      { "id": "reissue-fee", "label": "Card reissue fee ₹300 + GST", "flatPaise": 30000, "sourceId": "s1", "clause": "Reissuance fee: ₹300 + GST", "verified": true },
-      { "id": "fuel-surcharge", "label": "No fuel surcharge on ICICI Bank card machines at HPCL, IOCL and BPCL outlets", "bps": 0, "appliesTo": { "categories": ["fuel"], "channel": "offline" }, "sourceId": "s1", "clause": "Zero fuel surcharge on transactions at ICICI Bank swipe machines at HPCL, IOCL, BPCL", "verified": true }
+      {
+        "id": "reissue-fee",
+        "label": "Card reissue fee ₹300 + GST",
+        "flatPaise": 30000,
+        "sourceId": "s1",
+        "clause": "Reissuance fee: ₹300 + GST",
+        "verified": true
+      },
+      {
+        "id": "fuel-surcharge",
+        "label": "No fuel surcharge on ICICI Bank card machines at HPCL, IOCL and BPCL outlets",
+        "bps": 0,
+        "appliesTo": {
+          "categories": [
+            "fuel"
+          ],
+          "channel": "offline"
+        },
+        "sourceId": "s1",
+        "clause": "Zero fuel surcharge on transactions at ICICI Bank swipe machines at HPCL, IOCL, BPCL",
+        "verified": true
+      }
     ]
   },
   "earnRules": [
-    { "id": "domestic-2", "label": "2 reward points per ₹200 on domestic spends", "kind": "points", "pointsPer": { "points": 2, "perPaise": 20000 }, "appliesTo": { "channel": "any" }, "sourceId": "s1", "clause": "2 points on domestic spend for every ₹200", "verified": true },
-    { "id": "international-4", "label": "4 reward points per ₹200 on international spends", "kind": "points", "pointsPer": { "points": 4, "perPaise": 20000 }, "appliesTo": { "categories": ["international"] }, "sourceId": "s1", "clause": "4 points on international spend for every ₹200", "verified": true }
+    {
+      "id": "domestic-2",
+      "label": "2 reward points per ₹200 on domestic spends",
+      "kind": "points",
+      "pointsPer": {
+        "points": 2,
+        "perPaise": 20000
+      },
+      "appliesTo": {
+        "channel": "any"
+      },
+      "sourceId": "s1",
+      "clause": "2 points on domestic spend for every ₹200",
+      "verified": true
+    },
+    {
+      "id": "international-4",
+      "label": "4 reward points per ₹200 on international spends",
+      "kind": "points",
+      "pointsPer": {
+        "points": 4,
+        "perPaise": 20000
+      },
+      "appliesTo": {
+        "categories": [
+          "international"
+        ]
+      },
+      "sourceId": "s1",
+      "clause": "4 points on international spend for every ₹200",
+      "verified": true
+    }
   ],
   "offers": [
-    { "id": "bookmyshow-25", "label": "BookMyShow: 25% off up to ₹125 when you buy two tickets", "merchant": "BookMyShow", "appliesTo": { "categories": ["entertainment"], "channel": "online" }, "benefitType": "instant_discount_percent", "valueBps": 2500, "maxBenefitPaise": 12500, "sourceId": "s1", "clause": "25% off up to ₹125 on purchase of two tickets", "verified": true }
+    {
+      "id": "bookmyshow-25",
+      "label": "BookMyShow: 25% off up to ₹125 when you buy two tickets",
+      "merchant": "BookMyShow",
+      "appliesTo": {
+        "categories": [
+          "entertainment"
+        ],
+        "channel": "online"
+      },
+      "benefitType": "instant_discount_percent",
+      "valueBps": 2500,
+      "maxBenefitPaise": 12500,
+      "sourceId": "s1",
+      "clause": "25% off up to ₹125 on purchase of two tickets",
+      "verified": true
+    }
   ],
   "milestones": [
-    { "id": "lounge-10k", "kind": "lounge_unlock", "label": "Spend ₹10,000 in a quarter to unlock domestic lounge visits next quarter", "thresholdPaise": 1000000, "period": "calendar_quarter", "benefit": "Up to 2 domestic airport lounge visits in the following quarter (primary cardholder).", "sourceId": "s1", "clause": "based on spends of ₹10,000 in the previous quarter", "verified": true }
+    {
+      "id": "lounge-10k",
+      "kind": "lounge_unlock",
+      "label": "Spend ₹10,000 in a quarter to unlock domestic lounge visits next quarter",
+      "thresholdPaise": 1000000,
+      "period": "calendar_quarter",
+      "benefit": "Up to 2 domestic airport lounge visits in the following quarter (primary cardholder).",
+      "sourceId": "s1",
+      "clause": "based on spends of ₹10,000 in the previous quarter",
+      "verified": true
+    }
   ],
   "lounge": [
-    { "id": "dom-lounge", "label": "Up to 2 domestic airport lounge visits a quarter (primary cardholder)", "scope": "domestic", "visits": 2, "period": "calendar_quarter", "requiresMilestoneId": "lounge-10k", "sourceId": "s1", "clause": "Get Up to 2 Domestic Airport Lounge accesses", "verified": true }
+    {
+      "id": "dom-lounge",
+      "label": "Up to 2 domestic airport lounge visits a quarter (primary cardholder)",
+      "scope": "domestic",
+      "visits": 2,
+      "period": "calendar_quarter",
+      "requiresMilestoneId": "lounge-10k",
+      "sourceId": "s1",
+      "clause": "Get Up to 2 Domestic Airport Lounge accesses",
+      "verified": true
+    }
   ],
   "otherBenefits": [
-    { "id": "contactless", "label": "Contactless tap-and-pay", "detail": "Tap the card within about 4 cm of the machine; no need to hand it over.", "sourceId": "s1", "clause": "Contactless payments up to 4 cm from the POS terminal", "verified": true },
-    { "id": "limits", "label": "Transaction limits: domestic ₹1,00,000 / international ₹2,00,000 and domestic ₹5,00,000 / international ₹2,00,000", "detail": "The page lists these four figures without saying which are ATM and which are purchase limits, or whether they are daily. Check with the bank.", "sourceId": "s1", "verified": false }
-  ]
+    {
+      "id": "contactless",
+      "label": "Contactless tap-and-pay",
+      "detail": "Tap the card within about 4 cm of the machine; no need to hand it over.",
+      "sourceId": "s1",
+      "clause": "Contactless payments up to 4 cm from the POS terminal",
+      "verified": true
+    },
+    {
+      "id": "limits",
+      "label": "Transaction limits: domestic ₹1,00,000 / international ₹2,00,000 and domestic ₹5,00,000 / international ₹2,00,000",
+      "detail": "The page lists these four figures without saying which are ATM and which are purchase limits, or whether they are daily. Check with the bank.",
+      "sourceId": "s1",
+      "verified": false
+    }
+  ],
+  "pointValue": {
+    "paisePerPoint": 25,
+    "sourceId": "owner",
+    "clause": "ICICI reward point value is ₹0.25; no caps",
+    "verified": true
+  }
 }

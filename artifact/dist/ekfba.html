@@ -65,7 +65,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .btn.small { min-height: 38px; padding: 0 14px; font-size: 14px; }
 .btn[disabled] { opacity: .5; cursor: default; }
 
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
+.tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 4px; background: var(--quiet-bg); border-radius: 12px; }
 .tab { border: 0; background: transparent; border-radius: 9px; min-height: 40px; font-weight: 600; font-size: 14px; color: var(--muted); }
 .tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
 
@@ -114,6 +114,7 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .rule-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .rule-top strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .rule-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex: none; max-width: 50%; }
+.rule-badges.left { justify-content: flex-start; max-width: none; }
 .rule small { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .rule .src { font-size: 12px; }
 .rule.expired { opacity: .65; }
@@ -150,6 +151,21 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .empty p { color: var(--muted); max-width: 42ch; }
 .note { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); z-index: 10; }
+.ask-form { display: flex; gap: 8px; }
+.ask-form input { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; min-height: 52px; padding: 0 14px; font-size: 17px; }
+.ask-form input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.ask-q { font-family: var(--display); font-size: 20px; line-height: 1.2; }
+.winner { background: var(--surface); border: 2px solid var(--accent); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.winner .use { font-size: 13px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.winner .big { font-family: var(--display); font-size: 24px; line-height: 1.15; }
+.save { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.save b { font-family: var(--display); font-size: 30px; color: var(--ok); font-variant-numeric: tabular-nums; }
+.breakdown { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 14px; margin: 0; }
+.breakdown dt { color: var(--muted); }
+.breakdown dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.why { font-size: 13.5px; color: var(--muted); }
+.notes-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.alt-net { font-family: var(--display); font-size: 18px; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -977,6 +993,382 @@ function feeCalendarLink(card, feeDate, offset, today) {
 return { nextAnniversary, renewalStatus, REMINDER_OFFSETS, feeCalendarLink };
 })();
 
+const __m_merchants = (() => {
+// Merchant and category directory used to understand "where are you spending".
+// Data only — the Flutter app can load the same list. Categories come from the Rule Pack vocabulary.
+
+/** { name, aliases, categories, channel } — channel: 'online' | 'offline' | 'any' */
+const MERCHANTS = [
+  // Electronics
+  { name: 'Croma', aliases: [], categories: ['electronics'], channel: 'any' },
+  { name: 'Reliance Digital', aliases: ['reliance digital'], categories: ['electronics'], channel: 'any' },
+  { name: 'Vijay Sales', aliases: [], categories: ['electronics'], channel: 'any' },
+  { name: 'Bajaj Electronics', aliases: [], categories: ['electronics'], channel: 'any' },
+  { name: 'Apple Store', aliases: ['apple'], categories: ['electronics'], channel: 'any' },
+  // Online shopping and fashion
+  { name: 'Amazon', aliases: ['amazon.in'], categories: ['online_shopping'], channel: 'online' },
+  { name: 'Flipkart', aliases: [], categories: ['online_shopping'], channel: 'online' },
+  { name: 'Myntra', aliases: [], categories: ['apparel', 'online_shopping'], channel: 'online' },
+  { name: 'Ajio', aliases: [], categories: ['apparel', 'online_shopping'], channel: 'online' },
+  { name: 'Nykaa', aliases: [], categories: ['online_shopping'], channel: 'online' },
+  { name: 'Meesho', aliases: [], categories: ['online_shopping'], channel: 'online' },
+  { name: 'TATA CLiQ', aliases: ['tata cliq', 'tatacliq'], categories: ['online_shopping'], channel: 'online' },
+  { name: 'Lifestyle', aliases: [], categories: ['apparel', 'department_store'], channel: 'any' },
+  { name: 'Pantaloons', aliases: [], categories: ['apparel'], channel: 'any' },
+  { name: 'Westside', aliases: [], categories: ['apparel'], channel: 'any' },
+  { name: 'Shoppers Stop', aliases: [], categories: ['apparel', 'department_store'], channel: 'any' },
+  { name: 'Trends', aliases: ['reliance trends'], categories: ['apparel'], channel: 'offline' },
+  { name: 'Max Fashion', aliases: [], categories: ['apparel'], channel: 'offline' },
+  { name: 'Decathlon', aliases: [], categories: ['department_store'], channel: 'any' },
+  { name: 'IKEA', aliases: [], categories: ['department_store'], channel: 'any' },
+  { name: 'Tanishq', aliases: [], categories: ['jewellery'], channel: 'any' },
+  { name: 'Malabar Gold', aliases: ['malabar'], categories: ['jewellery'], channel: 'offline' },
+  // Groceries
+  { name: 'Swiggy Instamart', aliases: ['instamart'], categories: ['grocery'], channel: 'online' },
+  { name: 'Blinkit', aliases: [], categories: ['grocery'], channel: 'online' },
+  { name: 'Zepto', aliases: [], categories: ['grocery'], channel: 'online' },
+  { name: 'BigBasket', aliases: ['big basket', 'bb now'], categories: ['grocery'], channel: 'online' },
+  { name: 'Flipkart Minutes', aliases: [], categories: ['grocery'], channel: 'online' },
+  { name: 'Amazon Fresh', aliases: [], categories: ['grocery'], channel: 'online' },
+  { name: 'DMart', aliases: ['d mart', 'd-mart', 'dmart ready'], categories: ['grocery'], channel: 'any' },
+  { name: 'Ratnadeep', aliases: ['ratnadeep supermarket'], categories: ['grocery'], channel: 'offline' },
+  { name: 'More Supermarket', aliases: ['more retail', 'more megastore'], categories: ['grocery'], channel: 'offline' },
+  { name: 'Spencer\'s', aliases: ['spencers'], categories: ['grocery'], channel: 'offline' },
+  { name: 'Reliance Smart', aliases: ['reliance fresh', 'smart bazaar', 'reliance smart bazaar'], categories: ['grocery'], channel: 'offline' },
+  { name: 'Vijetha Supermarket', aliases: ['vijetha'], categories: ['grocery'], channel: 'offline' },
+  { name: 'Star Bazaar', aliases: [], categories: ['grocery'], channel: 'offline' },
+  // Food
+  { name: 'Swiggy', aliases: [], categories: ['food_delivery'], channel: 'online' },
+  { name: 'Zomato', aliases: [], categories: ['food_delivery'], channel: 'online' },
+  { name: 'Domino\'s', aliases: ['dominos'], categories: ['dining'], channel: 'any' },
+  { name: 'McDonald\'s', aliases: ['mcdonalds'], categories: ['dining'], channel: 'any' },
+  { name: 'KFC', aliases: [], categories: ['dining'], channel: 'any' },
+  { name: 'Starbucks', aliases: [], categories: ['dining'], channel: 'offline' },
+  { name: 'Paradise Biryani', aliases: ['paradise'], categories: ['dining'], channel: 'any' },
+  // Entertainment
+  { name: 'BookMyShow', aliases: ['book my show', 'bms'], categories: ['entertainment'], channel: 'online' },
+  { name: 'PVR INOX', aliases: ['pvr', 'inox'], categories: ['entertainment'], channel: 'any' },
+  { name: 'District', aliases: ['district by zomato'], categories: ['entertainment'], channel: 'online' },
+  // Travel
+  { name: 'MakeMyTrip', aliases: ['make my trip', 'mmt'], categories: ['travel'], channel: 'online' },
+  { name: 'Goibibo', aliases: [], categories: ['travel'], channel: 'online' },
+  { name: 'Cleartrip', aliases: [], categories: ['travel'], channel: 'online' },
+  { name: 'EaseMyTrip', aliases: ['ease my trip'], categories: ['travel'], channel: 'online' },
+  { name: 'Yatra', aliases: [], categories: ['travel'], channel: 'online' },
+  { name: 'Axis Bank Travel EDGE', aliases: ['travel edge', 'axis travel edge'], categories: ['travel', 'flights'], channel: 'online' },
+  { name: 'IRCTC', aliases: ['train ticket', 'railway'], categories: ['travel'], channel: 'online' },
+  { name: 'IndiGo', aliases: ['indigo'], categories: ['flights'], channel: 'any' },
+  { name: 'Air India', aliases: ['air india express'], categories: ['flights'], channel: 'any' },
+  { name: 'Akasa Air', aliases: ['akasa'], categories: ['flights'], channel: 'any' },
+  { name: 'Taj Hotels', aliases: ['taj', 'ihcl'], categories: ['hotels'], channel: 'any' },
+  { name: 'Marriott', aliases: [], categories: ['hotels'], channel: 'any' },
+  { name: 'OYO', aliases: [], categories: ['hotels'], channel: 'online' },
+  { name: 'Uber', aliases: [], categories: ['transport'], channel: 'online' },
+  { name: 'Ola', aliases: [], categories: ['transport'], channel: 'online' },
+  { name: 'Rapido', aliases: [], categories: ['transport'], channel: 'online' },
+  { name: 'FASTag', aliases: ['fastag', 'toll'], categories: ['transport'], channel: 'online' },
+  // Fuel
+  { name: 'Indian Oil', aliases: ['iocl', 'indianoil'], categories: ['fuel'], channel: 'offline' },
+  { name: 'HP Petrol Pump', aliases: ['hpcl', 'hp petrol', 'hindustan petroleum'], categories: ['fuel'], channel: 'offline' },
+  { name: 'Bharat Petroleum', aliases: ['bpcl'], categories: ['fuel'], channel: 'offline' },
+  { name: 'Shell', aliases: [], categories: ['fuel'], channel: 'offline' },
+  { name: 'Jio-bp', aliases: ['jio bp', 'jiobp'], categories: ['fuel'], channel: 'offline' },
+  // Health
+  { name: 'Apollo Pharmacy', aliases: ['apollo'], categories: ['healthcare'], channel: 'any' },
+  { name: 'MedPlus', aliases: ['med plus'], categories: ['healthcare'], channel: 'any' },
+  { name: 'PharmEasy', aliases: [], categories: ['healthcare'], channel: 'online' },
+  { name: 'Tata 1mg', aliases: ['1mg'], categories: ['healthcare'], channel: 'online' },
+  // Bills and others
+  { name: 'Airtel', aliases: [], categories: ['telecom'], channel: 'online' },
+  { name: 'Jio', aliases: ['jio recharge'], categories: ['telecom'], channel: 'online' },
+  { name: 'Vodafone Idea', aliases: ['vi recharge'], categories: ['telecom'], channel: 'online' },
+  { name: 'LIC', aliases: ['lic premium'], categories: ['insurance'], channel: 'online' },
+  { name: 'Amazon Pay wallet', aliases: ['paytm wallet', 'wallet load'], categories: ['wallet_load'], channel: 'online' },
+];
+
+/** Words that name a category when no merchant matches. */
+const CATEGORY_WORDS = {
+  grocery: ['grocery', 'groceries', 'supermarket', 'kirana', 'vegetables'],
+  dining: ['restaurant', 'dining', 'dinner', 'lunch', 'cafe', 'hotel food', 'eating out'],
+  food_delivery: ['food delivery', 'food order'],
+  fuel: ['petrol', 'diesel', 'fuel', 'petrol pump', 'cng'],
+  travel: ['travel', 'holiday', 'trip', 'bus ticket'],
+  flights: ['flight', 'flights', 'air ticket', 'airline'],
+  hotels: ['hotel', 'hotel stay', 'hotel booking', 'resort'],
+  transport: ['cab', 'taxi', 'auto', 'metro', 'toll'],
+  electronics: ['electronics', 'mobile phone', 'laptop', 'tv', 'television', 'fridge', 'washing machine', 'ac'],
+  apparel: ['clothes', 'clothing', 'apparel', 'fashion', 'shoes'],
+  online_shopping: ['online shopping'],
+  utilities: ['electricity', 'power bill', 'water bill', 'gas bill', 'utility', 'utilities', 'broadband'],
+  telecom: ['mobile recharge', 'recharge', 'postpaid'],
+  rent: ['rent', 'house rent'],
+  insurance: ['insurance', 'premium'],
+  education: ['school fee', 'school fees', 'college fee', 'tuition', 'education'],
+  government: ['tax', 'government', 'challan', 'passport'],
+  jewellery: ['jewellery', 'jewelry', 'gold'],
+  entertainment: ['movie', 'movies', 'cinema', 'concert', 'event'],
+  healthcare: ['pharmacy', 'medicine', 'medicines', 'hospital', 'doctor', 'diagnostic'],
+  wallet_load: ['wallet'],
+  emi: ['emi'],
+};
+
+return { MERCHANTS, CATEGORY_WORDS };
+})();
+
+const __m_recommend = (() => {
+// Recommendation engine: "where are you spending, and how much?" → best card from the wallet.
+// Pure and deterministic. Semantics are specified in spec/RECOMMEND.md and pinned by
+// spec/test-vectors/recommend/*.json, which a Dart port must also pass.
+
+const { MERCHANTS, CATEGORY_WORDS } = __m_merchants;
+const { parseRupeesToPaise, formatPaise } = __m_money;
+const { offerStatus, offersForCard, packFreshness, localDate } = __m_rulepack;
+const norm = (s) => ` ${String(s || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9₹.]+/g, ' ').trim()} `;
+const nameKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/* ---------------- Query parsing ---------------- */
+
+const AMOUNT_RE = /(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(k|l|lakh|lakhs|lac|cr|crore)?\b/gi;
+
+/**
+ * Parses free text such as "Croma 65000", "₹1.2L tv at croma", "swiggy instamart", "petrol 2k".
+ * Returns { text, amountPaise|null, merchant|null, categories[], channel|null, international }.
+ */
+function parseQuery(text, merchants = MERCHANTS) {
+  const raw = String(text || '').trim();
+  let amountPaise = null;
+  let rest = raw;
+  const amounts = [...raw.matchAll(AMOUNT_RE)].filter((m) => /\d/.test(m[1]));
+  // Prefer a number written with ₹/Rs or a k/lakh suffix; else the largest plain number of 2+ digits.
+  const scored = amounts.map((m) => ({ m, explicit: /₹|rs|inr/i.test(m[0]) || !!m[2], paise: parseRupeesToPaise(m[1].replace(/,/g, '') + (m[2] || '')) }))
+    .filter((a) => a.paise !== null && (a.explicit || a.m[1].replace(/[,.]/g, '').length >= 2));
+  scored.sort((a, b) => (b.explicit - a.explicit) || (b.paise - a.paise));
+  if (scored.length) { amountPaise = scored[0].paise; rest = raw.replace(scored[0].m[0], ' '); }
+
+  const t = norm(rest);
+  let merchant = null;
+  let best = 0;
+  for (const m of merchants) {
+    for (const n of [m.name, ...(m.aliases || [])]) {
+      const k = norm(n);
+      if (k.trim() && t.includes(k) && k.length > best) { merchant = m; best = k.length; }
+    }
+  }
+  let categories = merchant ? [...merchant.categories] : [];
+  if (!merchant) {
+    for (const [cat, words] of Object.entries(CATEGORY_WORDS)) {
+      if (words.some((w) => t.includes(norm(w)))) categories.push(cat);
+    }
+  }
+  let channel = merchant && merchant.channel !== 'any' ? merchant.channel : null;
+  if (/\b(online|app|website)\b/.test(t)) channel = 'online';
+  if (/\b(in store|instore|offline|outlet|shop|showroom|counter|swipe)\b/.test(t)) channel = channel || 'offline';
+  const international = /\b(international|abroad|overseas|forex|usd|dollars?|euros?)\b/.test(t);
+  if (international && !categories.includes('international')) categories.push('international');
+  const leftover = t.replace(merchant ? norm(merchant.name) : '', ' ').replace(/\b(at|on|in|from|for|buy|buying|spend|spending|order|ordering|pay|paying|the|a|an|my|rs|inr|online|offline|store|which|card|should|i|use)\b/g, ' ').trim();
+  return { text: raw, amountPaise, merchant, merchantGuess: merchant ? null : (leftover || null), categories, channel, international };
+}
+
+/* ---------------- Matching ---------------- */
+
+function merchantMatches(ruleMerchant, ctx) {
+  if (!ruleMerchant || !ctx.merchant) return false;
+  const r = nameKey(ruleMerchant);
+  const names = [ctx.merchant.name, ...(ctx.merchant.aliases || [])].map(nameKey);
+  return names.some((n) => n && (n === r || n.includes(r) || r.includes(n)));
+}
+
+/** How a scope applies to this purchase: -1 = does not apply, else specificity (3 merchant, 2 category, 1 channel, 0 general). */
+function scopeFit(scope, ctx) {
+  if (!scope) return 0;
+  // A channel-specific rule applies only when the purchase channel is known and matches.
+  if (scope.channel && scope.channel !== 'any' && scope.channel !== ctx.channel) return -1;
+  if (scope.merchants?.length) {
+    if (scope.merchants.some((m) => merchantMatches(m, ctx))) return 3;
+    if (!scope.categories?.length) return -1;
+  }
+  if (scope.categories?.length) {
+    return scope.categories.some((c) => ctx.categories.includes(c)) ? 2 : -1;
+  }
+  return scope.channel && scope.channel !== 'any' ? 1 : 0;
+}
+
+/* ---------------- Per-card evaluation ---------------- */
+
+const PERIOD_WORD = { transaction: 'a transaction', statement_cycle: 'a statement cycle', calendar_month: 'a month', calendar_quarter: 'a quarter', calendar_year: 'a calendar year', card_year: 'a card year' };
+
+function offerBenefit(o, amountPaise, pointValue) {
+  if (amountPaise === null) return null;
+  if (o.minSpendPaise && amountPaise < o.minSpendPaise) return 0;
+  let b = 0;
+  if (o.benefitType.endsWith('_percent')) b = Math.floor((amountPaise * o.valueBps) / 10000);
+  else if (o.benefitType.endsWith('_flat')) b = o.valuePaise;
+  else if (o.benefitType === 'bonus_points') b = pointValue ? Math.floor(o.valuePoints * pointValue.paisePerPoint) : null;
+  if (b !== null && o.maxBenefitPaise) b = Math.min(b, o.maxBenefitPaise);
+  if (b !== null) b = Math.min(b, amountPaise);
+  return b;
+}
+const offerHeadline = (o) => o.maxBenefitPaise || o.valuePaise || 0;
+
+/**
+ * Evaluates one card for one purchase. Returns a result object (see spec/RECOMMEND.md).
+ */
+function evaluateCard(card, pack, ctx, today = localDate()) {
+  const amount = ctx.amountPaise;
+  const notes = [];
+  const pv = pack.pointValue || null;
+  const fresh = packFreshness(pack, today);
+
+  // Exclusions
+  const excludedFrom = new Set();
+  for (const x of pack.exclusions || []) {
+    if (scopeFit(x.appliesTo, ctx) >= 2) x.excludedFrom.forEach((e) => excludedFrom.add(e));
+  }
+
+  // Offers: merchant offers must name this merchant; category offers must match the category.
+  const usable = [];
+  const notNow = [];
+  if (!excludedFrom.has('offers')) {
+    for (const o of offersForCard(pack, card)) {
+      const fits = o.merchant ? merchantMatches(o.merchant, ctx) && scopeFit({ channel: o.appliesTo?.channel }, ctx) >= 0
+        : scopeFit(o.appliesTo, ctx) >= 2;
+      if (!fits) continue;
+      const status = offerStatus(o, today);
+      if (status === 'expired' || status === 'upcoming') { notNow.push({ offer: o, status }); continue; }
+      const benefit = offerBenefit(o, amount, pv);
+      usable.push({ offer: o, status, benefitPaise: benefit, minSpendShortPaise: amount !== null && o.minSpendPaise && amount < o.minSpendPaise ? o.minSpendPaise - amount : 0,
+        stale: fresh.offersStale, verified: o.verified });
+    }
+  }
+  // Offers on one card never stack: the single best one counts.
+  usable.sort((a, b) => (amount !== null ? (b.benefitPaise ?? -1) - (a.benefitPaise ?? -1) : offerHeadline(b.offer) - offerHeadline(a.offer)));
+  const offer = usable[0] || null;
+  const offerPaise = offer && amount !== null ? (offer.benefitPaise || 0) : null;
+
+  // Rewards: most specific matching earn rule.
+  let reward = { rule: null, points: 0, valuePaise: 0, rateBps: 0, kind: null, excluded: false, valueKnown: true };
+  if (excludedFrom.has('rewards')) {
+    reward.excluded = true;
+    notes.push('This spend earns no rewards on this card.');
+  } else {
+    const fits = (pack.earnRules || []).map((r) => ({ r, fit: scopeFit(r.appliesTo, ctx) })).filter((x) => x.fit >= 0);
+    const rate = (r) => (r.kind === 'cashback' ? r.rateBps : pv ? (r.pointsPer.points * pv.paisePerPoint * 10000) / r.pointsPer.perPaise : r.pointsPer.points * 10000 / r.pointsPer.perPaise);
+    fits.sort((a, b) => b.fit - a.fit || rate(b.r) - rate(a.r));
+    const r = fits[0]?.r;
+    if (r) {
+      reward.rule = r;
+      reward.kind = r.kind;
+      if (r.kind === 'cashback') {
+        reward.rateBps = r.rateBps;
+        if (amount !== null) {
+          let v = Math.floor((amount * r.rateBps) / 10000);
+          if (r.capPaise && r.capPeriod === 'transaction') v = Math.min(v, r.capPaise);
+          reward.valuePaise = v;
+        }
+        if (r.capPaise && r.capPeriod !== 'transaction') notes.push(`Cashback is capped at ${formatPaise(r.capPaise)} in ${PERIOD_WORD[r.capPeriod]}; earlier spends this period may already use it.`);
+      } else {
+        const per = r.pointsPer;
+        if (amount !== null) {
+          let pts = Math.floor(amount / per.perPaise) * per.points;
+          if (r.capPoints && r.capPeriod === 'transaction') pts = Math.min(pts, r.capPoints);
+          reward.points = pts;
+        }
+        if (pv) {
+          reward.rateBps = Math.round((per.points * pv.paisePerPoint * 10000) / per.perPaise);
+          reward.valuePaise = amount !== null ? Math.floor(reward.points * pv.paisePerPoint) : 0;
+        } else {
+          reward.valueKnown = false;
+          reward.valuePaise = null;
+          notes.push('The rupee value of these points is not set, so they are not counted in the saving.');
+        }
+        if (r.capPoints && r.capPeriod !== 'transaction') notes.push(`Points are capped at ${r.capPoints.toLocaleString('en-IN')} in ${PERIOD_WORD[r.capPeriod]}.`);
+      }
+      if (amount !== null && r.minTransactionPaise && amount < r.minTransactionPaise) { reward.points = 0; reward.valuePaise = reward.valueKnown ? 0 : null; notes.push(`Rewards need at least ${formatPaise(r.minTransactionPaise)} in one transaction.`); }
+    }
+  }
+
+  // Charges: per-transaction percentage fees for international spends (forex mark-up).
+  let feesPaise = 0;
+  if (ctx.international) {
+    for (const f of pack.fees?.items || []) {
+      if (f.bps > 0 && f.appliesTo?.categories?.includes('international')) {
+        feesPaise += amount !== null ? Math.floor((amount * f.bps) / 10000) : 0;
+        notes.push(`${f.label} applies.`);
+      }
+    }
+  }
+
+  // Milestones this spend counts toward (progress itself needs logged purchases — Phase 4/5).
+  const milestones = (pack.milestones || [])
+    .filter((m) => !excludedFrom.has('milestones') && (!m.counts || scopeFit(m.counts, ctx) >= 0))
+    .map((m) => ({ id: m.id, label: m.label, kind: m.kind, verified: m.verified }));
+
+  const known = amount !== null && reward.valueKnown;
+  const netPaise = amount === null ? null : (offerPaise || 0) + (reward.valuePaise || 0) - feesPaise;
+  // Rate used for ranking when no amount is given: reward rate (bps) — offers ranked separately by headline value.
+  return {
+    cardId: card.id, card, offer, otherOffers: usable.slice(1), offersNotNow: notNow,
+    offerPaise, reward, feesPaise, netPaise, netComplete: known, milestones, notes,
+    freshness: { checkedAt: pack.checkedAt, offersStale: fresh.offersStale },
+  };
+}
+
+/* ---------------- Ranking ---------------- */
+
+/**
+ * wallet: [{ card, pack|null }]. query: string or parsed query.
+ * Returns { query, needs: null|'merchant_or_category', results: [...], skipped: [{card, reason}] }.
+ */
+function recommend(wallet, query, today = localDate()) {
+  const ctx = typeof query === 'string' ? parseQuery(query) : query;
+  const skipped = [];
+  if (!ctx.merchant && ctx.categories.length === 0) {
+    return { query: ctx, needs: 'merchant_or_category', results: [], skipped };
+  }
+  const results = [];
+  for (const { card, pack } of wallet) {
+    if (card.status !== 'active') continue;
+    if (!pack) { skipped.push({ card, reason: 'No rules added yet' }); continue; }
+    results.push(evaluateCard(card, pack, ctx, today));
+  }
+  const offerScore = (r) => (r.offer && !r.offer.minSpendShortPaise ? offerHeadline(r.offer.offer) : 0);
+  results.sort((a, b) => {
+    if (ctx.amountPaise !== null) {
+      // Known rupee value first; unknown-value rewards cannot be compared and rank after equal known values.
+      if (b.netPaise !== a.netPaise) return b.netPaise - a.netPaise;
+      if (a.netComplete !== b.netComplete) return a.netComplete ? -1 : 1;
+      return (b.reward.rateBps || 0) - (a.reward.rateBps || 0) || a.card.bank.localeCompare(b.card.bank);
+    }
+    return offerScore(b) - offerScore(a) || (b.reward.valueKnown - a.reward.valueKnown) || (b.reward.rateBps || 0) - (a.reward.rateBps || 0) || a.card.bank.localeCompare(b.card.bank);
+  });
+  return { query: ctx, needs: null, results, skipped };
+}
+
+/** One-line reason for the ranking position of a result relative to the winner. */
+function explain(result, winner, amountKnown) {
+  const parts = [];
+  if (result.offer) {
+    const o = result.offer;
+    if (o.minSpendShortPaise) parts.push(`offer needs ${formatPaise(o.minSpendShortPaise)} more spend`);
+    else if (amountKnown) parts.push(`${o.offer.label}${o.status === 'no_end_date' ? ' (end date unknown)' : ''}`);
+    else parts.push(o.offer.label);
+  }
+  if (result.reward.excluded) parts.push('no rewards on this spend');
+  else if (result.reward.rule) {
+    const r = result.reward;
+    const rate = r.kind === 'cashback' ? `${(r.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% cashback` : r.valueKnown ? `≈${(r.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% back in points` : `${r.rule.pointsPer.points} points per ${formatPaise(r.rule.pointsPer.perPaise)} (value not set)`;
+    parts.push(rate);
+  }
+  if (result.feesPaise) parts.push(`${formatPaise(result.feesPaise)} charges`);
+  if (result !== winner && amountKnown && winner.netPaise !== null && result.netPaise !== null && winner.netPaise > result.netPaise) {
+    parts.push(`${formatPaise(winner.netPaise - result.netPaise)} less than the top card`);
+  }
+  return parts.join(' · ');
+}
+
+return { parseQuery, evaluateCard, recommend, explain };
+})();
+
 const __m_uihtml = (() => {
 // Safe HTML templating: every interpolated value is escaped unless wrapped in raw().
 // Imported data (backups, rule packs) can never inject markup or scripts.
@@ -1005,13 +1397,14 @@ const icon = (name) => raw(`<svg class="i" aria-hidden="true"><use href="#i-${es
 
 return { escapeHtml, raw, html, icon };
 })();
-const __core = Object.assign({}, __m_ids, __m_money, __m_sensitive, __m_schema, __m_card, __m_backup, __m_rulepack, __m_feedates, __m_uihtml);
+const __core = Object.assign({}, __m_ids, __m_money, __m_sensitive, __m_schema, __m_card, __m_backup, __m_rulepack, __m_feedates, __m_merchants, __m_recommend, __m_uihtml);
 
 </script>
 <script>
 const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToPaise, formatPaise,
   validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
-  CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid } = __core;
+  CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid,
+  parseQuery, recommend, explain } = __core;
 
 const APP_VERSION = '0.2.0';
 const COLLECTIONS = ['cards', 'rulePacks'];
@@ -1025,7 +1418,7 @@ const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c.replace(/_/g, '
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'wallet', cards: [], packs: [], ready: { cards: false, rulePacks: false }, db: null, dl: null, canWrite: true,
+  tab: 'ask', askText: '', askResult: null, cards: [], packs: [], ready: { cards: false, rulePacks: false }, db: null, dl: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   offerFilter: 'active', offerQuery: '', showArchived: false, busy: false, loadErr: '', backupPreview: null,
 };
@@ -1085,14 +1478,14 @@ function render() {
   if (state.loadErr) h = html`${h}<div class="err" role="alert">${state.loadErr}</div>`;
   if (!state.canWrite) h = html`${h}<div class="hint">You can view this wallet but not change it.</div>`;
   h = html`${h}<nav class="tabs" role="tablist" aria-label="Sections">
-    ${[['wallet', 'Wallet'], ['offers', 'Offers'], ['fresh', 'Freshness'], ['backup', 'Backup']].map(([k, l]) =>
+    ${[['ask', 'Ask'], ['wallet', 'Wallet'], ['offers', 'Offers'], ['fresh', 'Freshness'], ['backup', 'Backup']].map(([k, l]) =>
       html`<button class="tab" role="tab" data-action="tab" data-tab="${k}" aria-selected="${state.tab === k}">${l}</button>`)}
   </nav>`;
-  const body = state.tab === 'wallet' ? walletView(cards) : state.tab === 'offers' ? offersView() : state.tab === 'fresh' ? freshView() : backupView();
+  const body = state.tab === 'ask' ? askView() : state.tab === 'wallet' ? walletView(cards) : state.tab === 'offers' ? offersView() : state.tab === 'fresh' ? freshView() : backupView();
   $app.innerHTML = String(html`${h}${body}
     <div class="note">
       <span>Only the owner of this page can see or change it. Never enter full card numbers, expiry dates, CVV, PIN or OTP; the page refuses them.</span>
-      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchase logging and "which card should I use" come in the next phases.</span>
+      <span>Card rules come from official bank pages you share in the Card Manager project chat. Purchase logging and spend-milestone tracking come next.</span>
     </div>`);
   afterRender();
 }
@@ -1446,6 +1839,73 @@ function offersView() {
 
 /* ---------- Freshness ---------- */
 
+function askView() {
+  const r = state.askResult;
+  const popular = ['Croma', 'Swiggy Instamart', 'Amazon', 'BookMyShow', 'Petrol', 'DMart'];
+  let out = html`<div class="ask-q">Where are you spending, and how much?</div>
+    <form class="ask-form" id="ask-form" novalidate>
+      <input id="ask-q" type="search" enterkeyhint="search" autocomplete="off" value="${state.askText}" placeholder="Croma 15000, Swiggy, petrol 2k" aria-label="Shop, app or category, and amount">
+      <button class="btn" type="submit">Find card</button>
+    </form>`;
+  if (!r) {
+    return html`${out}<div class="chips" aria-label="Try">${popular.map((p) => html`<button class="chip" data-action="ask-try" data-q="${p}">${p}</button>`)}</div>
+      <p class="hint">Type a shop, outlet or app name, with or without the amount. Recommendations use the rules saved on your cards; offers are labelled when they may be out of date.</p>`;
+  }
+  if (r.needs) {
+    const cats = ['grocery', 'dining', 'food_delivery', 'fuel', 'electronics', 'apparel', 'online_shopping', 'travel', 'flights', 'hotels', 'utilities', 'telecom', 'healthcare', 'entertainment', 'jewellery', 'rent', 'insurance', 'education', 'other'];
+    return html`${out}<section class="panel"><h2>What kind of spend is ${r.query.merchantGuess ? '“' + r.query.merchantGuess + '”' : 'this'}?</h2>
+      <p class="hint">I don't know this shop yet. Pick the closest type and I'll compare your cards.</p>
+      <div class="chips">${cats.map((c) => html`<button class="chip" data-action="ask-cat" data-cat="${c}">${CAT_LABEL[c] || c}</button>`)}</div></section>`;
+  }
+  const amountKnown = r.query.amountPaise !== null;
+  const what = [r.query.merchant ? r.query.merchant.name : r.query.categories.map((c) => CAT_LABEL[c] || c).join(', '), amountKnown ? formatPaise(r.query.amountPaise) : ''].filter(Boolean).join(' · ');
+  if (!r.results.length) {
+    return html`${out}<div class="empty"><h2>No card can be compared yet</h2><p>Add rules to your cards first. ${r.skipped.length ? `${r.skipped.length} card${r.skipped.length === 1 ? ' has' : 's have'} no rules.` : ''}</p></div>`;
+  }
+  const [w, ...rest] = r.results;
+  const rewardText = (x) => x.reward.excluded ? 'No rewards on this spend'
+    : !x.reward.rule ? 'No reward rule matches'
+    : x.reward.kind === 'cashback' ? `${(x.reward.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% cashback`
+    : amountKnown ? `${x.reward.points.toLocaleString('en-IN')} points${x.reward.valueKnown ? '' : ' (value not set)'}`
+    : `${x.reward.rule.pointsPer.points} points per ${formatPaise(x.reward.rule.pointsPer.perPaise)}${x.reward.valueKnown ? ` ≈ ${(x.reward.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}% back` : ' (value not set)'}`;
+  const badges = (x) => [x.offer && x.offer.status === 'no_end_date' ? html`<span class="pill st-soon">Offer end date unknown</span>` : '',
+    x.offer && x.offer.verified === false ? html`<span class="pill st-soon">Offer unverified</span>` : '',
+    x.offer && x.freshness.offersStale ? html`<span class="pill st-soon">Offer last checked ${fmtDate(x.freshness.checkedAt)}</span>` : ''];
+  out = html`${out}<div class="meta">Showing results for <strong>${what}</strong>${r.query.channel ? ` · ${r.query.channel}` : ''}</div>
+    <section class="winner" aria-label="Best card">
+      <span class="use">Use this card</span>
+      <div class="big">${cardLabel(w.card)}</div>
+      ${amountKnown ? html`<div class="save"><b>${formatPaise(Math.max(0, w.netPaise))}</b><span class="meta">estimated saving${w.netComplete ? '' : ' (points without a value are not counted)'}</span></div>
+        <dl class="breakdown">
+          <dt>Offer</dt><dd>${w.offer ? (w.offer.minSpendShortPaise ? `needs ${formatPaise(w.offer.minSpendShortPaise)} more` : formatPaise(w.offerPaise || 0)) : '–'}</dd>
+          <dt>Rewards · ${rewardText(w)}</dt><dd>${w.reward.valueKnown && !w.reward.excluded ? formatPaise(w.reward.valuePaise || 0) : '–'}</dd>
+          ${w.feesPaise ? html`<dt>Charges</dt><dd>−${formatPaise(w.feesPaise)}</dd>` : ''}
+        </dl>` : html`<div class="why">${rewardText(w)}${w.offer ? html` · <strong>${w.offer.offer.label}</strong>` : ''}</div><p class="hint">Add the amount for an exact saving in rupees.</p>`}
+      ${w.offer && amountKnown && !w.offer.minSpendShortPaise ? html`<div class="why"><strong>Offer:</strong> ${w.offer.offer.label}</div>` : ''}
+      ${badges(w).some(Boolean) ? html`<div class="rule-badges left">${badges(w)}</div>` : ''}
+      ${w.milestones.length ? html`<div class="why">Counts toward: ${w.milestones.map((m) => m.label).join('; ')}.</div>` : ''}
+      ${w.notes.length ? html`<ul class="notes-list">${w.notes.map((n) => html`<li>${n}</li>`)}</ul>` : ''}
+    </section>`;
+  if (rest.length) {
+    out = html`${out}<h2>Other cards</h2><section class="list">${rest.map((x) => html`<article class="row"><div class="row-head">
+      <div><div class="ins">${cardLabel(x.card)}</div><div class="meta">${explain(x, w, amountKnown)}</div>
+        ${x.notes.length ? html`<div class="meta">${x.notes[0]}</div>` : ''}</div>
+      <div class="right">${amountKnown ? html`<span class="alt-net">${formatPaise(Math.max(0, x.netPaise))}</span>` : html`<span class="pill st-quiet">${x.reward.valueKnown && x.reward.rule ? `${(x.reward.rateBps / 100).toFixed(2).replace(/\.?0+$/, '')}%` : 'n/a'}</span>`}</div>
+    </div></article>`)}</section>`;
+  }
+  if (r.skipped.length) out = html`${out}<p class="hint">Not compared (no rules yet): ${r.skipped.map((s) => cardLabel(s.card)).join(', ')}.</p>`;
+  return html`${out}<p class="hint">Estimates from your saved card rules. Period caps, the bank's own merchant classification and offers you have already used can change the real amount.</p>`;
+}
+
+function runAsk(text, extraCategory = null) {
+  state.askText = text;
+  const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null }));
+  let q = parseQuery(text);
+  if (extraCategory) q = { ...q, categories: [...q.categories, extraCategory] };
+  state.askResult = text.trim() || extraCategory ? recommend(wallet, q, today()) : null;
+  render();
+}
+
 function freshView() {
   const active = state.cards.filter((c) => c.status === 'active');
   if (!active.length) return html`<div class="empty"><p>Add cards to see how fresh their rules are.</p></div>`;
@@ -1550,6 +2010,8 @@ $app.addEventListener('click', async (ev) => {
   if (!t || t.disabled) return;
   const a = t.dataset.action, id = t.dataset.id;
   if (a === 'tab') { state.tab = t.dataset.tab; render(); }
+  else if (a === 'ask-try') runAsk(t.dataset.q);
+  else if (a === 'ask-cat') runAsk(state.askText, t.dataset.cat);
   else if (a === 'new') { state.editing = 'new'; state.formDraft = {}; state.formErrors = {}; render(); document.getElementById('f-bank')?.focus(); }
   else if (a === 'edit') { state.editing = id; state.formDraft = { ...state.cards.find((c) => c.id === id) }; state.formErrors = {}; render(); document.getElementById('card-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'cancel') { state.editing = null; state.formDraft = null; state.formErrors = {}; render(); }
@@ -1580,6 +2042,7 @@ $app.addEventListener('click', async (ev) => {
 });
 
 $app.addEventListener('submit', async (ev) => {
+  if (ev.target.id === 'ask-form') { ev.preventDefault(); runAsk(document.getElementById('ask-q').value); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -1598,8 +2061,9 @@ $app.addEventListener('submit', async (ev) => {
 
 // Keep what the person is typing when live updates arrive.
 function safeRender() {
+  if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
-  if (f && f.closest && (f.closest('#card-form') || f.id === 'pack-text')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 

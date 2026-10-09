@@ -1,0 +1,39 @@
+{
+ "description": "Instamart ₹1,200: only the Signature variant gets ₹100 off",
+ "today": "2026-10-09",
+ "wallet": [
+  {
+   "card": {
+    "id": "classic",
+    "bank": "Example Bank",
+    "name": "Sample Rewards",
+    "kind": "credit",
+    "variant": "Classic",
+    "status": "active"
+   },
+   "pack": "../../examples/example-pack.json"
+  },
+  {
+   "card": {
+    "id": "signature",
+    "bank": "Example Bank",
+    "name": "Sample Rewards",
+    "kind": "credit",
+    "variant": "Signature",
+    "status": "active"
+   },
+   "pack": "../../examples/example-pack.json"
+  }
+ ],
+ "query": "instamart 1200",
+ "expect": {
+  "order": [
+   "signature",
+   "classic"
+  ],
+  "offerId": {
+   "signature": "instamart-flat",
+   "classic": null
+  }
+ }
+}

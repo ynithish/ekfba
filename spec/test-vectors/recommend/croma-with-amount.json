@@ -1,0 +1,57 @@
+{
+ "description": "Croma with an amount: Emeralde 4 pts/₹100 at 25p = 1% beats Coral 0.25%; Horizon miles have no rupee value set",
+ "today": "2026-10-09",
+ "wallet": [
+  {
+   "card": {
+    "id": "emeralde",
+    "bank": "ICICI Bank",
+    "name": "Emerald",
+    "kind": "credit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/icici-emeralde.json"
+  },
+  {
+   "card": {
+    "id": "coral",
+    "bank": "ICICI Bank",
+    "name": "Coral",
+    "kind": "debit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/icici-coral-debit.json"
+  },
+  {
+   "card": {
+    "id": "horizon",
+    "bank": "Axis Bank",
+    "name": "Horizon",
+    "kind": "credit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/axis-horizon.json"
+  }
+ ],
+ "query": "Croma 15000",
+ "expect": {
+  "merchant": "Croma",
+  "amountPaise": 1500000,
+  "order": [
+   "emeralde",
+   "coral",
+   "horizon"
+  ],
+  "netPaise": {
+   "emeralde": 15000,
+   "coral": 3750,
+   "horizon": 0
+  }
+ }
+}

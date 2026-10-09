@@ -1,0 +1,60 @@
+{
+ "description": "BookMyShow ₹1,000 for two tickets: Emeralde buy-one-get-one ≈ 50% capped ₹750 + 1% points; Coral 25% capped ₹125 + 0.25% (5 blocks of ₹200)",
+ "today": "2026-10-09",
+ "wallet": [
+  {
+   "card": {
+    "id": "emeralde",
+    "bank": "ICICI Bank",
+    "name": "Emerald",
+    "kind": "credit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/icici-emeralde.json"
+  },
+  {
+   "card": {
+    "id": "coral",
+    "bank": "ICICI Bank",
+    "name": "Coral",
+    "kind": "debit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/icici-coral-debit.json"
+  },
+  {
+   "card": {
+    "id": "horizon",
+    "bank": "Axis Bank",
+    "name": "Horizon",
+    "kind": "credit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/axis-horizon.json"
+  }
+ ],
+ "query": "bookmyshow 1000",
+ "expect": {
+  "merchant": "BookMyShow",
+  "order": [
+   "emeralde",
+   "coral",
+   "horizon"
+  ],
+  "netPaise": {
+   "emeralde": 51000,
+   "coral": 12750,
+   "horizon": 0
+  },
+  "offerId": {
+   "emeralde": "bookmyshow-bogo",
+   "coral": "bookmyshow-25"
+  }
+ }
+}

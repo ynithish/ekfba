@@ -1,0 +1,37 @@
+{
+ "description": "Croma ₹20,000 on the example card: 10% capped at ₹1,500 + 2 pts/₹100 at 25p",
+ "today": "2026-10-09",
+ "wallet": [
+  {
+   "card": {
+    "id": "classic",
+    "bank": "Example Bank",
+    "name": "Sample Rewards",
+    "kind": "credit",
+    "variant": "Classic",
+    "status": "active"
+   },
+   "pack": "../../examples/example-pack.json"
+  },
+  {
+   "card": {
+    "id": "signature",
+    "bank": "Example Bank",
+    "name": "Sample Rewards",
+    "kind": "credit",
+    "variant": "Signature",
+    "status": "active"
+   },
+   "pack": "../../examples/example-pack.json"
+  }
+ ],
+ "query": "₹20,000 at Croma",
+ "expect": {
+  "netPaise": {
+   "classic": 160000
+  },
+  "offerId": {
+   "classic": "croma-diwali"
+  }
+ }
+}

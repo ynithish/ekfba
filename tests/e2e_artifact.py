@@ -52,6 +52,9 @@ def main():
         page.route('https://fonts.googleapis.com/**', lambda r: r.fulfill(status=200, body='', content_type='text/css'))
         page.route('http://ekfba.test/', lambda r: r.fulfill(status=200, body='<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"></head><body>' + PAGE + '</body></html>', content_type='text/html'))
         page.goto('http://ekfba.test/')
+        page.wait_for_selector('.ask-q')
+        check('opens on Ask', True)
+        page.click('[data-tab=wallet]')
         page.wait_for_selector('.empty h2:has-text("Your wallet is empty")')
         check('empty wallet state', True)
 
@@ -106,6 +109,20 @@ def main():
         statuses = page.evaluate("() => Object.values(window.__store.rulePacks).map(p => p.version + ':' + p.status).sort()")
         check('old version superseded, kept for history', statuses == ['1:superseded', '2:active'])
 
+        # Ask (Phase 3)
+        page.click('[data-tab=ask]')
+        page.fill('#ask-q', '₹20,000 at Croma'); page.click('#ask-form [type=submit]')
+        page.wait_for_selector('.winner')
+        check('ask: best card named', 'Everyday' in page.inner_text('.winner .big'))
+        check('ask: saving = 10% capped ₹1,500 + 400 pts × 25p', page.inner_text('.save b') == '₹1,600')
+        page.screenshot(path=str(SHOTS / 'a5-ask.png'), full_page=True)
+        page.fill('#ask-q', 'croma'); page.click('#ask-form [type=submit]'); page.wait_for_selector('.winner')
+        check('ask without amount works', 'exact saving' in page.inner_text('.winner'))
+        page.fill('#ask-q', 'sharma stores 500'); page.click('#ask-form [type=submit]')
+        page.wait_for_selector('[data-action=ask-cat]')
+        page.click('[data-cat=electronics]'); page.wait_for_selector('.winner')
+        check('ask: unknown shop -> category follow-up -> result', 'Everyday' in page.inner_text('.winner .big'))
+
         # Offers tab
         page.click('[data-tab=offers]')
         page.wait_for_selector('.chips')
@@ -134,7 +151,7 @@ def main():
         # Restore into an empty wallet
         page2 = ctx.new_page(); page2.route('http://ekfba.test/', lambda r: r.fulfill(status=200, body='<!doctype html><html><head><meta charset=utf8></head><body>' + PAGE + '</body></html>', content_type='text/html'))
         page2.route('https://fonts.googleapis.com/**', lambda r: r.fulfill(status=200, body='', content_type='text/css'))
-        page2.goto('http://ekfba.test/'); page2.wait_for_selector('.empty h2')
+        page2.goto('http://ekfba.test/'); page2.wait_for_selector('.ask-q')
         page2.click('[data-tab=backup]'); page2.set_input_files('#backup-file', str(path)); page2.wait_for_selector('.box.good')
         page2.click('[data-action=restore]'); page2.click('[data-tab=wallet]')
         page2.wait_for_selector('.row .ins:has-text("Everyday")')

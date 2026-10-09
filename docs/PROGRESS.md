@@ -31,8 +31,9 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - Tests: 23 unit tests; 26 functional checks of the page with a stand-in runtime
 - ✅ First real rule packs (spec/packs/): ICICI Emeralde (v2 active), ICICI Coral debit (on 2 cards), Axis Horizon — all approved in the page
 - ⬜ JSON Schema files and engine test vectors in spec/ (vectors move to Phase 3, where the engine they test is built)
-- ⬜ Gaps to close from official PDFs: point values, caps, exclusions (ICICI); fee waiver, forex, current lounge rules (Axis)
-- ⬜ Wallet data: no card has an issue date yet, so fee dates and calendar reminders are not showing
+- ✅ ICICI point value ₹0.25 and no caps; Axis has no fee waiver (from the cardholder)
+- ⬜ Still open: ICICI excluded categories; Axis forex mark-up and current lounge rules
+- ⬜ Issue dates: owner will add later (fee dates and calendar reminders appear then)
 
 ## Phase 2 (original PWA plan) — superseded by the Claude page above
 - ⬜ Card Rule Pack JSON schema + validator (sources, clause, fetched date, confidence, variant restrictions)
@@ -41,10 +42,16 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ⬜ Offers & terms explorer; expired offers never shown as valid (Scenario 6); unverified flagged (Scenario 10)
 - ⬜ First real cards extracted from your documents in this Project
 
-## Phase 3 — Recommendation engine ⬜
-- ⬜ Natural-language parser (merchant, amount, category, channel) with one follow-up question when needed
-- ⬜ Eligibility engine, caps, stacking groups, net benefit in paise; ranking + explanations; freshness labels
-- ⬜ Golden test cases per card; identical results offline (Scenarios 1, 2)
+## Phase 3 — Recommendation engine ✅ (9 Oct 2026, Claude page)
+- ✅ "Ask" tab (opens first): shop / outlet / app / category, with or without an amount
+- ✅ Parser: ₹ / Rs / k / lakh amounts; ~80 Indian merchants with aliases (src/core/merchants.js); category words; online/offline; international
+- ✅ Unknown shop → one follow-up question (which kind of spend), then the result
+- ✅ Engine (src/core/recommend.js, spec/RECOMMEND.md): exclusions, merchant vs category offers, min spend shortfall, no stacking,
+  most-specific earn rule, point value, per-transaction caps, forex mark-up, milestones the spend counts toward
+- ✅ Ranking with amount (net saving in ₹) and without (offer value, then reward rate); explanation per card; freshness/unverified labels
+- ✅ 10 portable test vectors (spec/test-vectors/recommend) + parser tests; 31 page checks
+- ⬜ Value for Axis EDGE Miles (needed before Horizon can be compared in rupees)
+- ⬜ Scenario 2 (offline) waits for the Flutter app, per ADR-008
 
 ## Phase 4 — Purchase tracking ⬜
 - ⬜ Post-recommendation confirm/log; manual entry; edit/cancel/refund events; duplicate detection (Scenarios 7, 8)

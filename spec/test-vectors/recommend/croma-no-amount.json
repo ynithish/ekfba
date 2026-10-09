@@ -1,0 +1,52 @@
+{
+ "description": "Croma without an amount ranks by reward rate",
+ "today": "2026-10-09",
+ "wallet": [
+  {
+   "card": {
+    "id": "emeralde",
+    "bank": "ICICI Bank",
+    "name": "Emerald",
+    "kind": "credit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/icici-emeralde.json"
+  },
+  {
+   "card": {
+    "id": "coral",
+    "bank": "ICICI Bank",
+    "name": "Coral",
+    "kind": "debit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/icici-coral-debit.json"
+  },
+  {
+   "card": {
+    "id": "horizon",
+    "bank": "Axis Bank",
+    "name": "Horizon",
+    "kind": "credit",
+    "network": "Visa",
+    "variant": "",
+    "status": "active"
+   },
+   "pack": "../../packs/axis-horizon.json"
+  }
+ ],
+ "query": "croma",
+ "expect": {
+  "merchant": "Croma",
+  "amountPaise": null,
+  "order": [
+   "emeralde",
+   "coral",
+   "horizon"
+  ]
+ }
+}
