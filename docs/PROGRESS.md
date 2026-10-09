@@ -33,7 +33,8 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ⬜ JSON Schema files and engine test vectors in spec/ (vectors move to Phase 3, where the engine they test is built)
 - ✅ ICICI point value ₹0.25 and no caps; Axis has no fee waiver (from the cardholder)
 - ⬜ Still open: ICICI excluded categories; Axis forex mark-up and current lounge rules
-- ⬜ Issue dates: owner will add later (fee dates and calendar reminders appear then)
+- ✅ Issue dates added by owner for Emerald and Axis Horizon (fee dates, reminders and card-year fee-waiver progress now work)
+- Owner decision: no backup in the Claude page; data stays in the page until the mobile app, which will use Google storage
 
 ## Phase 2 (original PWA plan) — superseded by the Claude page above
 - ⬜ Card Rule Pack JSON schema + validator (sources, clause, fetched date, confidence, variant restrictions)
