@@ -87,6 +87,9 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .row-head > div:first-child { flex: 1; }
 .lead-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .mini-card { flex: none; width: 44px; height: 28px; border-radius: 5px; background: linear-gradient(135deg, var(--card-from), var(--card-to)); color: #fff; font-size: 9px; font-weight: 700; display: grid; place-items: end start; padding: 3px 5px; letter-spacing: .04em; }
+.mini-card.other { background: var(--quiet-bg); color: var(--muted); place-items: center; font-size: 13px; }
+.seg.seg3 { grid-template-columns: repeat(3, 1fr); }
+.seg.seg3 span { font-size: 13px; padding: 9px 4px; }
 .mini-card.debit { background: linear-gradient(135deg, #1d6f46, #0e3a26); }
 .ins { font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
 .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
@@ -429,7 +432,7 @@ const __m_card = (() => {
 
 const { scanForSensitiveData, findExpiryDate } = __m_sensitive;
 const { uuid } = __m_ids;
-const CARD_KINDS = ['credit', 'debit'];
+const CARD_KINDS = ['credit', 'debit', 'other']; // other = bank transfer, UPI, cash and similar
 const NETWORKS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Other'];
 const HOLDER_TYPES = ['primary', 'add-on'];
 const CARD_STATUSES = ['active', 'deactivated', 'replaced', 'archived'];
@@ -467,14 +470,16 @@ function validateCard(draft, existing = null) {
     notes: trim(draft.notes) || '',
   };
 
-  if (!c.bank) errors.bank = 'Bank is required';
-  if (!c.name) errors.name = 'Card name is required';
-  if (!CARD_KINDS.includes(c.kind)) errors.kind = 'Choose credit or debit';
+  const isCard = c.kind !== 'other';
+  if (!isCard && !NETWORKS.includes(c.network)) c.network = 'Other';
+  if (isCard && !c.bank) errors.bank = 'Bank is required';
+  if (!c.name) errors.name = isCard ? 'Card name is required' : 'Give it a name, for example UPI or Bank transfer';
+  if (!CARD_KINDS.includes(c.kind)) errors.kind = 'Choose credit card, debit card or bank transfer / other';
   if (!NETWORKS.includes(c.network)) errors.network = 'Choose a card network';
   if (!HOLDER_TYPES.includes(c.holder)) errors.holder = 'Invalid holder type';
   if (!CARD_STATUSES.includes(c.status)) errors.status = 'Invalid status';
   if (c.last4 && !/^\d{4}$/.test(c.last4)) errors.last4 = 'Enter exactly the last 4 digits — never the full number';
-  if (!c.last4 && !c.nickname) errors.nickname = 'Give a nickname or the last 4 digits so you can tell cards apart';
+  if (isCard && !c.last4 && !c.nickname) errors.nickname = 'Give a nickname or the last 4 digits so you can tell cards apart';
   if (c.nickname.length > 40) errors.nickname = 'Keep the nickname under 40 characters';
   if (c.holderName.length > 60) errors.holderName = 'Keep the name under 60 characters';
   if (!isPaise(c.joiningFeePaise)) errors.joiningFeePaise = 'Invalid amount';
@@ -1684,6 +1689,7 @@ const STATUS_LABEL = { active: 'Active', deactivated: 'Deactivated', replaced: '
 const PERIOD_LABEL = { transaction: 'per transaction', statement_cycle: 'per statement cycle', calendar_month: 'per month',
   calendar_quarter: 'per quarter', calendar_year: 'per calendar year', card_year: 'per card year' };
 const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c === 'emi' ? 'EMI' : c.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')]));
+const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank transfer / Other' };
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
@@ -1767,7 +1773,7 @@ function walletView(all) {
   const shown = all.filter((c) => state.showArchived || c.status !== 'archived')
     .sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || a.bank.localeCompare(b.bank) || a.name.localeCompare(b.name));
   const feesSoon = active.filter((c) => { const f = feeInfo(c); return f && f.days <= 60; }).length;
-  const noRules = active.filter((c) => !activePack(c.id)).length;
+  const noRules = active.filter((c) => c.kind !== 'other' && !activePack(c.id)).length;
   const archivedCount = all.filter((c) => c.status === 'archived').length;
 
   return html`
@@ -1792,12 +1798,13 @@ function cardRow(c) {
   let right;
   if (c.status !== 'active') right = html`<span class="pill st-quiet">${STATUS_LABEL[c.status]}</span>`;
   else if (fee) right = html`<span class="pill ${PILL[fee.status.key]}">${fee.status.label}</span><span class="when">Fee ${fmtShort(fee.due)} · ${rel(fee.days)}</span>`;
+  else if (c.kind === 'other') right = '';
   else right = html`<span class="pill ${pack ? 'st-ok' : 'st-soon'}">${pack ? 'Rules added' : 'No rules yet'}</span>`;
   return html`<article class="row ${c.status !== 'active' ? 'inactive' : ''}">
     <button class="row-head" data-action="toggle" data-id="${c.id}" aria-expanded="${open}">
-      <div class="lead-line"><span class="mini-card ${c.kind}" aria-hidden="true">${c.last4 || ''}</span>
+      <div class="lead-line"><span class="mini-card ${c.kind}" aria-hidden="true">${c.kind === 'other' ? '₹' : (c.last4 || '')}</span>
         <div><div class="ins">${c.nickname || c.name}</div>
-        <div class="meta">${c.bank} · ${c.name} · ${c.kind === 'credit' ? 'Credit' : 'Debit'}${c.last4 ? html` · <span class="mono">•••• ${c.last4}</span>` : ''}</div></div></div>
+        <div class="meta">${[c.bank, c.name].filter(Boolean).join(' · ')} · ${c.kind === 'credit' ? 'Credit' : c.kind === 'debit' ? 'Debit' : 'Bank transfer / Other'}${c.last4 ? html` · <span class="mono">•••• ${c.last4}</span>` : ''}</div></div></div>
       <div class="right">${right}</div>
     </button>
     ${open ? cardDetail(c, fee, pack) : ''}
@@ -1834,8 +1841,8 @@ function cardDetail(c, fee, pack) {
   const replacement = c.replacedById ? state.cards.find((x) => x.id === c.replacedById) : null;
   return html`<div class="detail">
     <dl class="kv">
-      <dt>Card</dt><dd>${c.bank} ${c.name}</dd>
-      <dt>Type</dt><dd>${c.kind === 'credit' ? 'Credit card' : 'Debit card'} · ${c.network}</dd>
+      <dt>${c.kind === 'other' ? 'Name' : 'Card'}</dt><dd>${[c.bank, c.name].filter(Boolean).join(' ')}</dd>
+      <dt>Type</dt><dd>${KIND_LABEL[c.kind]}${c.kind === 'other' ? '' : ' · ' + c.network}</dd>
       ${holder ? html`<dt>Card holder</dt><dd>${holder}</dd>` : ''}
       ${c.joiningFeePaise != null ? html`<dt>Joining fee</dt><dd class="num">${formatPaise(c.joiningFeePaise)}</dd>` : ''}
       ${c.annualFeePaise != null ? html`<dt>Annual fee</dt><dd class="num">${formatPaise(c.annualFeePaise)}</dd>` : ''}
@@ -1851,11 +1858,11 @@ function cardDetail(c, fee, pack) {
       </div></div>`
       : c.kind === 'credit' ? html`<p class="hint">Add the card's issue date to track the annual fee date and get calendar reminders.</p>` : ''}
     ${billBox(c)}
-    ${rulesSection(c, pack)}
+    ${c.kind === 'other' ? html`<p class="hint">Payments logged with this are counted in your spends. There are no bank rules or rewards for it.</p>` : rulesSection(c, pack)}
     ${state.importing === c.id ? importPanel(c) : ''}
     ${state.canWrite ? html`<div class="actions">
       <button class="btn small" data-action="edit" data-id="${c.id}">Edit</button>
-      ${state.importing !== c.id ? html`<button class="btn ghost small" data-action="import" data-id="${c.id}">${pack ? 'Update rules' : 'Add rules'}</button>` : ''}
+      ${state.importing !== c.id && c.kind !== 'other' ? html`<button class="btn ghost small" data-action="import" data-id="${c.id}">${pack ? 'Update rules' : 'Add rules'}</button>` : ''}
       ${state.confirm?.id === c.id ? confirmBox(c, others) : html`
         ${c.status === 'active' ? html`<button class="btn ghost small" data-action="status" data-id="${c.id}" data-status="deactivated">Deactivate</button>`
           : html`<button class="btn ghost small" data-action="status" data-id="${c.id}" data-status="active">Reactivate</button>`}
@@ -2042,15 +2049,17 @@ function cardForm() {
   return html`<form class="panel" id="card-form" novalidate>
     <h2>${c.id ? 'Edit card' : 'New card'}</h2>
     ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
-    <fieldset class="seg" aria-label="Card type">
-      <label><input type="radio" name="kind" value="credit" ${c.kind !== 'debit' ? 'checked' : ''}><span>Credit card</span></label>
+    <fieldset class="seg seg3" aria-label="Type">
+      <label><input type="radio" name="kind" value="credit" ${!c.kind || c.kind === 'credit' ? 'checked' : ''}><span>Credit card</span></label>
       <label><input type="radio" name="kind" value="debit" ${c.kind === 'debit' ? 'checked' : ''}><span>Debit card</span></label>
+      <label><input type="radio" name="kind" value="other" ${c.kind === 'other' ? 'checked' : ''}><span>Bank transfer / Other</span></label>
     </fieldset>
     <div class="two">
-      <div class="field"><label for="f-bank">Bank *</label><input id="f-bank" name="bank" list="bank-list" value="${c.bank || ''}" autocomplete="off" placeholder="HDFC Bank">
+      <div class="field"><label for="f-bank">Bank <span class="card-only" ${c.kind === 'other' ? 'hidden' : ''}>*</span></label><input id="f-bank" name="bank" list="bank-list" value="${c.bank || ''}" autocomplete="off" placeholder="HDFC Bank">
         <datalist id="bank-list">${BANKS.map((b) => html`<option value="${b}">`)}</datalist>${err('bank')}</div>
-      <div class="field"><label for="f-name">Card name *</label><input id="f-name" name="name" value="${c.name || ''}" autocomplete="off" placeholder="Millennia">${err('name')}</div>
+      <div class="field"><label for="f-name" id="f-name-label">${c.kind === 'other' ? 'Name *' : 'Card name *'}</label><input id="f-name" name="name" value="${c.name || ''}" autocomplete="off" placeholder="${c.kind === 'other' ? 'UPI, Bank transfer, Cash' : 'Millennia'}">${err('name')}</div>
     </div>
+    <div class="card-only" ${c.kind === 'other' ? 'hidden' : ''}>
     <div class="two">
       <div class="field"><label for="f-network">Network *</label><select id="f-network" name="network">${opt('', c.network, 'Choose…')}${NETWORKS.map((n) => opt(n, c.network))}</select>${err('network')}</div>
       <div class="field"><label for="f-issue">Issue date (sets the fee date)</label><input id="f-issue" name="issueDate" type="date" value="${c.issueDate || ''}">${err('issueDate')}</div>
@@ -2069,12 +2078,13 @@ function cardForm() {
       <div class="field"><label for="f-joining">Joining fee (₹)</label><input id="f-joining" name="joiningFee" value="${rup(c.joiningFeePaise)}" inputmode="decimal" placeholder="0">${err('joiningFeePaise')}</div>
       <div class="field"><label for="f-annual">Annual fee (₹)</label><input id="f-annual" name="annualFee" value="${rup(c.annualFeePaise)}" inputmode="decimal" placeholder="0">${err('annualFeePaise')}</div>
     </div>
-    <div class="two" id="credit-fields" ${c.kind === 'debit' ? 'hidden' : ''}>
+    <div class="two" id="credit-fields" ${c.kind === 'debit' || c.kind === 'other' ? 'hidden' : ''}>
       <div class="field"><label for="f-stmt">Bill generation day (1–31)</label><input id="f-stmt" name="statementDay" value="${c.statementDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="15">${err('statementDay')}</div>
       <div class="field"><label for="f-due">Payment due day (1–31)</label><input id="f-due" name="dueDay" value="${c.dueDay ?? ''}" inputmode="numeric" maxlength="2" placeholder="4">${err('dueDay')}</div>
     </div>
     <div class="field"><label for="f-urls">Official benefit / T&amp;C links, one per line</label><textarea id="f-urls" name="sourceUrls" placeholder="https://…">${(c.sourceUrls || []).join('\n')}</textarea>
       ${Object.keys(e).filter((k) => k.startsWith('sourceUrls')).map((k) => err(k))}</div>
+    </div>
     <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" name="notes">${c.notes || ''}</textarea>${err('notes')}</div>
     <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save'}</button><button class="btn ghost" type="button" data-action="cancel">Cancel</button></div>
   </form>`;
@@ -2086,6 +2096,7 @@ function readForm(form) {
   const sd = String(f.statementDay).trim();
   const dd = String(f.dueDay ?? '').trim();
   const base = state.editing === 'new' ? {} : state.cards.find((c) => c.id === state.editing) || {};
+  if (f.kind === 'other') { f.network = 'Other'; f.last4 = ''; f.joiningFee = ''; f.annualFee = ''; f.issueDate = ''; f.sourceUrls = ''; }
   return { ...base, kind: f.kind, bank: f.bank, name: f.name, network: f.network, nickname: f.nickname, last4: f.last4,
     holderName: f.holderName, holder: f.holder, joiningFeePaise: fee(f.joiningFee), annualFeePaise: fee(f.annualFee), issueDate: f.issueDate,
     statementDay: f.kind !== 'credit' || sd === '' ? null : (/^\d+$/.test(sd) ? Number(sd) : -1), dueDay: f.kind !== 'credit' || dd === '' ? null : (/^\d+$/.test(dd) ? Number(dd) : -1), sourceUrls: String(f.sourceUrls).split('\n'), notes: f.notes };
@@ -2155,7 +2166,7 @@ function askView() {
 }
 
 function askWallet() {
-  return state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null }));
+  return state.cards.filter((c) => c.status === 'active' && c.kind !== 'other').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null }));
 }
 function runAsk(text, extraCategory = null) {
   state.askText = text;
@@ -2398,7 +2409,7 @@ function spendsView() {
 }
 
 function freshView() {
-  const active = state.cards.filter((c) => c.status === 'active');
+  const active = state.cards.filter((c) => c.status === 'active' && c.kind !== 'other');
   if (!active.length) return html`<div class="empty"><p>Add cards to see how fresh their rules are.</p></div>`;
   return html`<p class="hint">Offers are marked out of date 30 days after the bank pages were last checked, other rules after 180 days. To refresh, share the card's pages in the Card Manager project chat and ask for an updated rule pack.</p>
     <section class="list">${active.map((c) => {
@@ -2439,8 +2450,14 @@ function afterRender() {
     if (!renameBoxEl.hidden) document.getElementById('rename-text').textContent = renameText(orig, next, Number(renameBoxEl.dataset.others));
   });
   document.querySelectorAll('input[name=kind]').forEach((r) => r.addEventListener('change', () => {
+    const k = document.querySelector('input[name=kind]:checked')?.value;
     const cf = document.getElementById('credit-fields');
-    if (cf) cf.hidden = document.querySelector('input[name=kind]:checked')?.value !== 'credit';
+    if (cf) cf.hidden = k !== 'credit';
+    document.querySelectorAll('#card-form .card-only').forEach((el) => { el.hidden = k === 'other'; });
+    const lbl = document.getElementById('f-name-label');
+    if (lbl) lbl.textContent = k === 'other' ? 'Name *' : 'Card name *';
+    const nm = document.getElementById('f-name');
+    if (nm) nm.placeholder = k === 'other' ? 'UPI, Bank transfer, Cash' : 'Millennia';
   }));
 }
 

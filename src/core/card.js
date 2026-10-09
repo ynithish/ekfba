@@ -4,7 +4,7 @@
 import { scanForSensitiveData, findExpiryDate } from './sensitive.js';
 import { uuid } from './ids.js';
 
-export const CARD_KINDS = ['credit', 'debit'];
+export const CARD_KINDS = ['credit', 'debit', 'other']; // other = bank transfer, UPI, cash and similar
 export const NETWORKS = ['Visa', 'Mastercard', 'RuPay', 'American Express', 'Other'];
 export const HOLDER_TYPES = ['primary', 'add-on'];
 export const CARD_STATUSES = ['active', 'deactivated', 'replaced', 'archived'];
@@ -42,14 +42,16 @@ export function validateCard(draft, existing = null) {
     notes: trim(draft.notes) || '',
   };
 
-  if (!c.bank) errors.bank = 'Bank is required';
-  if (!c.name) errors.name = 'Card name is required';
-  if (!CARD_KINDS.includes(c.kind)) errors.kind = 'Choose credit or debit';
+  const isCard = c.kind !== 'other';
+  if (!isCard && !NETWORKS.includes(c.network)) c.network = 'Other';
+  if (isCard && !c.bank) errors.bank = 'Bank is required';
+  if (!c.name) errors.name = isCard ? 'Card name is required' : 'Give it a name, for example UPI or Bank transfer';
+  if (!CARD_KINDS.includes(c.kind)) errors.kind = 'Choose credit card, debit card or bank transfer / other';
   if (!NETWORKS.includes(c.network)) errors.network = 'Choose a card network';
   if (!HOLDER_TYPES.includes(c.holder)) errors.holder = 'Invalid holder type';
   if (!CARD_STATUSES.includes(c.status)) errors.status = 'Invalid status';
   if (c.last4 && !/^\d{4}$/.test(c.last4)) errors.last4 = 'Enter exactly the last 4 digits — never the full number';
-  if (!c.last4 && !c.nickname) errors.nickname = 'Give a nickname or the last 4 digits so you can tell cards apart';
+  if (isCard && !c.last4 && !c.nickname) errors.nickname = 'Give a nickname or the last 4 digits so you can tell cards apart';
   if (c.nickname.length > 40) errors.nickname = 'Keep the nickname under 40 characters';
   if (c.holderName.length > 60) errors.holderName = 'Keep the name under 60 characters';
   if (!isPaise(c.joiningFeePaise)) errors.joiningFeePaise = 'Invalid amount';

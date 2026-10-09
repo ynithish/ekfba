@@ -158,6 +158,20 @@ def main():
         page.click('.purchase:has-text("Sri Sai Tiffins")'); page.click('[data-action=log-delete-ask]'); page.click('[data-action=log-delete]')
         page.wait_for_selector('#log-form', state='detached')
         check('purchase deleted', page.locator('.purchase').count() == n_before - 1)
+        # Bank transfer / Other as a payment method
+        page.click('[data-tab=wallet]'); page.click('[data-action=new]'); page.wait_for_selector('#card-form')
+        page.click('label:has-text("Bank transfer / Other")')
+        check('other hides card-only fields', not page.is_visible('#f-network') and not page.is_visible('#f-last4') and not page.is_visible('#credit-fields'))
+        page.fill('#f-name', 'UPI'); page.click('#card-form [type=submit]')
+        page.wait_for_selector('.row .ins:has-text("UPI")')
+        check('bank transfer / other saved', 'Bank transfer / Other' in page.inner_text('.row:has-text("UPI")'))
+        page.click('[data-tab=spends]'); page.click('[data-action=log-new]'); page.wait_for_selector('#log-form')
+        page.fill('#l-merchant', 'Electricity bill'); page.fill('#l-amount', '1200'); page.select_option('#l-card', label='UPI')
+        page.click('#log-form [type=submit]'); page.wait_for_selector('#log-form', state='detached')
+        check('spend on UPI counted by card', '₹1,200' in page.inner_text('.spend-row:has-text("UPI")'))
+        page.click('[data-tab=ask]'); page.fill('#ask-q', 'croma 1000'); page.click('#ask-form [type=submit]'); page.wait_for_selector('.winner')
+        check('UPI not offered as a card to use', 'UPI' not in page.inner_text('main'))
+        page.click('[data-tab=spends]'); page.wait_for_selector('.total-n')
         page.click('[data-action=log-new]'); page.wait_for_selector('#log-form')
         page.fill('#l-merchant', 'sri sai tiffins'); page.dispatch_event('#l-merchant', 'change')
         check('category picked from earlier purchase', page.input_value('#l-category') == 'other')
@@ -190,10 +204,10 @@ def main():
 
         # Archive
         page.click('[data-tab=wallet]')
-        if page.locator('.detail').count() == 0: page.click('.row-head')
+        if page.locator('.row:has-text("Everyday") .detail').count() == 0: page.click('.row:has-text("Everyday") .row-head')
         page.click('[data-what=archive]'); page.click('[data-status=archived]')
         page.wait_for_selector('[data-action=toggle-archived]')
-        check('archived card hidden but kept', page.locator('.row').count() == 0)
+        check('archived card hidden but kept', page.locator('.row:has-text("Everyday")').count() == 0 and page.locator('[data-action=toggle-archived]').count() == 1)
 
         # Dark theme look
         page.emulate_media(color_scheme='dark'); page.click('[data-action=toggle-archived]')
