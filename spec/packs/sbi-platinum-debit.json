@@ -7,7 +7,7 @@
     "kind": "debit"
   },
   "checkedAt": "2026-10-11",
-  "notes": "Built from SBI's Platinum International Debit Card page (updated 1 Oct 2026) and SBI's debit card charges page. Network is Visa (cardholder). Not stated on the pages: the value of an SBI Reward Point, the meaning of 'cap of Rs. 1,000 per transaction', and the number of lounge visits or any spend condition for them.",
+  "notes": "Built from SBI's Platinum International Debit Card page (updated 1 Oct 2026) and SBI's debit card charges page. Network is Visa (cardholder). Not stated on the pages: the meaning of 'cap of Rs. 1,000 per transaction', and the number of lounge visits or any spend condition for them. Point value ₹0.25 comes from the cardholder.",
   "sources": [
     {
       "id": "s1",
@@ -21,6 +21,13 @@
       "type": "bank_page",
       "title": "SBI – Debit Card Related Charges",
       "url": "https://sbi.bank.in/web/personal-banking/information-services/kyc-guidelines/debit-card-related-charges",
+      "checkedAt": "2026-10-11"
+    },
+    {
+      "id": "owner",
+      "type": "other",
+      "title": "Cardholder's own information (Card Manager chat, 11 Oct 2026)",
+      "document": "Stated by the cardholder",
       "checkedAt": "2026-10-11"
     }
   ],
@@ -179,5 +186,11 @@
       "verified": true,
       "clause": "Redeem on rewardz.sbi, SBI REWARDZ App, Yono App and RINB"
     }
-  ]
+  ],
+  "pointValue": {
+    "paisePerPoint": 25,
+    "sourceId": "owner",
+    "clause": "SBI debit reward point value is ₹0.25 per point",
+    "verified": true
+  }
 }
