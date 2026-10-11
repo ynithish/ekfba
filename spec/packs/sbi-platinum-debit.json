@@ -1,0 +1,183 @@
+{
+  "format": "ekfba-rulepack",
+  "schemaVersion": 1,
+  "card": {
+    "bank": "SBI",
+    "name": "Platinum International Debit Card",
+    "kind": "debit"
+  },
+  "checkedAt": "2026-10-11",
+  "notes": "Built from SBI's Platinum International Debit Card page (updated 1 Oct 2026) and SBI's debit card charges page. Network is Visa (cardholder). Not stated on the pages: the value of an SBI Reward Point, the meaning of 'cap of Rs. 1,000 per transaction', and the number of lounge visits or any spend condition for them.",
+  "sources": [
+    {
+      "id": "s1",
+      "type": "bank_page",
+      "title": "SBI – Platinum International Debit Card",
+      "url": "https://sbi.bank.in/web/personal-banking/cards/debit-card/sbi-platinum-international-debit-card",
+      "checkedAt": "2026-10-11"
+    },
+    {
+      "id": "s2",
+      "type": "bank_page",
+      "title": "SBI – Debit Card Related Charges",
+      "url": "https://sbi.bank.in/web/personal-banking/information-services/kyc-guidelines/debit-card-related-charges",
+      "checkedAt": "2026-10-11"
+    }
+  ],
+  "fees": {
+    "joiningFeePaise": 30000,
+    "annualFeePaise": 32500,
+    "sourceId": "s2",
+    "items": [
+      {
+        "id": "amc-note",
+        "label": "Annual maintenance ₹325 + GST, charged from the second year",
+        "flatPaise": 32500,
+        "sourceId": "s2",
+        "clause": "Platinum Debit Card: Issuance ₹300/- plus GST; Annual maintenance ₹325/- plus GST, recovered at the beginning of the second year onwards",
+        "verified": true
+      },
+      {
+        "id": "replacement",
+        "label": "Card replacement ₹300 + GST",
+        "flatPaise": 30000,
+        "sourceId": "s2",
+        "clause": "Replacement — All other Debit Cards: Rs. 300/- + GST",
+        "verified": false
+      },
+      {
+        "id": "forex-markup",
+        "label": "International purchases (shop or online): 3% + GST",
+        "bps": 300,
+        "appliesTo": {
+          "categories": [
+            "international"
+          ]
+        },
+        "sourceId": "s2",
+        "clause": "International Transaction Charges — Point of Sale (PoS)/ eCommerce transactions: 3% of transaction amount plus GST",
+        "verified": true
+      }
+    ]
+  },
+  "earnRules": [
+    {
+      "id": "base-2-per-200",
+      "label": "2 SBI Reward Points per ₹200 on shopping, dining, fuel, travel and more",
+      "kind": "points",
+      "pointsPer": {
+        "points": 2,
+        "perPaise": 20000
+      },
+      "appliesTo": {
+        "channel": "any"
+      },
+      "capPoints": 10000,
+      "capPeriod": "calendar_month",
+      "sourceId": "s1",
+      "clause": "Earn 2 Reward Points per Rs.200 spent ... Earn up to 10,000 SBI Reward Points every month with a cap of Rs. 1,000/- per transaction",
+      "verified": true
+    },
+    {
+      "id": "international-2x",
+      "label": "2x points on international spends (4 per ₹200)",
+      "kind": "points",
+      "pointsPer": {
+        "points": 4,
+        "perPaise": 20000
+      },
+      "appliesTo": {
+        "categories": [
+          "international"
+        ]
+      },
+      "capPoints": 10000,
+      "capPeriod": "calendar_month",
+      "sourceId": "s1",
+      "clause": "Earn 2x Reward Points on international spending, online or in-store",
+      "verified": true
+    }
+  ],
+  "exclusions": [
+    {
+      "id": "no-milestone-wallet",
+      "label": "Wallet loads and prepaid top-ups (MCC 6540) don't count toward the ₹1 lakh monthly bonus",
+      "appliesTo": {
+        "categories": [
+          "wallet_load"
+        ]
+      },
+      "excludedFrom": [
+        "milestones"
+      ],
+      "sourceId": "s1",
+      "clause": "MCC-6540 spends are excluded",
+      "verified": true
+    }
+  ],
+  "offers": [],
+  "milestones": [
+    {
+      "id": "monthly-1l-bonus",
+      "kind": "spend_bonus",
+      "label": "Spend ₹1 lakh in a month (shop + online) for 1,000 bonus points",
+      "thresholdPaise": 10000000,
+      "period": "calendar_month",
+      "benefit": "1,000 bonus SBI Reward Points.",
+      "sourceId": "s1",
+      "clause": "Earn 1,000 Bonus Reward Points on PoS and E-comm spends of ₹1 lakh or more in a month",
+      "verified": true
+    }
+  ],
+  "lounge": [],
+  "otherBenefits": [
+    {
+      "id": "lounge",
+      "label": "Complimentary domestic airport lounge access",
+      "detail": "SBI says Platinum cards include domestic lounge access 'subject to Terms & Conditions' but doesn't give the number of visits or any spend condition. Check with SBI before relying on it.",
+      "sourceId": "s1",
+      "clause": "SBI Platinum Cards are one of the select variants of the Cards having complimentary domestic airport lounge access subject to Terms & Conditions applies",
+      "verified": false
+    },
+    {
+      "id": "birthday-2x",
+      "label": "2x points in your birthday month",
+      "detail": "Double reward points on debit card spends during your birthday month.",
+      "sourceId": "s1",
+      "clause": "Earn 2x Reward Points on spends made with your Debit Card during your birthday month",
+      "verified": true
+    },
+    {
+      "id": "activation",
+      "label": "Up to 300 bonus points for the first three payments",
+      "detail": "Within two months of issue, payments of ₹2,000 or more: 50 points for the 1st, 100 for the 2nd, 150 for the 3rd.",
+      "sourceId": "s1",
+      "clause": "Up to 300 bonus points for three payments within two months of issuance, minimum transaction Rs. 2,000",
+      "verified": true
+    },
+    {
+      "id": "per-txn-cap",
+      "label": "'Cap of ₹1,000 per transaction' on points",
+      "detail": "The page doesn't say whether this limits points per payment or only the first ₹1,000 of each payment earning points. Not used in recommendations until confirmed.",
+      "sourceId": "s1",
+      "clause": "with a cap of Rs. 1,000/- per transaction",
+      "verified": false
+    },
+    {
+      "id": "limits",
+      "label": "Daily limits: ATM ₹1,00,000; shop + online ₹2,00,000 (domestic)",
+      "detail": "International online: ₹50,000 per transaction and per month, at select sites only.",
+      "sourceId": "s1",
+      "verified": true,
+      "clause": "Daily ATM cash maximum Rs. 1,00,000; Daily PoS/online maximum Rs. 2,00,000; Online (international) Rs. 50,000 per transaction and per month"
+    },
+    {
+      "id": "redeem",
+      "label": "Redeem points on rewardz.sbi, SBI Rewardz app, YONO or net banking",
+      "detail": "Bill payments and FASTag, BookMyShow tickets, merchandise, vouchers and travel bookings.",
+      "sourceId": "s1",
+      "verified": true,
+      "clause": "Redeem on rewardz.sbi, SBI REWARDZ App, Yono App and RINB"
+    }
+  ]
+}
