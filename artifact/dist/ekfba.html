@@ -196,6 +196,21 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .cat-row { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; gap: 10px; align-items: center; font-size: 14px; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; margin: -4px -10px; cursor: pointer; color: inherit; }
 .cat-row:hover { background: var(--bg); }
 .cat-row.selected { border-color: var(--accent); background: var(--accent-soft); }
+.daily { gap: 8px; }
+.day-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
+.day-stats b { font-weight: 600; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.days { display: flex; align-items: flex-end; gap: 2px; height: 96px; }
+.day { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; background: none; border: 0; padding: 0; cursor: pointer; }
+.day span { display: block; min-height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); }
+.day.zero span { background: var(--quiet-bg); }
+.day.future { cursor: default; opacity: .35; }
+.day.today span { box-shadow: 0 0 0 2px var(--accent-soft); }
+.has-sel .day:not(.selected) span { opacity: .35; }
+.day-axis { display: flex; gap: 2px; font-size: 10px; color: var(--muted); }
+.day-axis span { flex: 1 1 0; min-width: 0; text-align: center; overflow: visible; white-space: nowrap; }
+.day-h { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; color: var(--muted); padding: 10px 2px 0; }
+.day-h:first-child { padding-top: 0; }
 .filters { align-items: center; }
 .ms { display: flex; flex-direction: column; gap: 4px; }
 .ms-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 14px; }
@@ -1243,7 +1258,39 @@ function billingInfo(card, purchases, today) {
   };
 }
 
-return { PURCHASE_STATUSES, monthKey, validatePurchase, findDuplicates, netSpend, flattenMonths, periodContaining, previousPeriod, totals, countsToward, milestoneProgress, dueDateFor, billingInfo };
+/* ---------------- Per-day spending ---------------- */
+
+/**
+ * Spend per day within [start, end]. Uses the same counting as totals() (pending and cancelled count 0).
+ * Returns { days: { 'YYYY-MM-DD': { paise, count } }, todayPaise, averagePaise, elapsedDays, highest: {date, paise}|null }.
+ * The average (rounded to whole rupees) is over the days of the period that have started (up to `today`), including days with no spend.
+ */
+function dailySpend(purchases, start, end, today) {
+  const days = {};
+  for (const p of purchases) {
+    if (p.date < start || p.date > end) continue;
+    const v = netSpend(p);
+    if (!v) continue;
+    const d = (days[p.date] ||= { paise: 0, count: 0 });
+    d.paise += v; d.count++;
+  }
+  const last = today < end ? today : end;
+  const elapsedDays = last < start ? 0 : Math.round((Date.parse(last + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000) + 1;
+  let total = 0, highest = null;
+  for (const [date, d] of Object.entries(days)) {
+    if (date <= last) total += d.paise;
+    if (!highest || d.paise > highest.paise) highest = { date, paise: d.paise };
+  }
+  return {
+    days,
+    todayPaise: days[today]?.paise || 0,
+    averagePaise: elapsedDays ? Math.round(total / elapsedDays / 100) * 100 : 0, // whole rupees
+    elapsedDays,
+    highest,
+  };
+}
+
+return { PURCHASE_STATUSES, monthKey, validatePurchase, findDuplicates, netSpend, flattenMonths, periodContaining, previousPeriod, totals, countsToward, milestoneProgress, dueDateFor, billingInfo, dailySpend };
 })();
 
 const __m_merchants = (() => {
@@ -1679,7 +1726,7 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
   CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid,
   parseQuery, recommend, explain, MERCHANTS, validatePurchase, findDuplicates, netSpend, flattenMonths, monthKey,
-  periodContaining, totals, milestoneProgress, formatShopName, billingInfo } = __core;
+  periodContaining, totals, milestoneProgress, formatShopName, billingInfo, dailySpend } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -1696,7 +1743,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], ready: { cards: false, rulePacks: false, months: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -2342,6 +2389,35 @@ async function savePurchase(confirmedDuplicate) {
   state.busy = false; render();
 }
 
+const fmtDay = (d, t) => {
+  const label = new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  if (d === t) return 'Today · ' + label;
+  const y = new Date(Date.parse(t + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+  return d === y ? 'Yesterday · ' + label : label;
+};
+
+/** Per-day spending: today, daily average, highest day; for a month, one bar per day (tap to see that day). */
+function dailyView(daily, range, t) {
+  const stats = html`<div class="day-stats">
+    ${range.start <= t && t <= range.end ? html`<span>Today <b class="num">${formatPaise(daily.todayPaise)}</b></span>` : ''}
+    <span>Daily average <b class="num">${formatPaise(daily.averagePaise)}</b></span>
+    ${daily.highest ? html`<span>Highest <button class="link-btn" data-action="spend-day" data-day="${daily.highest.date}"><b class="num">${formatPaise(daily.highest.paise)}</b> on ${fmtShort(daily.highest.date)}</button></span>` : ''}
+  </div>`;
+  if (state.spendPeriod !== 'month') return html`<h2>By day</h2><section class="total daily">${stats}<p class="meta">Purchases below are grouped by day with each day's total. Switch to This month to see a bar for each day.</p></section>`;
+  const dates = [];
+  for (let d = range.start; d <= range.end; d = new Date(Date.parse(d + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10)) dates.push(d);
+  const max = Math.max(1, ...dates.map((d) => daily.days[d]?.paise || 0));
+  const label = (d) => { const n = Number(d.slice(8)); return n % 7 === 1 || d === t ? String(n) : ''; };
+  return html`<h2>By day</h2><section class="total daily">
+    ${stats}
+    <div class="days ${state.spendDay ? 'has-sel' : ''}" role="group" aria-label="Spend per day">
+      ${dates.map((d) => { const v = daily.days[d]?.paise || 0; const future = d > t; return html`<button class="day ${v ? '' : 'zero'} ${d === t ? 'today' : ''} ${future ? 'future' : ''} ${state.spendDay === d ? 'selected' : ''}"
+        ${future ? 'disabled' : ''} data-action="spend-day" data-day="${d}" aria-pressed="${state.spendDay === d}" aria-label="${fmtShort(d)}: ${formatPaise(v)}" title="${fmtShort(d)}: ${formatPaise(v)}"><span style="height:${v ? Math.max(4, Math.round((v * 100) / max)) : 0}%"></span></button>`; })}
+    </div>
+    <div class="day-axis" aria-hidden="true">${dates.map((d) => html`<span>${label(d)}</span>`)}</div>
+  </section>`;
+}
+
 function spendsView() {
   const t = today();
   const range = periodContaining(state.spendPeriod === 'month' ? 'calendar_month' : state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year', t);
@@ -2354,7 +2430,10 @@ function spendsView() {
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory));
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay));
+  const daily = dailySpend(ps, range.start, range.end, t);
+  const dayTotals = {};
+  for (const p of list) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
   const periodName = { month: new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)}`, year: String(t.slice(0, 4)) }[state.spendPeriod];
   const pct = (v) => (tot.totalPaise ? Math.round((v * 100) / tot.totalPaise) : 0);
 
@@ -2384,6 +2463,7 @@ function spendsView() {
       <div class="total-n num">${formatPaise(tot.totalPaise)}</div>
       <div class="meta">${tot.count} purchase${tot.count === 1 ? '' : 's'}${tot.pendingPaise ? ` · ${formatPaise(tot.pendingPaise)} pending` : ''}</div>
     </section>
+    ${dailyView(daily, range, t)}
     <h2>By card</h2>
     ${active.length ? html`<section class="list">${cardsShown.map((c) => { const v = tot.byCard[c.id] || 0; return html`
       <button class="row spend-row ${state.spendCard === c.id ? 'selected' : ''}" data-action="spend-card" data-id="${c.id}" aria-pressed="${state.spendCard === c.id}">
@@ -2395,15 +2475,17 @@ function spendsView() {
       <button class="cat-row ${state.spendCategory === k ? 'selected' : ''}" data-action="spend-cat" data-cat="${k}" aria-pressed="${state.spendCategory === k}"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></button>`)}</section>` : ''}
     ${progress.length ? html`<h2>Card milestones</h2><section class="list">${progress}</section>` : ''}
     <h2 id="purchases-h">Purchases</h2>
-    ${state.spendCard || state.spendCategory ? html`<div class="chips filters">
+    ${state.spendCard || state.spendCategory || state.spendDay ? html`<div class="chips filters">
+      ${state.spendDay ? html`<button class="chip" aria-pressed="true" data-action="spend-day" data-day="${state.spendDay}">${fmtShort(state.spendDay)} ✕</button>` : ''}
       ${state.spendCard ? html`<button class="chip" aria-pressed="true" data-action="spend-card" data-id="${state.spendCard}">${cardLabel(cardById(state.spendCard) || {})} ✕</button>` : ''}
       ${state.spendCategory ? html`<button class="chip" aria-pressed="true" data-action="spend-cat" data-cat="${state.spendCategory}">${CAT_LABEL[state.spendCategory] || state.spendCategory} ✕</button>` : ''}
       <span class="meta">${list.length} purchase${list.length === 1 ? '' : 's'} · ${formatPaise(list.reduce((a, p) => a + netSpend(p), 0))} · tap one to change it</span></div>` : ''}
     ${!state.ready.months ? html`<div class="empty"><p>Loading purchases…</p></div>`
       : !list.length ? html`<div class="empty"><p>${ps.length ? 'No purchases in this period.' : 'No purchases logged yet. In Ask, tap “I paid with this card” after paying, or use Add purchase.'}</p></div>`
-      : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
+      : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p, i, shown) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
+        ${i === 0 || shown[i - 1].date !== p.date ? html`<div class="day-h"><span>${fmtDay(p.date, t)}</span><span class="num">${formatPaise(dayTotals[p.date] || 0)}</span></div>` : ''}
         <button class="row purchase" data-action="log-edit" data-id="${p.id}">
-          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${fmtShort(p.date)} · ${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}</div></div>
+          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}</div></div>
           <div class="right"><span class="num ${p.status === 'cancelled' ? 'strike' : ''}">${formatPaise(p.amountPaise)}</span>
             ${st ? html`<span class="pill ${st[0]}">${p.status === 'refunded' ? `Refunded ${formatPaise(p.refundPaise)}` : st[1]}</span>` : ''}</div>
         </button>`; })}</section>
@@ -2500,7 +2582,8 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
-  else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.purchaseLimit = 10; render(); }
+  else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.spendDay = null; state.purchaseLimit = 10; render(); }
+  else if (a === 'spend-day') { const d = t.dataset.day; state.spendDay = state.spendDay === d ? null : d; state.purchaseLimit = 10; render(); if (state.spendDay) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; state.purchaseLimit = 10; render(); if (state.spendCard) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'spend-cat') { const k = t.dataset.cat; state.spendCategory = state.spendCategory === k ? null : k; state.purchaseLimit = 10; render(); if (state.spendCategory) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'more-purchases') { state.purchaseLimit += 10; render(); }

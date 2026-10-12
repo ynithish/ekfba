@@ -127,3 +127,28 @@ test('credit card bill and payment dates', async () => {
   assert.equal(billingInfo({ ...card, kind: 'debit' }, ps, '2026-10-09'), null);
   assert.equal(billingInfo({ ...card, statementDay: null }, ps, '2026-10-09'), null);
 });
+
+test('dailySpend: per-day totals, today, average over elapsed days, highest day', async () => {
+  const { dailySpend } = await import('../src/core/purchases.js');
+  const mk = (date, amountPaise, status = 'completed', extra = {}) => ({ id: date + amountPaise + status, date, amountPaise, status, cardId: 'c', merchant: 'x', category: 'other', ...extra });
+  const ps = [
+    mk('2026-10-01', 10000), mk('2026-10-01', 5000), mk('2026-10-03', 30000),
+    mk('2026-10-03', 9999, 'pending'), mk('2026-10-03', 7777, 'cancelled'),
+    mk('2026-10-04', 20000, 'refunded', { refundPaise: 5000 }),
+    mk('2026-09-30', 99900),
+  ];
+  const r = dailySpend(ps, '2026-10-01', '2026-10-31', '2026-10-04');
+  assert.deepEqual(r.days['2026-10-01'], { paise: 15000, count: 2 });
+  assert.deepEqual(r.days['2026-10-03'], { paise: 30000, count: 1 });
+  assert.deepEqual(r.days['2026-10-04'], { paise: 15000, count: 1 });
+  assert.equal(r.days['2026-09-30'], undefined);
+  assert.equal(r.todayPaise, 15000);
+  assert.equal(r.elapsedDays, 4);
+  assert.equal(r.averagePaise, 15000); // 60,000 paise over 4 days
+  assert.deepEqual(r.highest, { date: '2026-10-03', paise: 30000 });
+  // A past period: average over the whole period.
+  const past = dailySpend(ps, '2026-09-01', '2026-09-30', '2026-10-04');
+  assert.equal(past.elapsedDays, 30);
+  assert.equal(past.averagePaise, 3300); // ₹33.30 rounds to ₹33
+  assert.equal(past.todayPaise, 0);
+});

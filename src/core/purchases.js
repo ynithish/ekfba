@@ -208,3 +208,35 @@ export function billingInfo(card, purchases, today) {
     payBy: lastDue && lastDue >= today ? { date: lastDue, bill: lastBill, amountPaise: sum(prev) } : nextDue ? { date: nextDue, bill: nextBill, amountPaise: null } : null,
   };
 }
+
+/* ---------------- Per-day spending ---------------- */
+
+/**
+ * Spend per day within [start, end]. Uses the same counting as totals() (pending and cancelled count 0).
+ * Returns { days: { 'YYYY-MM-DD': { paise, count } }, todayPaise, averagePaise, elapsedDays, highest: {date, paise}|null }.
+ * The average (rounded to whole rupees) is over the days of the period that have started (up to `today`), including days with no spend.
+ */
+export function dailySpend(purchases, start, end, today) {
+  const days = {};
+  for (const p of purchases) {
+    if (p.date < start || p.date > end) continue;
+    const v = netSpend(p);
+    if (!v) continue;
+    const d = (days[p.date] ||= { paise: 0, count: 0 });
+    d.paise += v; d.count++;
+  }
+  const last = today < end ? today : end;
+  const elapsedDays = last < start ? 0 : Math.round((Date.parse(last + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000) + 1;
+  let total = 0, highest = null;
+  for (const [date, d] of Object.entries(days)) {
+    if (date <= last) total += d.paise;
+    if (!highest || d.paise > highest.paise) highest = { date, paise: d.paise };
+  }
+  return {
+    days,
+    todayPaise: days[today]?.paise || 0,
+    averagePaise: elapsedDays ? Math.round(total / elapsedDays / 100) * 100 : 0, // whole rupees
+    elapsedDays,
+    highest,
+  };
+}
