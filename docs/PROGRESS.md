@@ -66,9 +66,9 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Credit cards: bill generation day + payment due day; last/next bill with logged amounts; pay-by date and calendar reminders
 - ✅ Purchases list shows 10 at a time with "Show more"; Spends total no longer shows a saved amount
 - ✅ Per-day spending (12 Oct 2026): today, daily average, highest day; a bar per day for the month (tap to see that day); purchases grouped by day with day totals
-- ⬜ Search purchases (owner: later phase)
+- ✅ Search purchases by shop or outlet (13 Oct 2026), combined with card, category and day filters
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 48 unit tests; 65 page checks
+- Tests: 48 unit tests; 72 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)

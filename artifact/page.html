@@ -211,6 +211,8 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .day-axis span { flex: 1 1 0; min-width: 0; text-align: center; overflow: visible; white-space: nowrap; }
 .day-h { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; color: var(--muted); padding: 10px 2px 0; }
 .day-h:first-child { padding-top: 0; }
+.p-search input { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--ink); }
+.p-search input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 .filters { align-items: center; }
 .ms { display: flex; flex-direction: column; gap: 4px; }
 .ms-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; font-size: 14px; }
@@ -245,7 +247,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], ready: { cards: false, rulePacks: false, months: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -920,6 +922,10 @@ function dailyView(daily, range, t) {
   </section>`;
 }
 
+/** Shop / outlet search: case-insensitive, ignores spaces and punctuation, matches any part of the name. */
+const squash = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function shopMatches(p, q) { const n = squash(q); return !n || squash(p.merchant).includes(n); }
+
 function spendsView() {
   const t = today();
   const range = periodContaining(state.spendPeriod === 'month' ? 'calendar_month' : state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year', t);
@@ -932,7 +938,7 @@ function spendsView() {
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay));
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery));
   const daily = dailySpend(ps, range.start, range.end, t);
   const dayTotals = {};
   for (const p of list) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
@@ -977,13 +983,15 @@ function spendsView() {
       <button class="cat-row ${state.spendCategory === k ? 'selected' : ''}" data-action="spend-cat" data-cat="${k}" aria-pressed="${state.spendCategory === k}"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></button>`)}</section>` : ''}
     ${progress.length ? html`<h2>Card milestones</h2><section class="list">${progress}</section>` : ''}
     <h2 id="purchases-h">Purchases</h2>
-    ${state.spendCard || state.spendCategory || state.spendDay ? html`<div class="chips filters">
+    ${ps.length ? html`<div class="p-search"><input id="p-search" type="search" placeholder="Search by shop or outlet" aria-label="Search purchases by shop or outlet" value="${state.spendQuery}" list="p-shops" autocomplete="off" enterkeyhint="search">
+      <datalist id="p-shops">${[...new Set(ps.filter((p) => p.date >= range.start && p.date <= range.end).map((p) => formatShopName(p.merchant)))].sort().map((n) => html`<option value="${n}">`)}</datalist></div>` : ''}
+    ${state.spendCard || state.spendCategory || state.spendDay || state.spendQuery.trim() ? html`<div class="chips filters">
       ${state.spendDay ? html`<button class="chip" aria-pressed="true" data-action="spend-day" data-day="${state.spendDay}">${fmtShort(state.spendDay)} ✕</button>` : ''}
       ${state.spendCard ? html`<button class="chip" aria-pressed="true" data-action="spend-card" data-id="${state.spendCard}">${cardLabel(cardById(state.spendCard) || {})} ✕</button>` : ''}
       ${state.spendCategory ? html`<button class="chip" aria-pressed="true" data-action="spend-cat" data-cat="${state.spendCategory}">${CAT_LABEL[state.spendCategory] || state.spendCategory} ✕</button>` : ''}
       <span class="meta">${list.length} purchase${list.length === 1 ? '' : 's'} · ${formatPaise(list.reduce((a, p) => a + netSpend(p), 0))} · tap one to change it</span></div>` : ''}
     ${!state.ready.months ? html`<div class="empty"><p>Loading purchases…</p></div>`
-      : !list.length ? html`<div class="empty"><p>${ps.length ? 'No purchases in this period.' : 'No purchases logged yet. In Ask, tap “I paid with this card” after paying, or use Add purchase.'}</p></div>`
+      : !list.length ? html`<div class="empty"><p>${state.spendQuery.trim() ? `No purchases at “${state.spendQuery.trim()}” with these filters.` : ps.length ? 'No purchases in this period.' : 'No purchases logged yet. In Ask, tap “I paid with this card” after paying, or use Add purchase.'}</p></div>`
       : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p, i, shown) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
         ${i === 0 || shown[i - 1].date !== p.date ? html`<div class="day-h"><span>${fmtDay(p.date, t)}</span><span class="num">${formatPaise(dayTotals[p.date] || 0)}</span></div>` : ''}
         <button class="row purchase" data-action="log-edit" data-id="${p.id}">
@@ -1110,10 +1118,24 @@ $app.addEventListener('submit', async (ev) => {
   document.querySelector('.ferr, #card-form .box.bad')?.scrollIntoView({ block: 'center' });
 });
 
+// Purchase search: filter as you type, keeping the cursor in the box.
+function renderKeepingSearch() {
+  const el = document.getElementById('p-search');
+  const pos = el ? [el.selectionStart, el.selectionEnd] : null;
+  render();
+  const again = document.getElementById('p-search');
+  if (again && pos) { again.focus(); try { again.setSelectionRange(pos[0], pos[1]); } catch (e) {} }
+}
+$app.addEventListener('input', (ev) => {
+  if (ev.target.id !== 'p-search') return;
+  state.spendQuery = ev.target.value; state.purchaseLimit = 10; renderKeepingSearch();
+});
+
 // Keep what the person is typing when live updates arrive.
 function safeRender() {
   if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
+  if (f && f.id === 'p-search') return renderKeepingSearch();
   if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
