@@ -108,6 +108,9 @@ def main():
         check('diff shows changed and removed', 'Changed' in diff and 'Removed' in diff and 'validTo' in diff)
         page.click('[data-action=approve]')
         page.wait_for_selector('.pack-meta:has-text("Rules version 2 of 2")')
+        # The old version is retired right after the new one is written; wait for that write to land.
+        try: page.wait_for_function("() => Object.values(window.__store.rulePacks).filter(p => p.status === 'active').length === 1", timeout=3000)
+        except Exception: pass
         statuses = page.evaluate("() => Object.values(window.__store.rulePacks).map(p => p.version + ':' + p.status).sort()")
         check('old version superseded, kept for history', statuses == ['1:superseded', '2:active'])
 
@@ -137,6 +140,7 @@ def main():
         page.fill('#l-amount', '15000'); page.click('#log-form [type=submit]'); page.wait_for_selector('#log-form', state='detached')
         check('edited amount updates the total', page.inner_text('.total-n') == '₹15,000')
         check('milestone progress shown', page.locator('.ms .bar').count() >= 1)
+        check('no percentage on milestones', '%' not in ''.join(page.locator('.ms-top').all_inner_texts()))
         # Manual purchase: shop name tidied, then corrected everywhere
         for i in range(2):
             page.click('[data-action=log-new]'); page.wait_for_selector('#log-form')

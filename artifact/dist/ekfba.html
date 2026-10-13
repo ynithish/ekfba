@@ -2446,7 +2446,7 @@ function spendsView() {
       <div class="ins">${cardLabel(c)}</div>
       ${items.map((m) => m.missing ? html`<div class="ms"><div class="ms-top"><span>${m.milestone.label}</span></div><p class="hint">Add the card's ${m.missing === 'issueDate' ? 'issue date' : 'statement day'} to track this.</p></div>`
         : html`<div class="ms">
-          <div class="ms-top"><span>${m.milestone.label}</span><span class="pill ${m.met ? 'st-ok' : 'st-quiet'}">${m.met ? 'Reached' : `${m.percent}%`}</span></div>
+          <div class="ms-top"><span>${m.milestone.label}</span>${m.met ? html`<span class="pill st-ok">Reached</span>` : ''}</div>
           <div class="bar" role="img" aria-label="${m.percent}% of ${formatPaise(m.milestone.thresholdPaise)}"><span style="width:${m.percent}%"></span></div>
           <div class="meta num">${formatPaise(m.eligiblePaise)} of ${formatPaise(m.milestone.thresholdPaise)}${m.met ? '' : ` · ${formatPaise(m.remainingPaise)} to go`} · ${fmtShort(m.period.start)} – ${fmtDate(m.period.end)}</div>
           ${m.milestone.kind === 'lounge_unlock' && m.previous ? html`<div class="meta">${m.previous.met ? 'Unlocked for now: last period reached ' + formatPaise(m.previous.eligiblePaise) + '.' : 'Not unlocked for now: last period logged ' + formatPaise(m.previous.eligiblePaise) + '.'}</div>` : ''}
