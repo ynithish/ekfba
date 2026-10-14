@@ -189,7 +189,9 @@ export function dueDateFor(billDate, dueDay) {
 /**
  * Bill dates for a credit card with a statement (bill generation) day. Returns null without one.
  * { lastBill, lastDue, lastBilledPaise, nextBill, nextDue, unbilledPaise, payBy } where payBy is the next
- * payment date that has not passed (the last bill's due date if still ahead, else the next bill's).
+ * payment date that has not passed (the last bill's due date if still ahead, else the next bill's), with the
+ * amount logged for that bill: { date, bill, amountPaise, billed }. billed=false means the bill is not generated
+ * yet, so amountPaise is what is logged in the current cycle so far.
  */
 export function billingInfo(card, purchases, today) {
   if (card.kind !== 'credit') return null;
@@ -205,7 +207,7 @@ export function billingInfo(card, purchases, today) {
   return {
     lastBill, lastDue, lastBilledPaise: sum(prev), lastCycle: prev,
     nextBill, nextDue, unbilledPaise: sum(cur), currentCycle: cur,
-    payBy: lastDue && lastDue >= today ? { date: lastDue, bill: lastBill, amountPaise: sum(prev) } : nextDue ? { date: nextDue, bill: nextBill, amountPaise: null } : null,
+    payBy: lastDue && lastDue >= today ? { date: lastDue, bill: lastBill, amountPaise: sum(prev), billed: true } : nextDue ? { date: nextDue, bill: nextBill, amountPaise: sum(cur), billed: false } : null,
   };
 }
 

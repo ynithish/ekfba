@@ -120,10 +120,12 @@ test('credit card bill and payment dates', async () => {
   assert.equal(b.nextBill, '2026-10-15');
   assert.equal(b.nextDue, '2026-11-04');
   assert.equal(b.unbilledPaise, 130000);
-  assert.deepEqual(b.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: null });
+  assert.deepEqual(b.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000, billed: false });
   const b2 = billingInfo(card, ps, '2026-10-20');
   assert.equal(b2.lastBilledPaise, 130000);
-  assert.deepEqual(b2.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000 });
+  assert.deepEqual(b2.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000, billed: true });
+  // A purchase after the bill date is not part of that payment.
+  assert.equal(billingInfo(card, [...ps, { cardId: 'c', date: '2026-10-18', amountPaise: 99900, status: 'completed' }], '2026-10-20').payBy.amountPaise, 130000);
   assert.equal(billingInfo({ ...card, kind: 'debit' }, ps, '2026-10-09'), null);
   assert.equal(billingInfo({ ...card, statementDay: null }, ps, '2026-10-09'), null);
 });
