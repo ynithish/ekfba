@@ -74,6 +74,10 @@ header { display: flex; justify-content: space-between; align-items: center; gap
 .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
 .stat b { display: block; font-family: var(--display); font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
 .stat span { color: var(--muted); font-size: 12px; }
+button.stat { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+button.stat[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+button.stat.warn b { color: var(--soon); }
+.stats + .stats { margin-top: -6px; }
 
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; min-height: 36px; padding: 0 14px; font-size: 14px; }
@@ -247,7 +251,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], ready: { cards: false, rulePacks: false, months: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -321,25 +325,38 @@ function render() {
 function walletView(all) {
   const loading = !state.ready.cards;
   const active = all.filter((c) => c.status === 'active');
-  const shown = all.filter((c) => state.showArchived || c.status !== 'archived')
+  const t = today();
+  const oldRules = (c) => { const r = activePack(c.id); return !!r && packFreshness(r.pack, t).ageDays > 30; };
+  const FILTERS = {
+    credit: (c) => c.status === 'active' && c.kind === 'credit',
+    debit: (c) => c.status === 'active' && c.kind === 'debit',
+    other: (c) => c.status === 'active' && c.kind === 'other',
+    old: (c) => c.status === 'active' && oldRules(c),
+    norules: (c) => c.status === 'active' && c.kind !== 'other' && !activePack(c.id),
+    fees: (c) => c.status === 'active' && (() => { const f = feeInfo(c); return f && f.days <= 60; })(),
+  };
+  const n = (k) => all.filter(FILTERS[k]).length;
+  const wf = FILTERS[state.walletFilter] ? state.walletFilter : null;
+  const tile = (k, label, warn = false) => html`<button class="stat ${warn && n(k) ? 'warn' : ''}" data-action="wallet-filter" data-f="${k}" aria-pressed="${wf === k}"><b>${n(k)}</b><span>${label}</span></button>`;
+  const shown = all.filter((c) => (wf ? FILTERS[wf](c) : state.showArchived || c.status !== 'archived'))
     .sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || a.bank.localeCompare(b.bank) || a.name.localeCompare(b.name));
-  const feesSoon = active.filter((c) => { const f = feeInfo(c); return f && f.days <= 60; }).length;
-  const noRules = active.filter((c) => c.kind !== 'other' && !activePack(c.id)).length;
   const archivedCount = all.filter((c) => c.status === 'archived').length;
 
   return html`
-    <section class="stats" aria-label="Summary">
-      <div class="stat"><b>${active.length}</b><span>Active cards</span></div>
-      <div class="stat"><b>${feesSoon}</b><span>Fees due in 60 days</span></div>
-      <div class="stat"><b>${noRules}</b><span>Cards without rules</span></div>
+    <section class="stats" aria-label="Active cards by type">
+      ${tile('credit', 'Credit cards')}${tile('debit', 'Debit cards')}${tile('other', 'Bank transfer / Other')}
     </section>
+    <section class="stats" aria-label="Needs attention">
+      ${tile('old', 'Rules older than 30 days', true)}${tile('norules', 'Cards without rules', true)}${tile('fees', 'Fees due in 60 days', true)}
+    </section>
+    ${wf ? html`<div class="chips filters"><button class="chip" aria-pressed="true" data-action="wallet-filter" data-f="${wf}">${{ credit: 'Credit cards', debit: 'Debit cards', other: 'Bank transfer / Other', old: 'Rules older than 30 days', norules: 'Cards without rules', fees: 'Fees due in 60 days' }[wf]} ✕</button><span class="meta">${shown.length} shown${wf === 'old' ? ' · share the bank page in the project chat to refresh the rules' : ''}</span></div>` : ''}
     ${state.editing ? cardForm() : ''}
     ${loading ? html`<div class="empty"><p>Loading your wallet…</p></div>`
       : !all.length ? html`<div class="empty"><h2>Your wallet is empty</h2>
           <p>Add each credit and debit card you own. Store a nickname and the last 4 digits only, never the full number.</p>
           ${state.canWrite && !state.editing ? html`<button class="btn" data-action="new">Add your first card</button>` : ''}</div>`
       : html`<section class="list" aria-label="Cards">${shown.map(cardRow)}</section>
-          ${archivedCount ? html`<div class="actions"><button class="btn ghost small" data-action="toggle-archived">${state.showArchived ? 'Hide' : 'Show'} ${archivedCount} archived</button></div>` : ''}`}`;
+          ${archivedCount && !wf ? html`<div class="actions"><button class="btn ghost small" data-action="toggle-archived">${state.showArchived ? 'Hide' : 'Show'} ${archivedCount} archived</button></div>` : ''}`}`;
 }
 
 function cardRow(c) {
@@ -1094,6 +1111,7 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'wallet-filter') { const f = t.dataset.f; state.walletFilter = state.walletFilter === f ? null : f; render(); }
   else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.spendDay = null; state.purchaseLimit = 10; render(); }
   else if (a === 'spend-day') { const d = t.dataset.day; state.spendDay = state.spendDay === d ? null : d; state.purchaseLimit = 10; render(); if (state.spendDay) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; state.purchaseLimit = 10; render(); if (state.spendCard) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
