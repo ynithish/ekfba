@@ -1880,8 +1880,8 @@ function billBox(c) {
   return html`<div><div class="label">Bills</div>
     <dl class="kv">
       ${due ? html`<dt>Payment due</dt><dd><b class="num">${formatPaise(due.amountPaise)}</b>* by ${fmtDate(due.date)} · ${due.billed ? `bill of ${fmtDate(due.bill)}` : `logged so far; bill on ${fmtDate(due.bill)}`}</dd>` : ''}
-      <dt>Last Bill</dt><dd>${fmtDate(b.lastBill)}${b.lastDue ? ` · Payment Date ${fmtDate(b.lastDue)}` : ''} · ${formatPaise(b.lastBilledPaise)} logged</dd>
-      <dt>Next Bill</dt><dd>${fmtDate(b.nextBill)}${b.nextDue ? ` · Payment Date ${fmtDate(b.nextDue)}` : ''} · ${formatPaise(b.unbilledPaise)} logged so far</dd>
+      <dt>Last Bill</dt><dd>${fmtDate(b.lastBill)}${b.lastDue ? ` · Payment Date ${fmtDate(b.lastDue)}` : ''} · <b class="num">${formatPaise(b.lastBilledPaise)}</b>*</dd>
+      <dt>Next Bill</dt><dd>${fmtDate(b.nextBill)}${b.nextDue ? ` · Payment Date ${fmtDate(b.nextDue)}` : ''} · <b class="num">${formatPaise(b.unbilledPaise)}</b> so far*</dd>
     </dl>
     ${due ? html`<div class="rem" style="margin-top:8px">${[3, 0].map((n) => { const l = calLink(due.date, n); const lbl = n ? `Remind ${n} days before ${fmtShort(due.date)}` : `Remind on ${fmtShort(due.date)}`; return l ? html`<a href="${l}" target="_blank" rel="noopener">${lbl}</a>` : ''; })}</div>` : html`<p class="hint">Add the payment due day to see when to pay.</p>`}
     <p class="hint">* Amounts are purchases logged here up to the bill date; your bank statement is the final word.</p></div>`;
@@ -2312,7 +2312,7 @@ function billLine(c, ps, t) {
   if (!b) return '';
   const pay = b.payBy;
   const days = pay ? daysBetween(t, pay.date) : null;
-  const items = [{ date: b.nextBill, node: html`<span>Next Bill ${fmtShort(b.nextBill)}</span>` }];
+  const items = [{ date: b.nextBill, node: html`<span>Next Bill ${fmtShort(b.nextBill)} · <b class="num">${formatPaise(b.unbilledPaise)}</b> so far*</span>` }];
   if (pay) items.push({ date: pay.date, node: html`<span class="${days <= 3 ? 'due-soon' : ''}">Payment Date ${fmtShort(pay.date)} · <b class="num">${formatPaise(pay.amountPaise)}</b>${pay.billed ? ' due' : ' so far'}*</span>` });
   items.sort((x, y) => x.date.localeCompare(y.date));
   return html`<div class="meta bill-line">${items.map((x, i) => html`${i ? ' · ' : ''}${x.node}`)}</div>`;
@@ -2480,7 +2480,7 @@ function spendsView() {
         <div class="bar"><span style="width:${Math.round((v * 100) / maxCard)}%"></span></div>
         ${billLine(c, ps, t)}
       </button>`; })}</section>
-      ${cardsShown.some((c) => billingInfo(c, ps, t)?.payBy) ? html`<p class="hint footnote">* Payment amount from purchases logged here up to the bill date. Your bank statement is the final word.</p>` : ''}` : html`<div class="empty"><p>Add your cards in Cards first.</p></div>`}
+      ${cardsShown.some((c) => billingInfo(c, ps, t)?.payBy) ? html`<p class="hint footnote">* Bill and payment amounts are from purchases logged here up to the bill date. Your bank statement is the final word.</p>` : ''}` : html`<div class="empty"><p>Add your cards in Cards first.</p></div>`}
     ${cats.length ? html`<h2>By category</h2><section class="panel plain cat-list">${cats.map(([k, v]) => html`
       <button class="cat-row ${state.spendCategory === k ? 'selected' : ''}" data-action="spend-cat" data-cat="${k}" aria-pressed="${state.spendCategory === k}"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></button>`)}</section>` : ''}
     ${progress.length ? html`<h2>Card milestones</h2><section class="list">${progress}</section>` : ''}

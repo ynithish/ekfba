@@ -3,7 +3,7 @@ with an in-memory stand-in for the Claude page runtime (db, user, downloads).
 
 Run: node tools/build-artifact.mjs && python3 tests/e2e_artifact.py
 """
-import json, os, sys
+import json, os, re, sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -176,6 +176,7 @@ def main():
         check('By card sorted by spend', 'Everyday' in page.locator('.spend-row').first.inner_text())
         bl = page.inner_text('.spend-row:has-text("Everyday") .bill-line')
         check('payment date shows amount with asterisk', 'Payment Date' in bl and '₹' in bl and '*' in bl)
+        check('next bill shows total with asterisk', re.search(r'Next Bill [^·]+· ₹[\d,]+ so far\*', bl) is not None)
         check('asterisk explained under By card', 'logged here up to the bill date' in page.inner_text('.footnote'))
         check('debit-like rows have no payment line', page.locator('.spend-row:has-text("UPI") .bill-line').count() == 0)
         page.click('[data-tab=ask]'); page.fill('#ask-q', 'croma 1000'); page.click('#ask-form [type=submit]'); page.wait_for_selector('.winner')
