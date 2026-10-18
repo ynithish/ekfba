@@ -33,6 +33,7 @@ export function validatePurchase(d, existing = null, now = Date.now()) {
     source: d.source === 'ask' ? 'ask' : 'manual',
     orderRef: String(d.orderRef || '').trim(),
     notes: String(d.notes || '').trim(),
+    vehicleId: typeof d.vehicleId === 'string' && d.vehicleId ? d.vehicleId : null,
   };
   if (!isDate(p.date)) errors.date = 'Pick the purchase date.';
   if (!p.merchant) errors.merchant = 'Where did you spend?';

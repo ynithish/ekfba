@@ -38,3 +38,7 @@ Money fields end in `Paise` (integer). Dates are `YYYY-MM-DD`.
 ## Backup file
 Plain: `{ format: "ekfba-backup", schemaVersion: 1, appVersion, exportedAt, stores: { <store>: [...] } }`
 Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations, salt}, cipher: {AES-GCM, iv}, data }`
+
+## Claude page: vehicles (18 Oct 2026)
+- Collection `vehicles/{id}`: `{ id, name, type: car|bike|scooter|other, notes, status: active|archived, createdAt, updatedAt }` (ms timestamps).
+- Purchases gain optional `vehicleId` (string or null) linking a spend to a vehicle.

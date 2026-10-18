@@ -218,6 +218,13 @@ button.stat.warn b { color: var(--soon); }
 .day-axis span { flex: 1 1 0; min-width: 0; text-align: center; overflow: visible; white-space: nowrap; }
 .day-h { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; color: var(--muted); padding: 10px 2px 0; }
 .day-h:first-child { padding-top: 0; }
+.veh-box { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 10px; background: var(--accent-soft); }
+.seg.seg4 { grid-template-columns: repeat(4, 1fr); }
+.seg.seg4 span { font-size: 13px; padding: 9px 4px; }
+.h-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.veh-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.veh-row.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.veh-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 .p-search input { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--ink); }
 .p-search input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 .filters { align-items: center; }
@@ -237,7 +244,8 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
   CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid,
   parseQuery, recommend, explain, MERCHANTS, validatePurchase, findDuplicates, netSpend, flattenMonths, monthKey,
-  periodContaining, totals, milestoneProgress, formatShopName, billingInfo, dailySpend } = __core;
+  periodContaining, totals, milestoneProgress, formatShopName, billingInfo, dailySpend,
+  validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -251,10 +259,10 @@ const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank tr
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], ready: { cards: false, rulePacks: false, months: false }, db: null, canWrite: true,
+  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -793,12 +801,37 @@ function logForm() {
     </div>
     <div class="field"><label for="l-category">Category</label><select id="l-category" name="category">${cats.map((c) => html`<option value="${c}" ${c === d.category ? 'selected' : ''}>${CAT_LABEL[c]}</option>`)}</select>${err('category')}</div>
     <div class="field"><label for="l-notes">Notes (optional)</label><input id="l-notes" name="notes" value="${d.notes || ''}" autocomplete="off"></div>
+    ${vehicleBox(d)}
     ${d.recommendedCardId && d.cardId && d.recommendedCardId !== d.cardId ? html`<p class="hint">EKFBA suggested ${cardLabel(cardById(d.recommendedCardId) || { nickname: 'another card' })}; this records the card you actually used.</p>` : ''}
     ${state.logConfirmDelete ? html`<div class="box bad">Delete this purchase? It will be removed from your totals.
       <div class="actions" style="margin-top:8px"><button class="btn danger small" type="button" data-action="log-delete">Yes, delete</button><button class="btn ghost small" type="button" data-action="log-delete-no">Keep it</button></div></div>`
     : html`<div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save purchase'}</button><button class="btn ghost" type="button" data-action="log-cancel">Cancel</button>
       ${d.id ? html`<button class="btn ghost small danger-text push-right" type="button" data-action="log-delete-ask">Delete</button>` : ''}</div>`}
   </form>`;
+}
+
+const activeVehicles = (keepId) => state.vehicles.filter((v) => v.status !== 'archived' || v.id === keepId).sort((a, b) => a.name.localeCompare(b.name));
+const vehicleById = (id) => state.vehicles.find((v) => v.id === id);
+/** The vehicle last used at this shop, if any. */
+function vehicleForShop(raw) {
+  const name = formatShopName(raw);
+  return name ? allPurchases().find((p) => p.vehicleId && formatShopName(p.merchant) === name)?.vehicleId || null : null;
+}
+
+/** "Is this vehicle related?" — shown for fuel and vehicle words (wash, service, insurance…), or when already linked. */
+function vehicleBox(d) {
+  const vs = activeVehicles(d.vehicleId);
+  const remembered = !d.id && !d.vehicleId ? vehicleForShop(d.merchant) : null;
+  const chosen = d.vehicleId || remembered || (vs.length === 1 ? vs[0].id : '');
+  const on = d.vehicleRelated ?? !!(d.vehicleId || remembered);
+  const show = on || looksVehicleRelated(d);
+  return html`<div class="veh-box" id="veh-box" ${show ? '' : 'hidden'}>
+    <label class="check"><input type="checkbox" id="l-vrel" name="vehicleRelated" ${on ? 'checked' : ''}><span>Is this vehicle related?</span></label>
+    <div class="field" id="veh-pick" ${on ? '' : 'hidden'}>
+      ${vs.length ? html`<label for="l-vehicle">Vehicle</label><select id="l-vehicle" name="vehicleId"><option value="">Choose…</option>${vs.map((v) => html`<option value="${v.id}" ${v.id === chosen ? 'selected' : ''}>${v.name} · ${VEHICLE_TYPE_LABEL[v.type]}</option>`)}</select>`
+        : html`<p class="hint">No vehicles yet. Save this purchase, add your vehicles under Vehicles (below Purchases), then edit it to pick one.</p>`}
+      ${state.logErrors.vehicleId ? html`<span class="ferr" role="alert">${state.logErrors.vehicleId}</span>` : ''}
+    </div></div>`;
 }
 
 function renameBox(d) {
@@ -851,7 +884,9 @@ function readLogForm() {
   const box = document.getElementById('rename-box');
   return { ...state.logDraft, merchant: f.merchant, amountPaise: amountPaise === null ? 0 : amountPaise, cardId: f.cardId, date: f.date, category: f.category,
     status: state.logDraft.status || 'completed', refundPaise: state.logDraft.refundPaise || 0,
-    notes: f.notes, renameAll: !!box && !box.hidden && f.renameAll === 'on' };
+    notes: f.notes, renameAll: !!box && !box.hidden && f.renameAll === 'on',
+    vehicleRelated: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden,
+    vehicleId: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden ? (f.vehicleId || '') : null };
 }
 
 async function deletePurchase() {
@@ -875,6 +910,7 @@ async function savePurchase(confirmedDuplicate) {
   draft.merchant = formatShopName(draft.merchant);
   const existing = draft.id ? allPurchases().find((p) => p.id === draft.id) : null;
   const r = validatePurchase({ ...draft, id: draft.id || uuid() }, existing);
+  if (draft.vehicleRelated && !draft.vehicleId && activeVehicles().length) { r.ok = false; r.errors = { ...(r.errors || {}), vehicleId: 'Pick the vehicle, or untick “Is this vehicle related?”.' }; }
   if (!r.ok) { state.logDraft = draft; state.logErrors = r.errors; return render(); }
   const p = r.purchase;
   const dups = findDuplicates(p, allPurchases());
@@ -955,7 +991,7 @@ function spendsView() {
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery));
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery) && (!state.spendVehicle || p.vehicleId === state.spendVehicle));
   const daily = dailySpend(ps, range.start, range.end, t);
   const dayTotals = {};
   for (const p of list) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
@@ -1003,7 +1039,8 @@ function spendsView() {
     <h2 id="purchases-h">Purchases</h2>
     ${ps.length ? html`<div class="p-search"><input id="p-search" type="search" placeholder="Search by shop or outlet" aria-label="Search purchases by shop or outlet" value="${state.spendQuery}" list="p-shops" autocomplete="off" enterkeyhint="search">
       <datalist id="p-shops">${[...new Set(ps.filter((p) => p.date >= range.start && p.date <= range.end).map((p) => formatShopName(p.merchant)))].sort().map((n) => html`<option value="${n}">`)}</datalist></div>` : ''}
-    ${state.spendCard || state.spendCategory || state.spendDay || state.spendQuery.trim() ? html`<div class="chips filters">
+    ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendQuery.trim() ? html`<div class="chips filters">
+      ${state.spendVehicle ? html`<button class="chip" aria-pressed="true" data-action="spend-vehicle" data-id="${state.spendVehicle}">${vehicleById(state.spendVehicle)?.name || 'Vehicle'} ✕</button>` : ''}
       ${state.spendDay ? html`<button class="chip" aria-pressed="true" data-action="spend-day" data-day="${state.spendDay}">${fmtShort(state.spendDay)} ✕</button>` : ''}
       ${state.spendCard ? html`<button class="chip" aria-pressed="true" data-action="spend-card" data-id="${state.spendCard}">${cardLabel(cardById(state.spendCard) || {})} ✕</button>` : ''}
       ${state.spendCategory ? html`<button class="chip" aria-pressed="true" data-action="spend-cat" data-cat="${state.spendCategory}">${CAT_LABEL[state.spendCategory] || state.spendCategory} ✕</button>` : ''}
@@ -1013,11 +1050,65 @@ function spendsView() {
       : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p, i, shown) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
         ${i === 0 || shown[i - 1].date !== p.date ? html`<div class="day-h"><span>${fmtDay(p.date, t)}</span><span class="num">${formatPaise(dayTotals[p.date] || 0)}</span></div>` : ''}
         <button class="row purchase" data-action="log-edit" data-id="${p.id}">
-          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}</div></div>
+          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}</div></div>
           <div class="right"><span class="num ${p.status === 'cancelled' ? 'strike' : ''}">${formatPaise(p.amountPaise)}</span>
             ${st ? html`<span class="pill ${st[0]}">${p.status === 'refunded' ? `Refunded ${formatPaise(p.refundPaise)}` : st[1]}</span>` : ''}</div>
         </button>`; })}</section>
-        ${list.length > state.purchaseLimit ? html`<div class="actions center-actions"><button class="btn ghost" data-action="more-purchases">Show ${Math.min(10, list.length - state.purchaseLimit)} more <span class="meta">(${list.length - state.purchaseLimit} left)</span></button></div>` : ''}`}`;
+        ${list.length > state.purchaseLimit ? html`<div class="actions center-actions"><button class="btn ghost" data-action="more-purchases">Show ${Math.min(10, list.length - state.purchaseLimit)} more <span class="meta">(${list.length - state.purchaseLimit} left)</span></button></div>` : ''}`}
+    ${vehiclesView(ps, range, periodName)}`;
+}
+
+/** Vehicles: spend per vehicle in the period; tap to see its purchases; add or edit vehicles. */
+function vehiclesView(ps, range, periodName) {
+  const vt = vehicleTotals(ps, range.start, range.end);
+  const vs = activeVehicles().sort((a, b) => (vt[b.id]?.paise || 0) - (vt[a.id]?.paise || 0) || a.name.localeCompare(b.name));
+  const archived = state.vehicles.filter((v) => v.status === 'archived');
+  const max = Math.max(1, ...vs.map((v) => vt[v.id]?.paise || 0));
+  return html`<div class="h-row"><h2 id="vehicles-h">Vehicles</h2>${state.canWrite && !state.vehicleDraft ? html`<button class="btn ghost small" data-action="veh-new">Add vehicle</button>` : ''}</div>
+    ${state.vehicleDraft ? vehicleForm() : ''}
+    ${!state.ready.vehicles ? html`<div class="empty"><p>Loading vehicles…</p></div>`
+      : !vs.length ? (state.vehicleDraft ? '' : html`<div class="empty"><p>Add your car, bike or scooter. Then, when you log fuel, a car wash, service, insurance and similar spends, tick “Is this vehicle related?” to track what each vehicle costs.</p></div>`)
+      : html`<section class="list">${vs.map((v) => { const t = vt[v.id]; return html`
+        <article class="row veh-row ${state.spendVehicle === v.id ? 'selected' : ''}">
+          <button class="veh-main" data-action="spend-vehicle" data-id="${v.id}" aria-pressed="${state.spendVehicle === v.id}">
+            <div class="spend-top"><span class="ins">${v.name} <small class="meta">${VEHICLE_TYPE_LABEL[v.type]}</small></span><span class="num">${formatPaise(t?.paise || 0)}</span></div>
+            <div class="bar thin"><span style="width:${Math.round(((t?.paise || 0) * 100) / max)}%"></span></div>
+            <div class="meta">${t ? `${t.count} purchase${t.count === 1 ? '' : 's'} · Fuel ${formatPaise(t.fuelPaise)} · Other ${formatPaise(t.paise - t.fuelPaise)}` : 'No spends'} · ${periodName}</div>
+          </button>
+          ${state.canWrite ? html`<button class="btn ghost small" data-action="veh-edit" data-id="${v.id}" aria-label="Edit ${v.name}">Edit</button>` : ''}
+        </article>`; })}</section>`}
+    ${archived.length ? html`<p class="hint">${archived.length} archived vehicle${archived.length === 1 ? '' : 's'} hidden; their past purchases are kept.</p>` : ''}`;
+}
+
+function vehicleForm() {
+  const d = state.vehicleDraft, e = state.vehicleErrors;
+  const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
+  return html`<form class="panel" id="veh-form" novalidate>
+    <h2>${d.id ? 'Edit vehicle' : 'Add vehicle'}</h2>
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <div class="field"><label for="v-name">Name</label><input id="v-name" name="name" value="${d.name || ''}" placeholder="For example Swift or Activa" autocomplete="off">${err('name')}</div>
+    <fieldset class="seg seg4" aria-label="Type">${VEHICLE_TYPES.map((k) => html`<label><input type="radio" name="type" value="${k}" ${(d.type || 'car') === k ? 'checked' : ''}><span>${k === 'other' ? 'Other' : VEHICLE_TYPE_LABEL[k]}</span></label>`)}</fieldset>
+    <div class="field"><label for="v-notes">Notes (optional)</label><input id="v-notes" name="notes" value="${d.notes || ''}" autocomplete="off">${err('notes')}</div>
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save vehicle'}</button><button class="btn ghost" type="button" data-action="veh-cancel">Cancel</button>
+      ${d.id ? html`<button class="btn ghost small danger-text push-right" type="button" data-action="veh-archive">Archive</button>` : ''}</div>
+  </form>`;
+}
+
+async function saveVehicle(patch = {}) {
+  if (state.busy || !state.db) return;
+  const f = Object.fromEntries(new FormData(document.getElementById('veh-form')));
+  const draft = { ...state.vehicleDraft, name: f.name, type: f.type, notes: f.notes, ...patch };
+  const existing = draft.id ? vehicleById(draft.id) : null;
+  const r = validateVehicle({ ...draft, id: draft.id || uuid() }, existing);
+  if (!r.ok) { state.vehicleDraft = draft; state.vehicleErrors = r.errors; return render(); }
+  state.busy = true; render();
+  try {
+    await state.db.collection('vehicles').doc(r.vehicle.id).set(r.vehicle);
+    state.vehicleDraft = null; state.vehicleErrors = {};
+    if (r.vehicle.status === 'archived' && state.spendVehicle === r.vehicle.id) state.spendVehicle = null;
+    toast(r.vehicle.status === 'archived' ? `${r.vehicle.name} archived` : existing ? 'Vehicle updated' : `${r.vehicle.name} added`);
+  } catch (e) { state.vehicleErrors = { _form: friendly(e) }; }
+  state.busy = false; render();
 }
 
 function freshView() {
@@ -1052,6 +1143,22 @@ function afterRender() {
     if (cat && sel && sel.value !== cat) { sel.value = cat; sel.classList.add('auto-filled'); setTimeout(() => sel.classList.remove('auto-filled'), 1200); }
   };
   shop?.addEventListener('change', pickCategory);
+  const vbox = document.getElementById('veh-box');
+  if (vbox) {
+    const vrel = document.getElementById('l-vrel'), pick = document.getElementById('veh-pick'), vsel = document.getElementById('l-vehicle');
+    const notes = document.getElementById('l-notes'), catSel = document.getElementById('l-category');
+    const refresh = () => {
+      const auto = looksVehicleRelated({ merchant: shop.value, notes: notes.value, category: catSel.value });
+      const remembered = !state.logDraft?.id ? vehicleForShop(shop.value) : null;
+      if (remembered && !vrel.dataset.touched) { vrel.checked = true; if (vsel) vsel.value = remembered; }
+      vbox.hidden = !(auto || vrel.checked);
+      pick.hidden = !vrel.checked;
+    };
+    vrel.addEventListener('change', () => { vrel.dataset.touched = '1'; refresh(); });
+    // After the category is auto-picked from the shop name (that listener runs later), so a fuel shop counts.
+    [shop, notes].forEach((x) => x?.addEventListener('input', () => setTimeout(refresh)));
+    shop?.addEventListener('change', () => setTimeout(refresh)); catSel?.addEventListener('change', refresh);
+  }
   shop?.addEventListener('input', () => { if (categoryForShop(shop.value)) pickCategory(); });
   const renameBoxEl = document.getElementById('rename-box');
   shop?.addEventListener('input', () => {
@@ -1110,6 +1217,11 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'veh-new') { state.vehicleDraft = { type: 'car' }; state.vehicleErrors = {}; render(); document.getElementById('veh-form')?.scrollIntoView({ block: 'center' }); document.getElementById('v-name')?.focus(); }
+  else if (a === 'veh-edit') { state.vehicleDraft = { ...vehicleById(id) }; state.vehicleErrors = {}; render(); document.getElementById('veh-form')?.scrollIntoView({ block: 'center' }); }
+  else if (a === 'veh-cancel') { state.vehicleDraft = null; state.vehicleErrors = {}; render(); }
+  else if (a === 'veh-archive') saveVehicle({ status: 'archived' });
+  else if (a === 'spend-vehicle') { state.spendVehicle = state.spendVehicle === id ? null : id; state.purchaseLimit = 10; render(); if (state.spendVehicle) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'wallet-filter') { const f = t.dataset.f; state.walletFilter = state.walletFilter === f ? null : f; render(); }
   else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.spendDay = null; state.purchaseLimit = 10; render(); }
   else if (a === 'spend-day') { const d = t.dataset.day; state.spendDay = state.spendDay === d ? null : d; state.purchaseLimit = 10; render(); if (state.spendDay) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
@@ -1121,6 +1233,7 @@ $app.addEventListener('click', async (ev) => {
 $app.addEventListener('submit', async (ev) => {
   if (ev.target.id === 'ask-form') { ev.preventDefault(); runAsk(document.getElementById('ask-q').value); return; }
   if (ev.target.id === 'log-form') { ev.preventDefault(); savePurchase(false); return; }
+  if (ev.target.id === 'veh-form') { ev.preventDefault(); saveVehicle(); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -1155,17 +1268,17 @@ function safeRender() {
   if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
   if (f && f.id === 'p-search') return renderKeepingSearch();
-  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 
 render();
 
 (async () => {
-  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
   const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
   if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
-  if (!db) { state.ready = { cards: true, rulePacks: true, months: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
   state.db = db;
   render();
   db.collection('cards').onSnapshot((snap) => {
@@ -1179,6 +1292,11 @@ render();
     state.ready.rulePacks = true;
     safeRender();
   }, () => { state.ready.rulePacks = true; });
+  db.collection('vehicles').onSnapshot((snap) => {
+    state.vehicles = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.vehicles = true;
+    safeRender();
+  }, () => { state.ready.vehicles = true; });
   db.collection('purchaseMonths').onSnapshot((snap) => {
     state.months = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     state.ready.months = true;
