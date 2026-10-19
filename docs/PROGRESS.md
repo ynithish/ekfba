@@ -69,8 +69,10 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Per-day spending (12 Oct 2026): today, daily average, highest day; a bar per day for the month (tap to see that day); purchases grouped by day with day totals
 - ✅ Search purchases by shop or outlet (13 Oct 2026), combined with card, category and day filters
 - ✅ Vehicles (18 Oct 2026): vehicles list after Purchases (spend per vehicle, fuel vs other, tap to filter, add/edit/archive); purchase form asks "Is this vehicle related?" for fuel and vehicle words (wash, car care, service, maintenance, insurance, tyres, parking, toll, FASTag…), remembers the vehicle per shop
+- ✅ Layout (19 Oct 2026): tabs Spends · Ask · Cards · Others. Freshness is now a tile on Cards (tap for the freshness list). Others holds Vehicles (tap a vehicle → Spends filtered to it) and Insurances
+- ✅ Insurances moved in from NLNLALD Policies (3 policies copied with their ids; NLNLALD page left untouched): renewal status, person filter, documents, calendar reminders, add/edit/delete; Motor policies can name a vehicle
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 51 unit tests; 97 page checks
+- Tests: 53 unit tests; 111 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)

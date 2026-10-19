@@ -42,3 +42,6 @@ Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations
 ## Claude page: vehicles (18 Oct 2026)
 - Collection `vehicles/{id}`: `{ id, name, type: car|bike|scooter|other, notes, status: active|archived, createdAt, updatedAt }` (ms timestamps).
 - Purchases gain optional `vehicleId` (string or null) linking a spend to a vehicle.
+
+## Claude page: policies (19 Oct 2026)
+- Collection `policies/{id}` (same shape as NLNLALD Policies): `{ id, insurer, type, people[], renewalDate, coverage, comments, documents[{kind,label,url}], vehicleId|null, createdAt, updatedAt }`. No policy numbers.
