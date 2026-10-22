@@ -76,3 +76,25 @@ test('custom periods and variable amounts', () => {
   assert.equal(x.nextDue, '2026-11-05');
   assert.equal(x.count, 4);
 });
+
+test('subscription month summary: paid, due and non-monthly flag', async () => {
+  const { subscriptionMonthSummary } = await import('../src/core/subscriptions.js');
+  const b = { cardId: 'c', category: 'utilities', status: 'completed' };
+  const ps = [
+    { ...b, id: '1', merchant: 'MyGate', date: '2026-10-05', amountPaise: 245000, subscription: { every: 'monthly', variable: true } },
+    { ...b, id: '2', merchant: 'Airtel', date: '2026-10-01', amountPaise: 34900, subscription: { every: '28d' } },
+    { ...b, id: '3', merchant: 'Netflix', date: '2026-09-25', amountPaise: 64900, subscription: { every: 'monthly' } },
+    { ...b, id: '4', merchant: 'Croma', date: '2026-10-02', amountPaise: 999900 },
+  ];
+  let r = subscriptionMonthSummary(ps, '2026-10-22');
+  assert.equal(r.paidPaise, 245000 + 34900);
+  assert.equal(r.paidCount, 2);
+  // Airtel due 29 Oct; Netflix due 25 Oct; MyGate next is 5 Nov (not this month).
+  assert.equal(r.duePaise, 34900 + 64900);
+  assert.equal(r.dueCount, 2);
+  assert.equal(r.includesNonMonthly, false);
+  ps.push({ ...b, id: '5', merchant: 'Pest control', date: '2026-04-10', amountPaise: 180000, subscription: { every: 'custom', count: 6, unit: 'months' } });
+  r = subscriptionMonthSummary(ps, '2026-10-22');
+  assert.equal(r.duePaise, 34900 + 64900 + 180000);
+  assert.equal(r.includesNonMonthly, true);
+});

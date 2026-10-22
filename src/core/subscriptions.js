@@ -77,3 +77,35 @@ export function subscriptionsFrom(purchases) {
       cardId: last.cardId, applianceId: last.applianceId || null, vehicleId: last.vehicleId || null };
   }).sort((a, b) => a.nextDue.localeCompare(b.nextDue) || a.merchant.localeCompare(b.merchant));
 }
+
+/**
+ * This calendar month at a glance, for the Subscriptions header:
+ * { paidPaise, paidCount, duePaise, dueCount, includesNonMonthly, monthStart, monthEnd }.
+ * paid = subscription purchases dated this month (cancelled/pending excluded, refunds netted).
+ * due  = every payment still expected up to the month end, from each subscription's next due date
+ *        (overdue ones included; a 28-day plan can fall twice). Varying bills use the average of the last 3.
+ * includesNonMonthly = a payment in `due` repeats on another cycle (quarterly, yearly, custom…), so the
+ * total is only for this month and will not repeat every month.
+ */
+export function subscriptionMonthSummary(purchases, today) {
+  const [y, m] = today.split('-').map(Number);
+  const monthStart = `${y}-${pad(m)}-01`;
+  const monthEnd = `${y}-${pad(m)}-${pad(lastDay(y, m))}`;
+  let paidPaise = 0, paidCount = 0;
+  for (const p of purchases) {
+    if (!p.subscription?.every || p.date < monthStart || p.date > monthEnd) continue;
+    const v = p.status === 'completed' ? p.amountPaise : p.status === 'refunded' ? Math.max(0, p.amountPaise - (p.refundPaise || 0)) : 0;
+    if (v) { paidPaise += v; paidCount++; }
+  }
+  let duePaise = 0, dueCount = 0, includesNonMonthly = false;
+  for (const s of subscriptionsFrom(purchases)) {
+    const each = s.variable ? s.averagePaise : s.amountPaise;
+    let d = s.nextDue, guard = 0;
+    while (d && d <= monthEnd && guard++ < 40) {
+      duePaise += each; dueCount++;
+      if (!['28d', 'monthly'].includes(s.every)) includesNonMonthly = true;
+      d = nextDueDate(d, s.sub);
+    }
+  }
+  return { paidPaise, paidCount, duePaise, dueCount, includesNonMonthly, monthStart, monthEnd };
+}

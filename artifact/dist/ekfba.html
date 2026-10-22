@@ -236,6 +236,22 @@ button.stat.good b { color: var(--ok); }
 .group-label { margin: 2px 0 -4px; }
 .sub-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; font: inherit; color: inherit; cursor: pointer; }
 .sub-row > div { min-width: 0; }
+.sub-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sub-totals { display: flex; gap: 16px; }
+.sub-totals span { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.sub-totals small { color: var(--muted); font-size: 12px; }
+.sub-totals b { font-family: var(--display); font-size: 18px; font-weight: 700; }
+.sub-totals .due-odd b { color: var(--soon); }
+.due-odd-note { color: var(--soon); }
+.acc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.acc-head { width: 100%; display: grid; grid-template-columns: 1fr auto 20px; align-items: center; gap: 10px; padding: 14px 16px; background: none; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; min-height: 56px; }
+.acc-title { font-family: var(--display); font-weight: 700; font-size: 17px; }
+.acc-sum { color: var(--muted); font-size: 13px; text-align: right; }
+.acc-sum.attn { color: var(--soon); font-weight: 600; }
+.chev { width: 20px; height: 20px; color: var(--muted); transition: transform .15s; }
+.acc.open .chev { transform: rotate(180deg); }
+.acc-body { border-top: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 12px; background: var(--bg); }
+.acc-actions { display: flex; justify-content: flex-end; }
 .h-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .veh-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
 .veh-row.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -1792,7 +1808,39 @@ function subscriptionsFrom(purchases) {
   }).sort((a, b) => a.nextDue.localeCompare(b.nextDue) || a.merchant.localeCompare(b.merchant));
 }
 
-return { SUBSCRIPTION_PERIODS, CUSTOM_UNITS, PERIOD_LABEL, subscriptionLabel, nextDueDate, normaliseSubscription, subscriptionsFrom };
+/**
+ * This calendar month at a glance, for the Subscriptions header:
+ * { paidPaise, paidCount, duePaise, dueCount, includesNonMonthly, monthStart, monthEnd }.
+ * paid = subscription purchases dated this month (cancelled/pending excluded, refunds netted).
+ * due  = every payment still expected up to the month end, from each subscription's next due date
+ *        (overdue ones included; a 28-day plan can fall twice). Varying bills use the average of the last 3.
+ * includesNonMonthly = a payment in `due` repeats on another cycle (quarterly, yearly, custom…), so the
+ * total is only for this month and will not repeat every month.
+ */
+function subscriptionMonthSummary(purchases, today) {
+  const [y, m] = today.split('-').map(Number);
+  const monthStart = `${y}-${pad(m)}-01`;
+  const monthEnd = `${y}-${pad(m)}-${pad(lastDay(y, m))}`;
+  let paidPaise = 0, paidCount = 0;
+  for (const p of purchases) {
+    if (!p.subscription?.every || p.date < monthStart || p.date > monthEnd) continue;
+    const v = p.status === 'completed' ? p.amountPaise : p.status === 'refunded' ? Math.max(0, p.amountPaise - (p.refundPaise || 0)) : 0;
+    if (v) { paidPaise += v; paidCount++; }
+  }
+  let duePaise = 0, dueCount = 0, includesNonMonthly = false;
+  for (const s of subscriptionsFrom(purchases)) {
+    const each = s.variable ? s.averagePaise : s.amountPaise;
+    let d = s.nextDue, guard = 0;
+    while (d && d <= monthEnd && guard++ < 40) {
+      duePaise += each; dueCount++;
+      if (!['28d', 'monthly'].includes(s.every)) includesNonMonthly = true;
+      d = nextDueDate(d, s.sub);
+    }
+  }
+  return { paidPaise, paidCount, duePaise, dueCount, includesNonMonthly, monthStart, monthEnd };
+}
+
+return { SUBSCRIPTION_PERIODS, CUSTOM_UNITS, PERIOD_LABEL, subscriptionLabel, nextDueDate, normaliseSubscription, subscriptionsFrom, subscriptionMonthSummary };
 })();
 
 const __m_recommend = (() => {
@@ -2095,7 +2143,7 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL,
   validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
-  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel } = __core;
+  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -2112,7 +2160,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -2968,7 +3016,31 @@ function othersView() {
   const range = periodContaining(type, t);
   const periodName = { month: 'this month', quarter: 'this quarter', year: 'this year' }[state.spendPeriod];
   const ps = allPurchases();
-  return html`${vehiclesView(ps, range, periodName)}${appliancesView(ps, range, periodName)}${subscriptionsView(ps)}${policiesView()}`;
+  const vt = vehicleTotals(ps, range.start, range.end);
+  const vs = activeVehicles();
+  const vSpend = vs.reduce((a, v) => a + (vt[v.id]?.paise || 0), 0);
+  const items = activeAppliances();
+  const amcSoon = items.filter((v) => v.amc?.endDate && daysBetween(t, v.amc.endDate) <= 60).length;
+  const pols = state.policies;
+  const polSoon = pols.filter((x) => x.renewalDate && daysBetween(t, x.renewalDate) <= 60).length;
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  return html`${subscriptionsView(ps)}
+    ${accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}` : 'None added', false, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft)}
+    ${accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft)}
+    ${accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft)}`;
+}
+
+/** A collapsible Others section: header with a one-line summary; body only when open. */
+function accordion(key, title, summary, attention, body, forceOpen) {
+  const open = forceOpen || !!state.othersOpen[key];
+  return html`<section class="acc ${open ? 'open' : ''}">
+    <button class="acc-head" id="${key}-h" data-action="acc" data-k="${key}" aria-expanded="${open}">
+      <span class="acc-title">${title}</span>
+      <span class="acc-sum ${attention ? 'attn' : ''}">${summary}</span>
+      <svg class="chev" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    ${open ? html`<div class="acc-body">${body()}</div>` : ''}
+  </section>`;
 }
 
 /** Appliances and devices: AMC status, warranty, spend in the period; tap to see purchases. */
@@ -2992,7 +3064,7 @@ function appliancesView(ps, range, periodName) {
     </article>`;
   };
   const groups = [['device', 'Devices'], ['appliance', 'Appliances']].map(([g, l]) => [l, items.filter((v) => (v.group || groupOfType(v.type)) === g)]).filter(([, l]) => l.length);
-  return html`<div class="h-row"><h2 id="appliances-h">Appliances &amp; devices</h2>${state.canWrite && !state.applianceDraft ? html`<button class="btn ghost small" data-action="app-new">Add</button>` : ''}</div>
+  return html`${state.canWrite && !state.applianceDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="app-new">Add appliance or device</button></div>` : ''}
     ${state.applianceDraft ? applianceForm() : ''}
     ${!state.ready.appliances ? html`<div class="empty"><p>Loading…</p></div>`
       : !items.length ? (state.applianceDraft ? '' : html`<div class="empty"><p>Add appliances (AC, fridge, water purifier…) with their AMC, and devices (mobile, laptop…). Recharges, repairs and service visits can then be linked to them.</p></div>`)
@@ -3063,7 +3135,14 @@ async function saveAppliance(patch = {}) {
 function subscriptionsView(ps) {
   const t = today();
   const subs = subscriptionsFrom(ps);
-  return html`<h2 id="subs-h">Subscriptions</h2>
+  const m = subscriptionMonthSummary(ps, t);
+  const monthName = new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short' });
+  return html`<div class="sub-head"><h2 id="subs-h">Subscriptions</h2>
+      <div class="sub-totals">
+        <span><small>Paid in ${monthName}</small><b class="num">${formatPaise(m.paidPaise)}</b></span>
+        <span class="${m.includesNonMonthly ? 'due-odd' : ''}" ${m.includesNonMonthly ? html`title="Includes a payment that is not monthly or 28-day, so this due amount is only for ${monthName}"` : ''}><small>Due by ${fmtShort(m.monthEnd)}</small><b class="num">~${formatPaise(m.duePaise)}</b></span>
+      </div></div>
+    ${m.includesNonMonthly ? html`<p class="hint due-odd-note">The due amount is in orange because it includes a payment that doesn't repeat every month (for example quarterly, yearly or every 7 months), so it applies to ${monthName} only.</p>` : ''}
     ${!subs.length ? html`<div class="empty"><p>When you log a recharge, OTT plan, broadband bill or similar, tick “This repeats (subscription)” and pick how often. It shows up here with its next due date.</p></div>`
       : html`<section class="list">${subs.map((x) => {
         const days = daysBetween(t, x.nextDue);
@@ -3087,7 +3166,7 @@ function policiesView() {
   const daysTo = (x) => (x.renewalDate ? daysBetween(t, x.renewalDate) : null);
   const soon = all.filter((x) => { const d = daysTo(x); return d !== null && d >= 0 && d <= 60; }).length;
   const overdue = all.filter((x) => { const d = daysTo(x); return d !== null && d < 0; }).length;
-  return html`<div class="h-row"><h2 id="policies-h">Insurances</h2>${state.canWrite && !state.policyDraft ? html`<button class="btn ghost small" data-action="pol-new">Add policy</button>` : ''}</div>
+  return html`${state.canWrite && !state.policyDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="pol-new">Add policy</button></div>` : ''}
     ${state.policyDraft ? policyForm() : ''}
     ${all.length ? html`<p class="meta">${all.length} polic${all.length === 1 ? 'y' : 'ies'} · ${soon} renew${soon === 1 ? 's' : ''} in 60 days${overdue ? ` · ${overdue} overdue` : ''}</p>` : ''}
     ${people.length > 1 ? html`<div class="chips" role="group" aria-label="Filter by person">${['All', ...people].map((n) => html`<button class="chip" data-action="pol-person" data-name="${n}" aria-pressed="${who === n}">${n}</button>`)}</div>` : ''}
@@ -3198,7 +3277,7 @@ function vehiclesView(ps, range, periodName) {
   const vs = activeVehicles().sort((a, b) => (vt[b.id]?.paise || 0) - (vt[a.id]?.paise || 0) || a.name.localeCompare(b.name));
   const archived = state.vehicles.filter((v) => v.status === 'archived');
   const max = Math.max(1, ...vs.map((v) => vt[v.id]?.paise || 0));
-  return html`<div class="h-row"><h2 id="vehicles-h">Vehicles</h2>${state.canWrite && !state.vehicleDraft ? html`<button class="btn ghost small" data-action="veh-new">Add vehicle</button>` : ''}</div>
+  return html`${state.canWrite && !state.vehicleDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="veh-new">Add vehicle</button></div>` : ''}
     ${state.vehicleDraft ? vehicleForm() : ''}
     ${!state.ready.vehicles ? html`<div class="empty"><p>Loading vehicles…</p></div>`
       : !vs.length ? (state.vehicleDraft ? '' : html`<div class="empty"><p>Add your car, bike or scooter. Then, when you log fuel, a car wash, service, insurance and similar spends, tick “Is this vehicle related?” to track what each vehicle costs.</p></div>`)
@@ -3388,6 +3467,7 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'acc') { const k = t.dataset.k; state.othersOpen = { ...state.othersOpen, [k]: !state.othersOpen[k] }; render(); }
   else if (a === 'app-new') { state.applianceDraft = { type: 'Mobile' }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); document.getElementById('a-name')?.focus(); }
   else if (a === 'app-edit') { state.applianceDraft = { ...applianceById(id) }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'app-cancel') { state.applianceDraft = null; state.applianceErrors = {}; render(); }
