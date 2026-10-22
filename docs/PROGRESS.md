@@ -73,8 +73,9 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Insurances moved in from NLNLALD Policies (3 policies copied with their ids; NLNLALD page left untouched): renewal status, person filter, documents, calendar reminders, add/edit/delete; Motor policies can name a vehicle
 - ✅ Appliances & devices (22 Oct 2026): devices (mobile, laptop, tablet…) and appliances (AC, fridge, RO…) in Others, with brand, bought date, warranty and AMC (provider, start, end/renewal, amount) shown with renewal status; purchases can be linked (recharges, AMC, repairs, service), tap an item → its purchases
 - ✅ Subscriptions: purchase form "This repeats" with every 28/56/84 days, monthly, 3/6 months, yearly; remembered per shop; Others lists each subscription with its next due date (reminders later)
+- ✅ Subscriptions: "Other…" period (any number of days up to 730 or months up to 60, e.g. 7 or 13 months); "Amount changes each time" for bills like electricity and MyGate, listed as ~average of the last 3 with the last amount (22 Oct 2026)
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 57 unit tests; 122 page checks
+- Tests: 58 unit tests; 129 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)

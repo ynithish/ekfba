@@ -229,6 +229,8 @@ button.stat.good b { color: var(--ok); }
 .small-chips { margin-top: 6px; }
 .small-chips .chip { min-height: 32px; font-size: 13px; }
 .sub-box { display: flex; flex-direction: column; gap: 10px; }
+.sub-pick { display: flex; flex-direction: column; gap: 10px; }
+.inline-pair { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
 .amc-fields { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 10px; background: var(--accent-soft); }
 .amc-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .group-label { margin: 2px 0 -4px; }
@@ -261,7 +263,7 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL,
   validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
-  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom } = __core;
+  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -858,7 +860,7 @@ const activeAppliances = (keepId) => state.appliances.filter((v) => v.status !==
 const applianceById = (id) => state.appliances.find((v) => v.id === id);
 function lastAtShop(raw, test) { const name = formatShopName(raw); return name ? allPurchases().find((p) => test(p) && formatShopName(p.merchant) === name) || null : null; }
 const applianceForShop = (raw) => lastAtShop(raw, (p) => p.applianceId)?.applianceId || null;
-const subscriptionForShop = (raw) => lastAtShop(raw, (p) => p.subscription?.every)?.subscription.every || null;
+const subscriptionForShop = (raw) => lastAtShop(raw, (p) => p.subscription?.every)?.subscription || null;
 
 /** "Is this for an appliance or device?" — shown for recharges, AC/RO service, repairs, AMC and similar words. */
 function applianceBox(d) {
@@ -881,13 +883,19 @@ function applianceBox(d) {
 /** "This repeats (subscription)" with how often — for recharges, OTT, broadband and similar. */
 function subscriptionBox(d) {
   const remembered = !d.id && !d.subscription ? subscriptionForShop(d.merchant) : null;
-  const every = d.subscription?.every || remembered || 'monthly';
+  const sub = d.subscription || remembered || { every: 'monthly' };
   const on = !!(d.subscription?.every || remembered);
   return html`<div class="sub-box" id="sub-box">
-    <label class="check"><input type="checkbox" id="l-sub" name="isSubscription" ${on ? 'checked' : ''}><span>This repeats (subscription), like a recharge or plan</span></label>
-    <div class="field" id="sub-pick" ${on ? '' : 'hidden'}><label for="l-every">How often</label>
-      <select id="l-every" name="every">${SUBSCRIPTION_PERIODS.map(([k, l]) => html`<option value="${k}" ${k === every ? 'selected' : ''}>${l}</option>`)}</select>
-      ${state.logErrors.subscription ? html`<span class="ferr" role="alert">${state.logErrors.subscription}</span>` : ''}</div>
+    <label class="check"><input type="checkbox" id="l-sub" name="isSubscription" ${on ? 'checked' : ''}><span>This repeats (subscription), like a recharge, plan or monthly bill</span></label>
+    <div class="sub-pick" id="sub-pick" ${on ? '' : 'hidden'}>
+      <div class="field"><label for="l-every">How often</label>
+        <select id="l-every" name="every">${SUBSCRIPTION_PERIODS.map(([k, l]) => html`<option value="${k}" ${k === sub.every ? 'selected' : ''}>${l}</option>`)}</select></div>
+      <div class="field" id="sub-custom" ${sub.every === 'custom' ? '' : 'hidden'}><label for="l-every-n">Every</label>
+        <div class="inline-pair"><input id="l-every-n" name="everyCount" inputmode="numeric" value="${sub.count || ''}" placeholder="7" autocomplete="off">
+          <select id="l-every-unit" name="everyUnit" aria-label="Days or months">${['months', 'days'].map((u) => html`<option value="${u}" ${(sub.unit || 'months') === u ? 'selected' : ''}>${u}</option>`)}</select></div></div>
+      <label class="check"><input type="checkbox" id="l-variable" name="variable" ${sub.variable ? 'checked' : ''}><span>Amount changes each time (electricity, MyGate, postpaid bills)</span></label>
+      ${state.logErrors.subscription ? html`<span class="ferr" role="alert">${state.logErrors.subscription}</span>` : ''}
+    </div>
   </div>`;
 }
 
@@ -946,7 +954,7 @@ function readLogForm() {
     vehicleId: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden ? (f.vehicleId || '') : null,
     applianceRelated: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden,
     applianceId: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden ? (f.applianceId || '') : null,
-    subscription: f.isSubscription === 'on' ? { every: f.every || 'monthly' } : null };
+    subscription: f.isSubscription === 'on' ? { every: f.every || 'monthly', ...(f.every === 'custom' ? { count: String(f.everyCount || '').trim(), unit: f.everyUnit } : {}), ...(f.variable === 'on' ? { variable: true } : {}) } : null };
 }
 
 async function deletePurchase() {
@@ -1112,7 +1120,7 @@ function spendsView() {
       : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p, i, shown) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
         ${i === 0 || shown[i - 1].date !== p.date ? html`<div class="day-h"><span>${fmtDay(p.date, t)}</span><span class="num">${formatPaise(dayTotals[p.date] || 0)}</span></div>` : ''}
         <button class="row purchase" data-action="log-edit" data-id="${p.id}">
-          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}${p.applianceId && applianceById(p.applianceId) ? ' · ' + applianceById(p.applianceId).name : ''}${p.subscription?.every ? ' · ↻ ' + SUB_LABEL[p.subscription.every] : ''}</div></div>
+          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}${p.applianceId && applianceById(p.applianceId) ? ' · ' + applianceById(p.applianceId).name : ''}${p.subscription?.every ? ' · ↻ ' + subscriptionLabel(p.subscription) : ''}</div></div>
           <div class="right"><span class="num ${p.status === 'cancelled' ? 'strike' : ''}">${formatPaise(p.amountPaise)}</span>
             ${st ? html`<span class="pill ${st[0]}">${p.status === 'refunded' ? `Refunded ${formatPaise(p.refundPaise)}` : st[1]}</span>` : ''}</div>
         </button>`; })}</section>
@@ -1231,8 +1239,9 @@ function subscriptionsView(ps) {
         const linked = [x.applianceId && applianceById(x.applianceId)?.name, x.vehicleId && vehicleById(x.vehicleId)?.name].filter(Boolean).join(', ');
         const c = cardById(x.cardId);
         return html`<button class="row sub-row" data-action="sub-open" data-shop="${x.merchant}">
-          <div><div class="ins">${x.merchant}</div><div class="meta">${SUB_LABEL[x.every]}${linked ? ' · ' + linked : ''} · last ${fmtShort(x.last)}${c ? ' on ' + cardLabel(c) : ''}</div></div>
-          <div class="right"><span class="pill ${cls}">${label}</span><span class="when">${formatPaise(x.amountPaise)} · ${fmtShort(x.nextDue)} (${rel(days)})</span></div>
+          <div><div class="ins">${x.merchant}</div><div class="meta">${x.label}${x.variable ? ' · amount varies' : ''}${linked ? ' · ' + linked : ''} · last ${fmtShort(x.last)}${c ? ' on ' + cardLabel(c) : ''}</div></div>
+          <div class="right"><span class="pill ${cls}">${label}</span><span class="when">${x.variable ? `~${formatPaise(x.averagePaise)}` : formatPaise(x.amountPaise)} · ${fmtShort(x.nextDue)} (${rel(days)})</span>
+            ${x.variable && x.count > 1 ? html`<span class="when">last ${formatPaise(x.amountPaise)} · avg of last ${Math.min(3, x.count)}</span>` : ''}</div>
         </button>`; })}</section>
         <p class="hint">Next due dates are worked out from the last payment you logged. Reminders will come later.</p>`}`;
 }
@@ -1450,18 +1459,25 @@ function afterRender() {
     const notesA = document.getElementById('l-notes'), catA = document.getElementById('l-category');
     const subOn = document.getElementById('l-sub'), subPick = document.getElementById('sub-pick'), subEvery = document.getElementById('l-every');
     const refreshA = () => {
+      if (!abox.isConnected) return; // the form was closed or re-drawn before this ran
       const auto = looksApplianceRelated({ merchant: shop.value, notes: notesA.value, category: catA.value });
       const isNew = !state.logDraft?.id;
       const remembered = isNew ? applianceForShop(shop.value) : null;
       if (remembered && !arel.dataset.touched) { arel.checked = true; if (asel) asel.value = remembered; }
       const sub = isNew ? subscriptionForShop(shop.value) : null;
-      if (sub && !subOn.dataset.touched) { subOn.checked = true; subEvery.value = sub; }
+      if (sub && !subOn.dataset.touched) {
+        subOn.checked = true; subEvery.value = sub.every;
+        if (sub.every === 'custom') { document.getElementById('l-every-n').value = sub.count; document.getElementById('l-every-unit').value = sub.unit; }
+        document.getElementById('l-variable').checked = !!sub.variable;
+      }
+      document.getElementById('sub-custom').hidden = subEvery.value !== 'custom';
       abox.hidden = !(auto || arel.checked);
       apick.hidden = !arel.checked;
       subPick.hidden = !subOn.checked;
     };
     arel.addEventListener('change', () => { arel.dataset.touched = '1'; refreshA(); });
     subOn.addEventListener('change', () => { subOn.dataset.touched = '1'; refreshA(); });
+    subEvery.addEventListener('change', () => { subOn.dataset.touched = '1'; refreshA(); if (subEvery.value === 'custom') document.getElementById('l-every-n').focus(); });
     [shop, notesA].forEach((x) => x?.addEventListener('input', () => setTimeout(refreshA)));
     shop?.addEventListener('change', () => setTimeout(refreshA)); catA?.addEventListener('change', refreshA);
   }
@@ -1470,6 +1486,7 @@ function afterRender() {
     const vrel = document.getElementById('l-vrel'), pick = document.getElementById('veh-pick'), vsel = document.getElementById('l-vehicle');
     const notes = document.getElementById('l-notes'), catSel = document.getElementById('l-category');
     const refresh = () => {
+      if (!vbox.isConnected) return;
       const auto = looksVehicleRelated({ merchant: shop.value, notes: notes.value, category: catSel.value });
       const remembered = !state.logDraft?.id ? vehicleForShop(shop.value) : null;
       if (remembered && !vrel.dataset.touched) { vrel.checked = true; if (vsel) vsel.value = remembered; }

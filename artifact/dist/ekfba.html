@@ -229,6 +229,8 @@ button.stat.good b { color: var(--ok); }
 .small-chips { margin-top: 6px; }
 .small-chips .chip { min-height: 32px; font-size: 13px; }
 .sub-box { display: flex; flex-direction: column; gap: 10px; }
+.sub-pick { display: flex; flex-direction: column; gap: 10px; }
+.inline-pair { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
 .amc-fields { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 10px; background: var(--accent-soft); }
 .amc-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .group-label { margin: 2px 0 -4px; }
@@ -1083,7 +1085,20 @@ const __m_purchases = (() => {
 
 const { scanForSensitiveData } = __m_sensitive;
 const { CATEGORIES } = __m_rulepack;
-const SUB_PERIODS = ['28d', 'monthly', '56d', '84d', 'quarterly', 'halfyearly', 'yearly']; // same as subscriptions.js
+// Same rules as normaliseSubscription in subscriptions.js (kept here so purchases.js has no later-module import).
+const SUB_PERIODS = ['28d', 'monthly', '56d', '84d', 'quarterly', 'halfyearly', 'yearly', 'custom'];
+function normaliseSub(s) {
+  if (!s || !s.every) return null;
+  if (!SUB_PERIODS.includes(s.every)) return undefined;
+  const out = { every: s.every };
+  if (s.every === 'custom') {
+    const n = Number(s.count), max = { days: 730, months: 60 }[s.unit];
+    if (!max || !Number.isInteger(n) || n < 1 || n > max) return undefined;
+    out.count = n; out.unit = s.unit;
+  }
+  if (s.variable) out.variable = true;
+  return out;
+}
 const PURCHASE_STATUSES = ['completed', 'pending', 'cancelled', 'refunded'];
 const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z')) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
 const MAX_PAISE = 1_00_00_000_00;
@@ -1114,7 +1129,7 @@ function validatePurchase(d, existing = null, now = Date.now()) {
     notes: String(d.notes || '').trim(),
     vehicleId: typeof d.vehicleId === 'string' && d.vehicleId ? d.vehicleId : null,
     applianceId: typeof d.applianceId === 'string' && d.applianceId ? d.applianceId : null,
-    subscription: d.subscription && d.subscription.every ? { every: d.subscription.every } : null,
+    subscription: normaliseSub(d.subscription),
   };
   if (!isDate(p.date)) errors.date = 'Pick the purchase date.';
   if (!p.merchant) errors.merchant = 'Where did you spend?';
@@ -1127,7 +1142,7 @@ function validatePurchase(d, existing = null, now = Date.now()) {
     errors.refundPaise = 'Refund must be more than ₹0 and not more than the amount paid.';
   }
   if (p.discountPaise !== null && !(Number.isInteger(p.discountPaise) && p.discountPaise >= 0)) errors.discountPaise = 'Invalid discount.';
-  if (p.subscription && !SUB_PERIODS.includes(p.subscription.every)) errors.subscription = 'Pick how often it repeats.';
+  if (p.subscription === undefined) { errors.subscription = 'Pick how often it repeats. For Other, enter a number of days (up to 730) or months (up to 60).'; }
   if (p.notes.length > 500) errors.notes = 'Notes are too long (500 characters).';
   const s = scanForSensitiveData({ merchant: p.merchant, notes: p.notes, orderRef: p.orderRef });
   if (s) errors[s.path] = `Not saved: ${s.reason}.`;
@@ -1704,8 +1719,10 @@ const __m_subscriptions = (() => {
 const { formatShopName } = __m_merchants;
 const SUBSCRIPTION_PERIODS = [
   ['28d', 'Every 28 days'], ['monthly', 'Monthly'], ['56d', 'Every 56 days'], ['84d', 'Every 84 days'],
-  ['quarterly', 'Every 3 months'], ['halfyearly', 'Every 6 months'], ['yearly', 'Yearly'],
+  ['quarterly', 'Every 3 months'], ['halfyearly', 'Every 6 months'], ['yearly', 'Yearly'], ['custom', 'Other…'],
 ];
+const CUSTOM_UNITS = ['days', 'months'];
+const CUSTOM_MAX = { days: 730, months: 60 };
 const PERIOD_LABEL = Object.fromEntries(SUBSCRIPTION_PERIODS);
 const DAYS = { '28d': 28, '56d': 56, '84d': 84 };
 const MONTHS = { monthly: 1, quarterly: 3, halfyearly: 6, yearly: 12 };
@@ -1713,21 +1730,40 @@ const MONTHS = { monthly: 1, quarterly: 3, halfyearly: 6, yearly: 12 };
 const pad = (n) => String(n).padStart(2, '0');
 const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 
-/** The date one period after `date` (month periods keep the day, capped at the month's last day). */
+/** "Every 7 months", "Every 45 days", "Monthly"… for a subscription object (or a period key). */
+function subscriptionLabel(sub) {
+  const s = typeof sub === 'string' ? { every: sub } : (sub || {});
+  if (s.every === 'custom') return `Every ${s.count} ${s.count === 1 ? s.unit.replace(/s$/, '') : s.unit}`;
+  return PERIOD_LABEL[s.every] || '';
+}
+
+/** The date one period after `date` (month periods keep the day, capped at the month's last day).
+ *  `every` is a period key or a subscription object (custom periods use { every: 'custom', count, unit }). */
 function nextDueDate(date, every) {
-  if (DAYS[every]) return new Date(Date.parse(date + 'T00:00:00Z') + DAYS[every] * 86400000).toISOString().slice(0, 10);
-  const add = MONTHS[every];
+  const s = typeof every === 'string' ? { every } : (every || {});
+  const days = s.every === 'custom' ? (s.unit === 'days' ? s.count : 0) : DAYS[s.every];
+  if (days) return new Date(Date.parse(date + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
+  const add = s.every === 'custom' ? (s.unit === 'months' ? s.count : 0) : MONTHS[s.every];
   if (!add) return null;
   let [y, m, d] = date.split('-').map(Number);
   m += add; while (m > 12) { m -= 12; y++; }
   return `${y}-${pad(m)}-${pad(Math.min(d, lastDay(y, m)))}`;
 }
 
-/** Validates a purchase's subscription field: null, or { every } with a known period. */
+/** Validates a purchase's subscription field: null, or { every[, count, unit][, variable] }; undefined = invalid. */
 function normaliseSubscription(s) {
   if (!s || !s.every) return null;
-  return PERIOD_LABEL[s.every] ? { every: s.every } : undefined; // undefined = invalid
+  if (!PERIOD_LABEL[s.every]) return undefined;
+  const out = { every: s.every };
+  if (s.every === 'custom') {
+    const count = Number(s.count);
+    if (!CUSTOM_UNITS.includes(s.unit) || !Number.isInteger(count) || count < 1 || count > CUSTOM_MAX[s.unit]) return undefined;
+    out.count = count; out.unit = s.unit;
+  }
+  if (s.variable) out.variable = true;
+  return out;
 }
+const specKey = (s) => (s.every === 'custom' ? `custom:${s.count}${s.unit}` : s.every);
 
 /**
  * One entry per subscription (same shop name, linked item and period), from its latest purchase:
@@ -1739,19 +1775,24 @@ function subscriptionsFrom(purchases) {
   for (const p of purchases) {
     if (!p.subscription?.every || p.status === 'cancelled') continue;
     const merchant = formatShopName(p.merchant);
-    const key = [merchant.toLowerCase(), p.subscription.every, p.applianceId || '', p.vehicleId || ''].join('|');
+    const key = [merchant.toLowerCase(), specKey(p.subscription), p.applianceId || '', p.vehicleId || ''].join('|');
     const cur = map.get(key);
-    if (!cur) map.set(key, { key, merchant, every: p.subscription.every, last: p, count: 1 });
-    else { cur.count++; if (p.date > cur.last.date || (p.date === cur.last.date && (p.createdAt || 0) > (cur.last.createdAt || 0))) cur.last = p; }
+    if (!cur) map.set(key, { key, merchant, all: [p] });
+    else cur.all.push(p);
   }
-  return [...map.values()].map((s) => ({
-    key: s.key, merchant: s.merchant, every: s.every, count: s.count,
-    last: s.last.date, nextDue: nextDueDate(s.last.date, s.every), amountPaise: s.last.amountPaise,
-    cardId: s.last.cardId, applianceId: s.last.applianceId || null, vehicleId: s.last.vehicleId || null,
-  })).sort((a, b) => a.nextDue.localeCompare(b.nextDue) || a.merchant.localeCompare(b.merchant));
+  return [...map.values()].map((s) => {
+    const sorted = s.all.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+    const last = sorted[0];
+    const recent = sorted.slice(0, 3);
+    return { key: s.key, merchant: s.merchant, sub: last.subscription, every: last.subscription.every, label: subscriptionLabel(last.subscription),
+      variable: !!last.subscription.variable, count: sorted.length,
+      averagePaise: Math.round(recent.reduce((a, p) => a + p.amountPaise, 0) / recent.length / 100) * 100,
+      last: last.date, nextDue: nextDueDate(last.date, last.subscription), amountPaise: last.amountPaise,
+      cardId: last.cardId, applianceId: last.applianceId || null, vehicleId: last.vehicleId || null };
+  }).sort((a, b) => a.nextDue.localeCompare(b.nextDue) || a.merchant.localeCompare(b.merchant));
 }
 
-return { SUBSCRIPTION_PERIODS, PERIOD_LABEL, nextDueDate, normaliseSubscription, subscriptionsFrom };
+return { SUBSCRIPTION_PERIODS, CUSTOM_UNITS, PERIOD_LABEL, subscriptionLabel, nextDueDate, normaliseSubscription, subscriptionsFrom };
 })();
 
 const __m_recommend = (() => {
@@ -2054,7 +2095,7 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL,
   validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
-  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom } = __core;
+  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -2651,7 +2692,7 @@ const activeAppliances = (keepId) => state.appliances.filter((v) => v.status !==
 const applianceById = (id) => state.appliances.find((v) => v.id === id);
 function lastAtShop(raw, test) { const name = formatShopName(raw); return name ? allPurchases().find((p) => test(p) && formatShopName(p.merchant) === name) || null : null; }
 const applianceForShop = (raw) => lastAtShop(raw, (p) => p.applianceId)?.applianceId || null;
-const subscriptionForShop = (raw) => lastAtShop(raw, (p) => p.subscription?.every)?.subscription.every || null;
+const subscriptionForShop = (raw) => lastAtShop(raw, (p) => p.subscription?.every)?.subscription || null;
 
 /** "Is this for an appliance or device?" — shown for recharges, AC/RO service, repairs, AMC and similar words. */
 function applianceBox(d) {
@@ -2674,13 +2715,19 @@ function applianceBox(d) {
 /** "This repeats (subscription)" with how often — for recharges, OTT, broadband and similar. */
 function subscriptionBox(d) {
   const remembered = !d.id && !d.subscription ? subscriptionForShop(d.merchant) : null;
-  const every = d.subscription?.every || remembered || 'monthly';
+  const sub = d.subscription || remembered || { every: 'monthly' };
   const on = !!(d.subscription?.every || remembered);
   return html`<div class="sub-box" id="sub-box">
-    <label class="check"><input type="checkbox" id="l-sub" name="isSubscription" ${on ? 'checked' : ''}><span>This repeats (subscription), like a recharge or plan</span></label>
-    <div class="field" id="sub-pick" ${on ? '' : 'hidden'}><label for="l-every">How often</label>
-      <select id="l-every" name="every">${SUBSCRIPTION_PERIODS.map(([k, l]) => html`<option value="${k}" ${k === every ? 'selected' : ''}>${l}</option>`)}</select>
-      ${state.logErrors.subscription ? html`<span class="ferr" role="alert">${state.logErrors.subscription}</span>` : ''}</div>
+    <label class="check"><input type="checkbox" id="l-sub" name="isSubscription" ${on ? 'checked' : ''}><span>This repeats (subscription), like a recharge, plan or monthly bill</span></label>
+    <div class="sub-pick" id="sub-pick" ${on ? '' : 'hidden'}>
+      <div class="field"><label for="l-every">How often</label>
+        <select id="l-every" name="every">${SUBSCRIPTION_PERIODS.map(([k, l]) => html`<option value="${k}" ${k === sub.every ? 'selected' : ''}>${l}</option>`)}</select></div>
+      <div class="field" id="sub-custom" ${sub.every === 'custom' ? '' : 'hidden'}><label for="l-every-n">Every</label>
+        <div class="inline-pair"><input id="l-every-n" name="everyCount" inputmode="numeric" value="${sub.count || ''}" placeholder="7" autocomplete="off">
+          <select id="l-every-unit" name="everyUnit" aria-label="Days or months">${['months', 'days'].map((u) => html`<option value="${u}" ${(sub.unit || 'months') === u ? 'selected' : ''}>${u}</option>`)}</select></div></div>
+      <label class="check"><input type="checkbox" id="l-variable" name="variable" ${sub.variable ? 'checked' : ''}><span>Amount changes each time (electricity, MyGate, postpaid bills)</span></label>
+      ${state.logErrors.subscription ? html`<span class="ferr" role="alert">${state.logErrors.subscription}</span>` : ''}
+    </div>
   </div>`;
 }
 
@@ -2739,7 +2786,7 @@ function readLogForm() {
     vehicleId: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden ? (f.vehicleId || '') : null,
     applianceRelated: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden,
     applianceId: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden ? (f.applianceId || '') : null,
-    subscription: f.isSubscription === 'on' ? { every: f.every || 'monthly' } : null };
+    subscription: f.isSubscription === 'on' ? { every: f.every || 'monthly', ...(f.every === 'custom' ? { count: String(f.everyCount || '').trim(), unit: f.everyUnit } : {}), ...(f.variable === 'on' ? { variable: true } : {}) } : null };
 }
 
 async function deletePurchase() {
@@ -2905,7 +2952,7 @@ function spendsView() {
       : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p, i, shown) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
         ${i === 0 || shown[i - 1].date !== p.date ? html`<div class="day-h"><span>${fmtDay(p.date, t)}</span><span class="num">${formatPaise(dayTotals[p.date] || 0)}</span></div>` : ''}
         <button class="row purchase" data-action="log-edit" data-id="${p.id}">
-          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}${p.applianceId && applianceById(p.applianceId) ? ' · ' + applianceById(p.applianceId).name : ''}${p.subscription?.every ? ' · ↻ ' + SUB_LABEL[p.subscription.every] : ''}</div></div>
+          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}${p.applianceId && applianceById(p.applianceId) ? ' · ' + applianceById(p.applianceId).name : ''}${p.subscription?.every ? ' · ↻ ' + subscriptionLabel(p.subscription) : ''}</div></div>
           <div class="right"><span class="num ${p.status === 'cancelled' ? 'strike' : ''}">${formatPaise(p.amountPaise)}</span>
             ${st ? html`<span class="pill ${st[0]}">${p.status === 'refunded' ? `Refunded ${formatPaise(p.refundPaise)}` : st[1]}</span>` : ''}</div>
         </button>`; })}</section>
@@ -3024,8 +3071,9 @@ function subscriptionsView(ps) {
         const linked = [x.applianceId && applianceById(x.applianceId)?.name, x.vehicleId && vehicleById(x.vehicleId)?.name].filter(Boolean).join(', ');
         const c = cardById(x.cardId);
         return html`<button class="row sub-row" data-action="sub-open" data-shop="${x.merchant}">
-          <div><div class="ins">${x.merchant}</div><div class="meta">${SUB_LABEL[x.every]}${linked ? ' · ' + linked : ''} · last ${fmtShort(x.last)}${c ? ' on ' + cardLabel(c) : ''}</div></div>
-          <div class="right"><span class="pill ${cls}">${label}</span><span class="when">${formatPaise(x.amountPaise)} · ${fmtShort(x.nextDue)} (${rel(days)})</span></div>
+          <div><div class="ins">${x.merchant}</div><div class="meta">${x.label}${x.variable ? ' · amount varies' : ''}${linked ? ' · ' + linked : ''} · last ${fmtShort(x.last)}${c ? ' on ' + cardLabel(c) : ''}</div></div>
+          <div class="right"><span class="pill ${cls}">${label}</span><span class="when">${x.variable ? `~${formatPaise(x.averagePaise)}` : formatPaise(x.amountPaise)} · ${fmtShort(x.nextDue)} (${rel(days)})</span>
+            ${x.variable && x.count > 1 ? html`<span class="when">last ${formatPaise(x.amountPaise)} · avg of last ${Math.min(3, x.count)}</span>` : ''}</div>
         </button>`; })}</section>
         <p class="hint">Next due dates are worked out from the last payment you logged. Reminders will come later.</p>`}`;
 }
@@ -3243,18 +3291,25 @@ function afterRender() {
     const notesA = document.getElementById('l-notes'), catA = document.getElementById('l-category');
     const subOn = document.getElementById('l-sub'), subPick = document.getElementById('sub-pick'), subEvery = document.getElementById('l-every');
     const refreshA = () => {
+      if (!abox.isConnected) return; // the form was closed or re-drawn before this ran
       const auto = looksApplianceRelated({ merchant: shop.value, notes: notesA.value, category: catA.value });
       const isNew = !state.logDraft?.id;
       const remembered = isNew ? applianceForShop(shop.value) : null;
       if (remembered && !arel.dataset.touched) { arel.checked = true; if (asel) asel.value = remembered; }
       const sub = isNew ? subscriptionForShop(shop.value) : null;
-      if (sub && !subOn.dataset.touched) { subOn.checked = true; subEvery.value = sub; }
+      if (sub && !subOn.dataset.touched) {
+        subOn.checked = true; subEvery.value = sub.every;
+        if (sub.every === 'custom') { document.getElementById('l-every-n').value = sub.count; document.getElementById('l-every-unit').value = sub.unit; }
+        document.getElementById('l-variable').checked = !!sub.variable;
+      }
+      document.getElementById('sub-custom').hidden = subEvery.value !== 'custom';
       abox.hidden = !(auto || arel.checked);
       apick.hidden = !arel.checked;
       subPick.hidden = !subOn.checked;
     };
     arel.addEventListener('change', () => { arel.dataset.touched = '1'; refreshA(); });
     subOn.addEventListener('change', () => { subOn.dataset.touched = '1'; refreshA(); });
+    subEvery.addEventListener('change', () => { subOn.dataset.touched = '1'; refreshA(); if (subEvery.value === 'custom') document.getElementById('l-every-n').focus(); });
     [shop, notesA].forEach((x) => x?.addEventListener('input', () => setTimeout(refreshA)));
     shop?.addEventListener('change', () => setTimeout(refreshA)); catA?.addEventListener('change', refreshA);
   }
@@ -3263,6 +3318,7 @@ function afterRender() {
     const vrel = document.getElementById('l-vrel'), pick = document.getElementById('veh-pick'), vsel = document.getElementById('l-vehicle');
     const notes = document.getElementById('l-notes'), catSel = document.getElementById('l-category');
     const refresh = () => {
+      if (!vbox.isConnected) return;
       const auto = looksVehicleRelated({ merchant: shop.value, notes: notes.value, category: catSel.value });
       const remembered = !state.logDraft?.id ? vehicleForShop(shop.value) : null;
       if (remembered && !vrel.dataset.touched) { vrel.checked = true; if (vsel) vsel.value = remembered; }

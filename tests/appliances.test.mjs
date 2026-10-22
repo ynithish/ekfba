@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateAppliance, looksApplianceRelated, itemTotals } from '../src/core/appliances.js';
-import { nextDueDate, subscriptionsFrom } from '../src/core/subscriptions.js';
+import { nextDueDate, subscriptionsFrom, subscriptionLabel, normaliseSubscription } from '../src/core/subscriptions.js';
 import { validatePurchase } from '../src/core/purchases.js';
 
 test('appliance validation with AMC', () => {
@@ -49,4 +49,30 @@ test('purchases keep appliance and subscription', () => {
   assert.deepEqual(r.purchase.subscription, { every: '28d' });
   assert.equal(validatePurchase(b).purchase.subscription, null);
   assert.ok(validatePurchase({ ...b, subscription: { every: 'weekly' } }).errors.subscription);
+});
+
+test('custom periods and variable amounts', () => {
+  assert.equal(nextDueDate('2026-10-22', { every: 'custom', count: 7, unit: 'months' }), '2027-05-22');
+  assert.equal(nextDueDate('2026-10-22', { every: 'custom', count: 45, unit: 'days' }), '2026-12-06');
+  assert.equal(subscriptionLabel({ every: 'custom', count: 13, unit: 'months' }), 'Every 13 months');
+  assert.equal(subscriptionLabel({ every: 'custom', count: 1, unit: 'days' }), 'Every 1 day');
+  assert.equal(subscriptionLabel({ every: 'monthly' }), 'Monthly');
+  assert.equal(normaliseSubscription({ every: 'custom', count: 0, unit: 'months' }), undefined);
+  assert.equal(normaliseSubscription({ every: 'custom', count: 61, unit: 'months' }), undefined);
+  assert.deepEqual(normaliseSubscription({ every: 'monthly', variable: true }), { every: 'monthly', variable: true });
+  const b = { date: '2026-10-09', merchant: 'TSSPDCL', category: 'utilities', amountPaise: 150000, cardId: 'c1' };
+  assert.deepEqual(validatePurchase({ ...b, subscription: { every: 'custom', count: '7', unit: 'months' } }).purchase.subscription, { every: 'custom', count: 7, unit: 'months' });
+  assert.ok(validatePurchase({ ...b, subscription: { every: 'custom', count: 'x', unit: 'months' } }).errors.subscription);
+  const ps = [
+    { ...b, id: '1', date: '2026-08-05', amountPaise: 120000, status: 'completed', subscription: { every: 'monthly', variable: true } },
+    { ...b, id: '2', date: '2026-09-05', amountPaise: 180000, status: 'completed', subscription: { every: 'monthly', variable: true } },
+    { ...b, id: '3', date: '2026-10-05', amountPaise: 150000, status: 'completed', subscription: { every: 'monthly', variable: true } },
+    { ...b, id: '4', date: '2026-07-05', amountPaise: 900000, status: 'completed', subscription: { every: 'monthly', variable: true } },
+  ];
+  const [x] = subscriptionsFrom(ps);
+  assert.equal(x.variable, true);
+  assert.equal(x.amountPaise, 150000);
+  assert.equal(x.averagePaise, 150000); // last three: 1,500 + 1,800 + 1,200
+  assert.equal(x.nextDue, '2026-11-05');
+  assert.equal(x.count, 4);
 });
