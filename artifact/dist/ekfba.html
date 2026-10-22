@@ -237,9 +237,9 @@ button.stat.good b { color: var(--ok); }
 .sub-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; font: inherit; color: inherit; cursor: pointer; }
 .sub-row > div { min-width: 0; }
 .sub-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.sub-totals { display: flex; gap: 16px; }
+.sub-totals { display: flex; gap: 14px; color: var(--ink); }
 .sub-totals span { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
-.sub-totals small { color: var(--muted); font-size: 12px; }
+.sub-totals small { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .sub-totals b { font-family: var(--display); font-size: 18px; font-weight: 700; }
 .sub-totals .due-odd b { color: var(--soon); }
 .due-odd-note { color: var(--soon); }
@@ -3024,7 +3024,13 @@ function othersView() {
   const pols = state.policies;
   const polSoon = pols.filter((x) => x.renewalDate && daysBetween(t, x.renewalDate) <= 60).length;
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  return html`${subscriptionsView(ps)}
+  const sm = subscriptionMonthSummary(ps, t);
+  const monthName = new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short' });
+  const subTotals = html`<span class="sub-totals">
+      <span><small>Paid in ${monthName}</small><b class="num">${formatPaise(sm.paidPaise)}</b></span>
+      <span class="${sm.includesNonMonthly ? 'due-odd' : ''}" ${sm.includesNonMonthly ? html`title="Includes a payment that is not monthly or 28-day, so this due amount is only for ${monthName}"` : ''}><small>Due in ${monthName}</small><b class="num">~${formatPaise(sm.duePaise)}</b></span>
+    </span>`;
+  return html`${accordion('subs', 'Subscriptions', subTotals, false, () => subscriptionsView(ps))}
     ${accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}` : 'None added', false, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft)}
     ${accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft)}
     ${accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft)}`;
@@ -3137,12 +3143,7 @@ function subscriptionsView(ps) {
   const subs = subscriptionsFrom(ps);
   const m = subscriptionMonthSummary(ps, t);
   const monthName = new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short' });
-  return html`<div class="sub-head"><h2 id="subs-h">Subscriptions</h2>
-      <div class="sub-totals">
-        <span><small>Paid in ${monthName}</small><b class="num">${formatPaise(m.paidPaise)}</b></span>
-        <span class="${m.includesNonMonthly ? 'due-odd' : ''}" ${m.includesNonMonthly ? html`title="Includes a payment that is not monthly or 28-day, so this due amount is only for ${monthName}"` : ''}><small>Due by ${fmtShort(m.monthEnd)}</small><b class="num">~${formatPaise(m.duePaise)}</b></span>
-      </div></div>
-    ${m.includesNonMonthly ? html`<p class="hint due-odd-note">The due amount is in orange because it includes a payment that doesn't repeat every month (for example quarterly, yearly or every 7 months), so it applies to ${monthName} only.</p>` : ''}
+  return html`${m.includesNonMonthly ? html`<p class="hint due-odd-note">The due amount is in orange because it includes a payment that doesn't repeat every month (for example quarterly, yearly or every 7 months), so it applies to ${monthName} only.</p>` : ''}
     ${!subs.length ? html`<div class="empty"><p>When you log a recharge, OTT plan, broadband bill or similar, tick “This repeats (subscription)” and pick how often. It shows up here with its next due date.</p></div>`
       : html`<section class="list">${subs.map((x) => {
         const days = daysBetween(t, x.nextDue);
