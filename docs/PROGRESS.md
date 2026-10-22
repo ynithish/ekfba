@@ -71,8 +71,10 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Vehicles (18 Oct 2026): vehicles list after Purchases (spend per vehicle, fuel vs other, tap to filter, add/edit/archive); purchase form asks "Is this vehicle related?" for fuel and vehicle words (wash, car care, service, maintenance, insurance, tyres, parking, toll, FASTag…), remembers the vehicle per shop
 - ✅ Layout (19 Oct 2026): tabs Spends · Ask · Cards · Others. Freshness is now a tile on Cards (tap for the freshness list). Others holds Vehicles (tap a vehicle → Spends filtered to it) and Insurances
 - ✅ Insurances moved in from NLNLALD Policies (3 policies copied with their ids; NLNLALD page left untouched): renewal status, person filter, documents, calendar reminders, add/edit/delete; Motor policies can name a vehicle
+- ✅ Appliances & devices (22 Oct 2026): devices (mobile, laptop, tablet…) and appliances (AC, fridge, RO…) in Others, with brand, bought date, warranty and AMC (provider, start, end/renewal, amount) shown with renewal status; purchases can be linked (recharges, AMC, repairs, service), tap an item → its purchases
+- ✅ Subscriptions: purchase form "This repeats" with every 28/56/84 days, monthly, 3/6 months, yearly; remembered per shop; Others lists each subscription with its next due date (reminders later)
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 53 unit tests; 111 page checks
+- Tests: 57 unit tests; 122 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)

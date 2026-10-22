@@ -45,3 +45,7 @@ Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations
 
 ## Claude page: policies (19 Oct 2026)
 - Collection `policies/{id}` (same shape as NLNLALD Policies): `{ id, insurer, type, people[], renewalDate, coverage, comments, documents[{kind,label,url}], vehicleId|null, createdAt, updatedAt }`. No policy numbers.
+
+## Claude page: appliances and subscriptions (22 Oct 2026)
+- Collection `appliances/{id}`: `{ id, name, type, group: appliance|device, brand, purchaseDate, warrantyUntil, amc: {provider, startDate, endDate, amountPaise, notes}|null, notes, status, createdAt, updatedAt }`.
+- Purchases gain `applianceId` (string|null) and `subscription` (`{ every: 28d|monthly|56d|84d|quarterly|halfyearly|yearly }` or null). Next due = purchase date + period.

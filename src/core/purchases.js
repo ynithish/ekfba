@@ -5,6 +5,7 @@
 import { scanForSensitiveData } from './sensitive.js';
 import { CATEGORIES } from './rulepack.js';
 
+const SUB_PERIODS = ['28d', 'monthly', '56d', '84d', 'quarterly', 'halfyearly', 'yearly']; // same as subscriptions.js
 export const PURCHASE_STATUSES = ['completed', 'pending', 'cancelled', 'refunded'];
 const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z')) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
 const MAX_PAISE = 1_00_00_000_00;
@@ -34,6 +35,8 @@ export function validatePurchase(d, existing = null, now = Date.now()) {
     orderRef: String(d.orderRef || '').trim(),
     notes: String(d.notes || '').trim(),
     vehicleId: typeof d.vehicleId === 'string' && d.vehicleId ? d.vehicleId : null,
+    applianceId: typeof d.applianceId === 'string' && d.applianceId ? d.applianceId : null,
+    subscription: d.subscription && d.subscription.every ? { every: d.subscription.every } : null,
   };
   if (!isDate(p.date)) errors.date = 'Pick the purchase date.';
   if (!p.merchant) errors.merchant = 'Where did you spend?';
@@ -46,6 +49,7 @@ export function validatePurchase(d, existing = null, now = Date.now()) {
     errors.refundPaise = 'Refund must be more than ₹0 and not more than the amount paid.';
   }
   if (p.discountPaise !== null && !(Number.isInteger(p.discountPaise) && p.discountPaise >= 0)) errors.discountPaise = 'Invalid discount.';
+  if (p.subscription && !SUB_PERIODS.includes(p.subscription.every)) errors.subscription = 'Pick how often it repeats.';
   if (p.notes.length > 500) errors.notes = 'Notes are too long (500 characters).';
   const s = scanForSensitiveData({ merchant: p.merchant, notes: p.notes, orderRef: p.orderRef });
   if (s) errors[s.path] = `Not saved: ${s.reason}.`;

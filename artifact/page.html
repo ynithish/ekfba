@@ -228,6 +228,12 @@ button.stat.good b { color: var(--ok); }
 .doc-row .ferr { grid-column: 1 / -1; }
 .small-chips { margin-top: 6px; }
 .small-chips .chip { min-height: 32px; font-size: 13px; }
+.sub-box { display: flex; flex-direction: column; gap: 10px; }
+.amc-fields { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 10px; background: var(--accent-soft); }
+.amc-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.group-label { margin: 2px 0 -4px; }
+.sub-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; font: inherit; color: inherit; cursor: pointer; }
+.sub-row > div { min-width: 0; }
 .h-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .veh-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
 .veh-row.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -253,7 +259,9 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   parseQuery, recommend, explain, MERCHANTS, validatePurchase, findDuplicates, netSpend, flattenMonths, monthKey,
   periodContaining, totals, milestoneProgress, formatShopName, billingInfo, dailySpend,
   validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL,
-  validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS } = __core;
+  validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
+  validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
+  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -267,10 +275,10 @@ const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank tr
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false }, db: null, canWrite: true,
+  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -811,6 +819,8 @@ function logForm() {
     <div class="field"><label for="l-category">Category</label><select id="l-category" name="category">${cats.map((c) => html`<option value="${c}" ${c === d.category ? 'selected' : ''}>${CAT_LABEL[c]}</option>`)}</select>${err('category')}</div>
     <div class="field"><label for="l-notes">Notes (optional)</label><input id="l-notes" name="notes" value="${d.notes || ''}" autocomplete="off"></div>
     ${vehicleBox(d)}
+    ${applianceBox(d)}
+    ${subscriptionBox(d)}
     ${d.recommendedCardId && d.cardId && d.recommendedCardId !== d.cardId ? html`<p class="hint">EKFBA suggested ${cardLabel(cardById(d.recommendedCardId) || { nickname: 'another card' })}; this records the card you actually used.</p>` : ''}
     ${state.logConfirmDelete ? html`<div class="box bad">Delete this purchase? It will be removed from your totals.
       <div class="actions" style="margin-top:8px"><button class="btn danger small" type="button" data-action="log-delete">Yes, delete</button><button class="btn ghost small" type="button" data-action="log-delete-no">Keep it</button></div></div>`
@@ -841,6 +851,44 @@ function vehicleBox(d) {
         : html`<p class="hint">No vehicles yet. Save this purchase, add your vehicles under Vehicles (below Purchases), then edit it to pick one.</p>`}
       ${state.logErrors.vehicleId ? html`<span class="ferr" role="alert">${state.logErrors.vehicleId}</span>` : ''}
     </div></div>`;
+}
+
+const activeAppliances = (keepId) => state.appliances.filter((v) => v.status !== 'archived' || v.id === keepId)
+  .sort((a, b) => (a.group || '').localeCompare(b.group || '') || a.name.localeCompare(b.name));
+const applianceById = (id) => state.appliances.find((v) => v.id === id);
+function lastAtShop(raw, test) { const name = formatShopName(raw); return name ? allPurchases().find((p) => test(p) && formatShopName(p.merchant) === name) || null : null; }
+const applianceForShop = (raw) => lastAtShop(raw, (p) => p.applianceId)?.applianceId || null;
+const subscriptionForShop = (raw) => lastAtShop(raw, (p) => p.subscription?.every)?.subscription.every || null;
+
+/** "Is this for an appliance or device?" — shown for recharges, AC/RO service, repairs, AMC and similar words. */
+function applianceBox(d) {
+  const items = activeAppliances(d.applianceId);
+  const remembered = !d.id && !d.applianceId ? applianceForShop(d.merchant) : null;
+  const chosen = d.applianceId || remembered || (items.length === 1 ? items[0].id : '');
+  const on = d.applianceRelated ?? !!(d.applianceId || remembered);
+  const show = on || looksApplianceRelated(d);
+  const opt = (v) => html`<option value="${v.id}" ${v.id === chosen ? 'selected' : ''}>${v.name} · ${v.type}</option>`;
+  return html`<div class="veh-box" id="app-box" ${show ? '' : 'hidden'}>
+    <label class="check"><input type="checkbox" id="l-arel" name="applianceRelated" ${on ? 'checked' : ''}><span>Is this for an appliance or device?</span></label>
+    <div class="field" id="app-pick" ${on ? '' : 'hidden'}>
+      ${items.length ? html`<label for="l-appliance">Appliance or device</label><select id="l-appliance" name="applianceId"><option value="">Choose…</option>
+          ${['device', 'appliance'].map((g) => { const list = items.filter((v) => (v.group || groupOfType(v.type)) === g); return list.length ? html`<optgroup label="${g === 'device' ? 'Devices' : 'Appliances'}">${list.map(opt)}</optgroup>` : ''; })}</select>`
+        : html`<p class="hint">No appliances or devices yet. Save this purchase, add them under Others, then edit it to pick one.</p>`}
+      ${state.logErrors.applianceId ? html`<span class="ferr" role="alert">${state.logErrors.applianceId}</span>` : ''}
+    </div></div>`;
+}
+
+/** "This repeats (subscription)" with how often — for recharges, OTT, broadband and similar. */
+function subscriptionBox(d) {
+  const remembered = !d.id && !d.subscription ? subscriptionForShop(d.merchant) : null;
+  const every = d.subscription?.every || remembered || 'monthly';
+  const on = !!(d.subscription?.every || remembered);
+  return html`<div class="sub-box" id="sub-box">
+    <label class="check"><input type="checkbox" id="l-sub" name="isSubscription" ${on ? 'checked' : ''}><span>This repeats (subscription), like a recharge or plan</span></label>
+    <div class="field" id="sub-pick" ${on ? '' : 'hidden'}><label for="l-every">How often</label>
+      <select id="l-every" name="every">${SUBSCRIPTION_PERIODS.map(([k, l]) => html`<option value="${k}" ${k === every ? 'selected' : ''}>${l}</option>`)}</select>
+      ${state.logErrors.subscription ? html`<span class="ferr" role="alert">${state.logErrors.subscription}</span>` : ''}</div>
+  </div>`;
 }
 
 function renameBox(d) {
@@ -895,7 +943,10 @@ function readLogForm() {
     status: state.logDraft.status || 'completed', refundPaise: state.logDraft.refundPaise || 0,
     notes: f.notes, renameAll: !!box && !box.hidden && f.renameAll === 'on',
     vehicleRelated: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden,
-    vehicleId: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden ? (f.vehicleId || '') : null };
+    vehicleId: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden ? (f.vehicleId || '') : null,
+    applianceRelated: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden,
+    applianceId: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden ? (f.applianceId || '') : null,
+    subscription: f.isSubscription === 'on' ? { every: f.every || 'monthly' } : null };
 }
 
 async function deletePurchase() {
@@ -920,6 +971,7 @@ async function savePurchase(confirmedDuplicate) {
   const existing = draft.id ? allPurchases().find((p) => p.id === draft.id) : null;
   const r = validatePurchase({ ...draft, id: draft.id || uuid() }, existing);
   if (draft.vehicleRelated && !draft.vehicleId && activeVehicles().length) { r.ok = false; r.errors = { ...(r.errors || {}), vehicleId: 'Pick the vehicle, or untick “Is this vehicle related?”.' }; }
+  if (draft.applianceRelated && !draft.applianceId && activeAppliances().length) { r.ok = false; r.errors = { ...(r.errors || {}), applianceId: 'Pick the appliance or device, or untick the box.' }; }
   if (!r.ok) { state.logDraft = draft; state.logErrors = r.errors; return render(); }
   const p = r.purchase;
   const dups = findDuplicates(p, allPurchases());
@@ -1000,7 +1052,7 @@ function spendsView() {
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery) && (!state.spendVehicle || p.vehicleId === state.spendVehicle));
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery) && (!state.spendVehicle || p.vehicleId === state.spendVehicle) && (!state.spendAppliance || p.applianceId === state.spendAppliance));
   const daily = dailySpend(ps, range.start, range.end, t);
   const dayTotals = {};
   for (const p of list) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
@@ -1048,7 +1100,8 @@ function spendsView() {
     <h2 id="purchases-h">Purchases</h2>
     ${ps.length ? html`<div class="p-search"><input id="p-search" type="search" placeholder="Search by shop or outlet" aria-label="Search purchases by shop or outlet" value="${state.spendQuery}" list="p-shops" autocomplete="off" enterkeyhint="search">
       <datalist id="p-shops">${[...new Set(ps.filter((p) => p.date >= range.start && p.date <= range.end).map((p) => formatShopName(p.merchant)))].sort().map((n) => html`<option value="${n}">`)}</datalist></div>` : ''}
-    ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendQuery.trim() ? html`<div class="chips filters">
+    ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendAppliance || state.spendQuery.trim() ? html`<div class="chips filters">
+      ${state.spendAppliance ? html`<button class="chip" aria-pressed="true" data-action="spend-appliance" data-id="${state.spendAppliance}">${applianceById(state.spendAppliance)?.name || 'Appliance'} ✕</button>` : ''}
       ${state.spendVehicle ? html`<button class="chip" aria-pressed="true" data-action="spend-vehicle" data-id="${state.spendVehicle}">${vehicleById(state.spendVehicle)?.name || 'Vehicle'} ✕</button>` : ''}
       ${state.spendDay ? html`<button class="chip" aria-pressed="true" data-action="spend-day" data-day="${state.spendDay}">${fmtShort(state.spendDay)} ✕</button>` : ''}
       ${state.spendCard ? html`<button class="chip" aria-pressed="true" data-action="spend-card" data-id="${state.spendCard}">${cardLabel(cardById(state.spendCard) || {})} ✕</button>` : ''}
@@ -1059,7 +1112,7 @@ function spendsView() {
       : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p, i, shown) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
         ${i === 0 || shown[i - 1].date !== p.date ? html`<div class="day-h"><span>${fmtDay(p.date, t)}</span><span class="num">${formatPaise(dayTotals[p.date] || 0)}</span></div>` : ''}
         <button class="row purchase" data-action="log-edit" data-id="${p.id}">
-          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}</div></div>
+          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}${p.applianceId && applianceById(p.applianceId) ? ' · ' + applianceById(p.applianceId).name : ''}${p.subscription?.every ? ' · ↻ ' + SUB_LABEL[p.subscription.every] : ''}</div></div>
           <div class="right"><span class="num ${p.status === 'cancelled' ? 'strike' : ''}">${formatPaise(p.amountPaise)}</span>
             ${st ? html`<span class="pill ${st[0]}">${p.status === 'refunded' ? `Refunded ${formatPaise(p.refundPaise)}` : st[1]}</span>` : ''}</div>
         </button>`; })}</section>
@@ -1074,7 +1127,114 @@ function othersView() {
   const type = state.spendPeriod === 'month' ? 'calendar_month' : state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year';
   const range = periodContaining(type, t);
   const periodName = { month: 'this month', quarter: 'this quarter', year: 'this year' }[state.spendPeriod];
-  return html`${vehiclesView(allPurchases(), range, periodName)}${policiesView()}`;
+  const ps = allPurchases();
+  return html`${vehiclesView(ps, range, periodName)}${appliancesView(ps, range, periodName)}${subscriptionsView(ps)}${policiesView()}`;
+}
+
+/** Appliances and devices: AMC status, warranty, spend in the period; tap to see purchases. */
+function appliancesView(ps, range, periodName) {
+  const t = today();
+  const tot = itemTotals(ps, range.start, range.end, 'applianceId');
+  const items = activeAppliances();
+  const archived = state.appliances.filter((v) => v.status === 'archived').length;
+  const row = (v) => {
+    const x = tot[v.id];
+    const amcDays = v.amc?.endDate ? daysBetween(t, v.amc.endDate) : null;
+    const st = v.amc ? renewalStatus(amcDays) : null;
+    const warranty = v.warrantyUntil ? (v.warrantyUntil >= t ? `Warranty till ${fmtDate(v.warrantyUntil)}` : `Warranty ended ${fmtDate(v.warrantyUntil)}`) : '';
+    return html`<article class="row veh-row ${state.spendAppliance === v.id ? 'selected' : ''}">
+      <button class="veh-main" data-action="spend-appliance" data-id="${v.id}">
+        <div class="spend-top"><span class="ins">${v.name} <small class="meta">${v.type}${v.brand ? ' · ' + v.brand : ''}</small></span><span class="num">${formatPaise(x?.paise || 0)}</span></div>
+        ${v.amc ? html`<div class="amc-line"><span class="pill ${PILL[st.key]}">AMC · ${st.label}</span><span class="meta">${v.amc.provider ? v.amc.provider + ' · ' : ''}ends ${fmtDate(v.amc.endDate)} (${rel(amcDays)})${v.amc.amountPaise ? ' · ' + formatPaise(v.amc.amountPaise) : ''}</span></div>` : ''}
+        <div class="meta">${x ? `${x.count} purchase${x.count === 1 ? '' : 's'}` : 'No spends'} ${periodName}${warranty ? ' · ' + warranty : ''} · tap to see purchases</div>
+      </button>
+      ${state.canWrite ? html`<button class="btn ghost small" data-action="app-edit" data-id="${v.id}" aria-label="Edit ${v.name}">Edit</button>` : ''}
+    </article>`;
+  };
+  const groups = [['device', 'Devices'], ['appliance', 'Appliances']].map(([g, l]) => [l, items.filter((v) => (v.group || groupOfType(v.type)) === g)]).filter(([, l]) => l.length);
+  return html`<div class="h-row"><h2 id="appliances-h">Appliances &amp; devices</h2>${state.canWrite && !state.applianceDraft ? html`<button class="btn ghost small" data-action="app-new">Add</button>` : ''}</div>
+    ${state.applianceDraft ? applianceForm() : ''}
+    ${!state.ready.appliances ? html`<div class="empty"><p>Loading…</p></div>`
+      : !items.length ? (state.applianceDraft ? '' : html`<div class="empty"><p>Add appliances (AC, fridge, water purifier…) with their AMC, and devices (mobile, laptop…). Recharges, repairs and service visits can then be linked to them.</p></div>`)
+      : groups.map(([label, list]) => html`<div class="label group-label">${label}</div><section class="list">${list.map(row)}</section>`)}
+    ${archived ? html`<p class="hint">${archived} archived item${archived === 1 ? '' : 's'} hidden; their past purchases are kept.</p>` : ''}`;
+}
+
+function applianceForm() {
+  const d = state.applianceDraft, e = state.applianceErrors;
+  const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
+  const a = d.amc || {};
+  const amcOn = d.amcOn ?? !!d.amc;
+  const rup = (p) => (p == null ? '' : String(p / 100));
+  return html`<form class="panel" id="app-form" novalidate>
+    <h2>${d.id ? 'Edit appliance or device' : 'Add appliance or device'}</h2>
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <div class="two">
+      <div class="field"><label for="a-name">Name</label><input id="a-name" name="name" value="${d.name || ''}" placeholder="Bedroom AC, Nithish's iPhone…" autocomplete="off">${err('name')}</div>
+      <div class="field"><label for="a-type">Type</label><select id="a-type" name="type">
+        <optgroup label="Devices">${APPLIANCE_TYPES.device.map((x) => html`<option ${d.type === x ? 'selected' : ''}>${x}</option>`)}</optgroup>
+        <optgroup label="Appliances">${APPLIANCE_TYPES.appliance.map((x) => html`<option ${d.type === x ? 'selected' : ''}>${x}</option>`)}</optgroup></select></div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="a-brand">Brand / model (optional)</label><input id="a-brand" name="brand" value="${d.brand || ''}" autocomplete="off">${err('brand')}</div>
+      <div class="field"><label for="a-bought">Bought on (optional)</label><input id="a-bought" name="purchaseDate" type="date" value="${d.purchaseDate || ''}">${err('purchaseDate')}</div>
+    </div>
+    <div class="field"><label for="a-warranty">Warranty until (optional)</label><input id="a-warranty" name="warrantyUntil" type="date" value="${d.warrantyUntil || ''}">${err('warrantyUntil')}</div>
+    <label class="check"><input type="checkbox" id="a-amc" name="amcOn" ${amcOn ? 'checked' : ''}><span>Has an AMC (annual maintenance contract)</span></label>
+    <div class="amc-fields" id="amc-fields" ${amcOn ? '' : 'hidden'}>
+      <div class="two">
+        <div class="field"><label for="a-amc-provider">AMC provider</label><input id="a-amc-provider" name="amcProvider" value="${a.provider || ''}" placeholder="Brand service, Urban Company…" autocomplete="off">${err('amc.provider')}</div>
+        <div class="field"><label for="a-amc-amount">AMC amount (₹)</label><input id="a-amc-amount" name="amcAmount" inputmode="decimal" value="${rup(a.amountPaise)}" autocomplete="off">${err('amc.amountPaise')}</div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="a-amc-start">Starts</label><input id="a-amc-start" name="amcStart" type="date" value="${a.startDate || ''}">${err('amc.startDate')}</div>
+        <div class="field"><label for="a-amc-end">Ends (renewal date)</label><input id="a-amc-end" name="amcEnd" type="date" value="${a.endDate || ''}">${err('amc.endDate')}</div>
+      </div>
+      <div class="field"><label for="a-amc-notes">AMC notes (optional)</label><input id="a-amc-notes" name="amcNotes" value="${a.notes || ''}" placeholder="Visits included, contact number…" autocomplete="off"></div>
+    </div>
+    <div class="field"><label for="a-notes">Notes (optional)</label><input id="a-notes" name="notes" value="${d.notes || ''}" autocomplete="off">${err('notes')}</div>
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save'}</button><button class="btn ghost" type="button" data-action="app-cancel">Cancel</button>
+      ${d.id ? html`<button class="btn ghost small danger-text push-right" type="button" data-action="app-archive">Archive</button>` : ''}</div>
+  </form>`;
+}
+
+async function saveAppliance(patch = {}) {
+  if (state.busy || !state.db) return;
+  const f = Object.fromEntries(new FormData(document.getElementById('app-form')));
+  const amount = String(f.amcAmount || '').trim() === '' ? null : (parseRupeesToPaise(f.amcAmount) ?? -1);
+  const amcOn = f.amcOn === 'on';
+  const draft = { ...state.applianceDraft, name: f.name, type: f.type, brand: f.brand, purchaseDate: f.purchaseDate, warrantyUntil: f.warrantyUntil, notes: f.notes, amcOn,
+    amc: amcOn ? { provider: f.amcProvider, startDate: f.amcStart, endDate: f.amcEnd, amountPaise: amount, notes: f.amcNotes } : null, ...patch };
+  const existing = draft.id ? applianceById(draft.id) : null;
+  const r = validateAppliance({ ...draft, id: draft.id || uuid() }, existing);
+  if (amcOn && !r.item?.amc && r.ok) { r.ok = false; r.errors = { 'amc.endDate': 'Add the date the AMC ends (its renewal date).' }; }
+  if (!r.ok) { state.applianceDraft = draft; state.applianceErrors = r.errors; return render(); }
+  state.busy = true; render();
+  try {
+    await state.db.collection('appliances').doc(r.item.id).set(r.item);
+    state.applianceDraft = null; state.applianceErrors = {};
+    if (r.item.status === 'archived' && state.spendAppliance === r.item.id) state.spendAppliance = null;
+    toast(r.item.status === 'archived' ? `${r.item.name} archived` : existing ? 'Saved' : `${r.item.name} added`);
+  } catch (e) { state.applianceErrors = { _form: friendly(e) }; }
+  state.busy = false; render();
+}
+
+/** Subscriptions: one row per repeating spend, from its latest purchase, with the next due date. */
+function subscriptionsView(ps) {
+  const t = today();
+  const subs = subscriptionsFrom(ps);
+  return html`<h2 id="subs-h">Subscriptions</h2>
+    ${!subs.length ? html`<div class="empty"><p>When you log a recharge, OTT plan, broadband bill or similar, tick “This repeats (subscription)” and pick how often. It shows up here with its next due date.</p></div>`
+      : html`<section class="list">${subs.map((x) => {
+        const days = daysBetween(t, x.nextDue);
+        const [cls, label] = days < 0 ? ['st-urgent', 'Overdue'] : days <= 7 ? ['st-soon', 'Due soon'] : ['st-ok', 'On track'];
+        const linked = [x.applianceId && applianceById(x.applianceId)?.name, x.vehicleId && vehicleById(x.vehicleId)?.name].filter(Boolean).join(', ');
+        const c = cardById(x.cardId);
+        return html`<button class="row sub-row" data-action="sub-open" data-shop="${x.merchant}">
+          <div><div class="ins">${x.merchant}</div><div class="meta">${SUB_LABEL[x.every]}${linked ? ' · ' + linked : ''} · last ${fmtShort(x.last)}${c ? ' on ' + cardLabel(c) : ''}</div></div>
+          <div class="right"><span class="pill ${cls}">${label}</span><span class="when">${formatPaise(x.amountPaise)} · ${fmtShort(x.nextDue)} (${rel(days)})</span></div>
+        </button>`; })}</section>
+        <p class="hint">Next due dates are worked out from the last payment you logged. Reminders will come later.</p>`}`;
 }
 
 function policiesView() {
@@ -1276,12 +1436,35 @@ function afterRender() {
     if (cat && sel && sel.value !== cat) { sel.value = cat; sel.classList.add('auto-filled'); setTimeout(() => sel.classList.remove('auto-filled'), 1200); }
   };
   shop?.addEventListener('change', pickCategory);
+  const amcBox = document.getElementById('a-amc');
+  amcBox?.addEventListener('change', () => { document.getElementById('amc-fields').hidden = !amcBox.checked; });
   const ptype = document.getElementById('p-type');
   ptype?.addEventListener('change', () => {
     document.getElementById('p-newtype-f').hidden = ptype.value !== '__new__';
     document.getElementById('p-vehicle-f').hidden = ptype.value !== 'Motor';
     if (ptype.value === '__new__') document.getElementById('p-newtype')?.focus();
   });
+  const abox = document.getElementById('app-box');
+  if (abox) {
+    const arel = document.getElementById('l-arel'), apick = document.getElementById('app-pick'), asel = document.getElementById('l-appliance');
+    const notesA = document.getElementById('l-notes'), catA = document.getElementById('l-category');
+    const subOn = document.getElementById('l-sub'), subPick = document.getElementById('sub-pick'), subEvery = document.getElementById('l-every');
+    const refreshA = () => {
+      const auto = looksApplianceRelated({ merchant: shop.value, notes: notesA.value, category: catA.value });
+      const isNew = !state.logDraft?.id;
+      const remembered = isNew ? applianceForShop(shop.value) : null;
+      if (remembered && !arel.dataset.touched) { arel.checked = true; if (asel) asel.value = remembered; }
+      const sub = isNew ? subscriptionForShop(shop.value) : null;
+      if (sub && !subOn.dataset.touched) { subOn.checked = true; subEvery.value = sub; }
+      abox.hidden = !(auto || arel.checked);
+      apick.hidden = !arel.checked;
+      subPick.hidden = !subOn.checked;
+    };
+    arel.addEventListener('change', () => { arel.dataset.touched = '1'; refreshA(); });
+    subOn.addEventListener('change', () => { subOn.dataset.touched = '1'; refreshA(); });
+    [shop, notesA].forEach((x) => x?.addEventListener('input', () => setTimeout(refreshA)));
+    shop?.addEventListener('change', () => setTimeout(refreshA)); catA?.addEventListener('change', refreshA);
+  }
   const vbox = document.getElementById('veh-box');
   if (vbox) {
     const vrel = document.getElementById('l-vrel'), pick = document.getElementById('veh-pick'), vsel = document.getElementById('l-vehicle');
@@ -1356,6 +1539,18 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'app-new') { state.applianceDraft = { type: 'Mobile' }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); document.getElementById('a-name')?.focus(); }
+  else if (a === 'app-edit') { state.applianceDraft = { ...applianceById(id) }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); }
+  else if (a === 'app-cancel') { state.applianceDraft = null; state.applianceErrors = {}; render(); }
+  else if (a === 'app-archive') saveAppliance({ status: 'archived' });
+  else if (a === 'spend-appliance') {
+    const fromOthers = state.tab === 'others';
+    state.spendAppliance = fromOthers ? id : (state.spendAppliance === id ? null : id); state.purchaseLimit = 10;
+    if (fromOthers) state.tab = 'spends';
+    render();
+    if (state.spendAppliance) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start' });
+  }
+  else if (a === 'sub-open') { state.tab = 'spends'; state.spendQuery = t.dataset.shop; state.spendPeriod = 'year'; state.purchaseLimit = 10; render(); document.getElementById('purchases-h')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'pol-new') { state.policyDraft = { type: 'Health', people: [], documents: [] }; state.policyErrors = {}; render(); document.getElementById('pol-form')?.scrollIntoView({ block: 'start' }); document.getElementById('p-insurer')?.focus(); }
   else if (a === 'pol-edit') { const x = state.policies.find((p) => p.id === id); state.policyDraft = { ...x, people: peopleOf(x), documents: (x.documents || []).map((d) => ({ ...d })) }; state.policyErrors = {}; render(); document.getElementById('pol-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'pol-cancel') { state.policyDraft = null; state.policyErrors = {}; render(); }
@@ -1396,6 +1591,7 @@ $app.addEventListener('submit', async (ev) => {
   if (ev.target.id === 'log-form') { ev.preventDefault(); savePurchase(false); return; }
   if (ev.target.id === 'veh-form') { ev.preventDefault(); saveVehicle(); return; }
   if (ev.target.id === 'pol-form') { ev.preventDefault(); savePolicy(); return; }
+  if (ev.target.id === 'app-form') { ev.preventDefault(); saveAppliance(); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -1430,17 +1626,17 @@ function safeRender() {
   if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
   if (f && f.id === 'p-search') return renderKeepingSearch();
-  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.closest('#app-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 
 render();
 
 (async () => {
-  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
   const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
   if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
-  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
   state.db = db;
   render();
   db.collection('cards').onSnapshot((snap) => {
@@ -1454,6 +1650,11 @@ render();
     state.ready.rulePacks = true;
     safeRender();
   }, () => { state.ready.rulePacks = true; });
+  db.collection('appliances').onSnapshot((snap) => {
+    state.appliances = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.appliances = true;
+    safeRender();
+  }, () => { state.ready.appliances = true; });
   db.collection('policies').onSnapshot((snap) => {
     state.policies = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     state.ready.policies = true;
