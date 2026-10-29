@@ -49,6 +49,7 @@ export function validatePurchase(d, existing = null, now = Date.now()) {
     notes: String(d.notes || '').trim(),
     vehicleId: typeof d.vehicleId === 'string' && d.vehicleId ? d.vehicleId : null,
     applianceId: typeof d.applianceId === 'string' && d.applianceId ? d.applianceId : null,
+    loanId: typeof d.loanId === 'string' && d.loanId ? d.loanId : null,
     subscription: normaliseSub(d.subscription),
   };
   if (!isDate(p.date)) errors.date = 'Pick the purchase date.';

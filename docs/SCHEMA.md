@@ -52,3 +52,7 @@ Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations
 
 ## Claude page: bill payments (29 Oct 2026)
 - Collection `billPayments/{id}`: `{ id, cardId (credit card paid), date, amountPaise, fromCardId|null (debit card / bank transfer used), note, createdAt, updatedAt }`. Not purchases; never counted as spend.
+
+## Claude page: loans (29 Oct 2026)
+- Collection `loans/{id}`: `{ id, name, type: home|personal|hand|other, lender, principalPaise, startDate, annualRateBps|null, termMonths|null, emiPaise|null, openingPaise|null, openingDate, notes, status: active|closed, createdAt, updatedAt }`. No loan account numbers.
+- Purchases gain `loanId` (string|null) for repayments.

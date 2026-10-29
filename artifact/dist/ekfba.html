@@ -243,6 +243,14 @@ button.stat.good b { color: var(--ok); }
 .sub-totals b { font-family: var(--display); font-size: 18px; font-weight: 700; }
 .sub-totals .due-odd b { color: var(--soon); }
 .due-odd-note { color: var(--soon); }
+.two.three { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 460px) { .two.three { grid-template-columns: 1fr 1fr; } .two.three > :last-child { grid-column: 1 / -1; } }
+.opt { color: var(--muted); font-weight: 400; }
+.veh-row:has(.warn-note) { flex-wrap: wrap; }
+.warn-note { color: var(--soon); flex-basis: 100%; }
+.loan-out { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; flex: none; }
+.loan-out small { font-size: 11.5px; font-weight: 400; }
+details.opening summary { cursor: pointer; color: var(--accent); font-size: 14px; }
 .paid-ok { color: var(--ok); font-weight: 600; }
 .pay-hist { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .pay-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -1150,6 +1158,7 @@ function validatePurchase(d, existing = null, now = Date.now()) {
     notes: String(d.notes || '').trim(),
     vehicleId: typeof d.vehicleId === 'string' && d.vehicleId ? d.vehicleId : null,
     applianceId: typeof d.applianceId === 'string' && d.applianceId ? d.applianceId : null,
+    loanId: typeof d.loanId === 'string' && d.loanId ? d.loanId : null,
     subscription: normaliseSub(d.subscription),
   };
   if (!isDate(p.date)) errors.date = 'Pick the purchase date.';
@@ -1883,6 +1892,129 @@ function subscriptionMonthSummary(purchases, today) {
 return { SUBSCRIPTION_PERIODS, CUSTOM_UNITS, PERIOD_LABEL, subscriptionLabel, nextDueDate, normaliseSubscription, subscriptionsFrom, subscriptionMonthSummary };
 })();
 
+const __m_loans = (() => {
+// Debts: home loan, personal loan, hand loan (flexible), other. Repayments are purchases with purchase.loanId.
+// Outstanding for interest-bearing loans uses a reducing balance with interest accrued daily between payments
+// (annual rate × days / 365), the way banks work out home and personal loans. Pure functions only.
+
+const { scanForSensitiveData } = __m_sensitive;
+const { netSpend } = __m_purchases;
+const LOAN_TYPES = ['home', 'personal', 'hand', 'other'];
+const LOAN_TYPE_LABEL = { home: 'Home loan', personal: 'Personal loan', hand: 'Hand loan', other: 'Other loan' };
+
+const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z')) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s;
+const isPaise = (v) => Number.isInteger(v) && v > 0 && v <= 1_00_00_000_00_00;
+const days = (a, b) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+
+/** Standard EMI for a reducing-balance loan: P·r·(1+r)^n / ((1+r)^n − 1), r = monthly rate. Whole paise. */
+function emiFor(principalPaise, annualRateBps, months) {
+  if (!(principalPaise > 0 && months > 0)) return null;
+  const r = annualRateBps / 10000 / 12;
+  if (!r) return Math.ceil(principalPaise / months);
+  const f = Math.pow(1 + r, months);
+  return Math.round((principalPaise * r * f) / (f - 1));
+}
+
+/** Validates a loan draft. Hand loans only need a name and amount; others need rate, term and EMI (EMI can be worked out). */
+function validateLoan(d, existing = null, now = Date.now()) {
+  const errors = {};
+  const type = LOAN_TYPES.includes(d.type) ? d.type : 'other';
+  const flexible = type === 'hand';
+  const L = {
+    name: String(d.name || '').trim(),
+    type,
+    lender: String(d.lender || '').trim(),
+    principalPaise: d.principalPaise ?? null,
+    startDate: String(d.startDate || '').trim(),
+    annualRateBps: d.annualRateBps ?? null,
+    termMonths: d.termMonths ?? null,
+    emiPaise: d.emiPaise ?? null,
+    openingPaise: d.openingPaise ?? null,   // outstanding when you started tracking (for a loan already running)
+    openingDate: String(d.openingDate || '').trim(),
+    notes: String(d.notes || '').trim(),
+    status: d.status === 'closed' ? 'closed' : 'active',
+  };
+  if (!L.name) errors.name = 'Give the loan a name, for example "SBI home loan" or "From Ravi".';
+  if (L.name.length > 60) errors.name = 'Keep the name under 60 characters.';
+  if (L.lender.length > 60) errors.lender = 'Keep the lender under 60 characters.';
+  if (!isPaise(L.principalPaise)) errors.principalPaise = 'Enter the amount borrowed.';
+  if (!isDate(L.startDate)) errors.startDate = 'Pick the date the loan started.';
+  if (L.annualRateBps !== null && !(Number.isInteger(L.annualRateBps) && L.annualRateBps >= 0 && L.annualRateBps <= 6000)) errors.annualRateBps = 'Interest rate must be between 0% and 60% a year.';
+  if (L.termMonths !== null && !(Number.isInteger(L.termMonths) && L.termMonths >= 1 && L.termMonths <= 480)) errors.termMonths = 'Term must be 1 to 480 months.';
+  if (L.emiPaise !== null && !isPaise(L.emiPaise)) errors.emiPaise = 'Enter the EMI amount.';
+  if (!flexible) {
+    if (L.annualRateBps === null && !errors.annualRateBps) errors.annualRateBps = 'Enter the interest rate (% a year).';
+    if (L.termMonths === null && !errors.termMonths) errors.termMonths = 'Enter the term in months.';
+    if (L.emiPaise === null && !errors.emiPaise && !errors.annualRateBps && !errors.termMonths && isPaise(L.principalPaise)) L.emiPaise = emiFor(L.principalPaise, L.annualRateBps, L.termMonths);
+    if (L.emiPaise === null && !errors.emiPaise) errors.emiPaise = 'Enter the EMI amount.';
+  }
+  if (L.openingPaise !== null) {
+    if (!(Number.isInteger(L.openingPaise) && L.openingPaise >= 0)) errors.openingPaise = 'Enter the outstanding amount.';
+    if (!isDate(L.openingDate)) errors.openingDate = 'Pick the date of that outstanding amount.';
+    else if (isDate(L.startDate) && L.openingDate < L.startDate) errors.openingDate = 'This date is before the loan started.';
+  } else L.openingDate = '';
+  if (L.notes.length > 500) errors.notes = 'Notes are too long (500 characters).';
+  const s = scanForSensitiveData({ name: L.name, lender: L.lender, notes: L.notes });
+  if (s) errors[s.path] = `Not saved: ${s.reason}.`;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, loan: { ...L, id: existing?.id || d.id, createdAt: existing?.createdAt || d.createdAt || now, updatedAt: now } };
+}
+
+/**
+ * Where a loan stands after the repayments logged so far (purchases with loanId = loan.id, up to `today`).
+ * Interest-bearing loans: balance starts at the opening outstanding (or the amount borrowed on the start date);
+ * at each repayment, interest for the days since the last one is added, then the payment is taken off.
+ * Hand loans: amount borrowed (or opening outstanding) minus repayments; any rate is shown but not charged.
+ * Returns { outstandingPaise, paidPaise, interestPaise, principalPaidPaise, payments, lastPaid, emisLeft, endsAround, paidPercent, missingEarlier }.
+ */
+function loanStatus(loan, purchases, today) {
+  const from = loan.openingPaise != null && loan.openingDate ? loan.openingDate : loan.startDate;
+  let balance = loan.openingPaise != null && loan.openingDate ? loan.openingPaise : loan.principalPaise;
+  const start = balance;
+  const pays = purchases.filter((p) => p.loanId === loan.id && p.date >= from && p.date <= today && netSpend(p) > 0)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0));
+  const rate = loan.type === 'hand' ? 0 : (loan.annualRateBps || 0) / 10000;
+  let last = from, paid = 0, interest = 0;
+  for (const p of pays) {
+    const add = Math.round(balance * rate * days(last, p.date) / 365);
+    interest += add;
+    const amt = netSpend(p);
+    paid += amt;
+    balance = Math.max(0, balance + add - amt);
+    last = p.date;
+  }
+  let emisLeft = null, endsAround = null;
+  if (balance > 0 && loan.emiPaise) {
+    const r = rate / 12, E = loan.emiPaise;
+    if (!r) emisLeft = Math.ceil(balance / E - 0.001);
+    // A few rupees over from day-count differences should not add a whole extra EMI.
+    else if (E > balance * r) emisLeft = Math.ceil(-Math.log(1 - (balance * r) / E) / Math.log(1 + r) - 0.05);
+    if (emisLeft !== null) {
+      const [y, m] = (pays.length ? last : today).split('-').map(Number);
+      const t = (y * 12 + (m - 1)) + emisLeft;
+      endsAround = `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+    }
+  } else if (balance === 0) emisLeft = 0;
+  return {
+    outstandingPaise: balance, paidPaise: paid, interestPaise: interest, principalPaidPaise: Math.max(0, start - balance),
+    payments: pays.length, lastPaid: pays.length ? last : null, emisLeft, endsAround,
+    paidPercent: start ? Math.max(0, Math.min(100, Math.round(((start - balance) * 1000) / start) / 10)) : 0,
+    // EMIs seem to be missing: more than ~45 days from the start (or opening date) to the first logged repayment.
+    // The outstanding then includes interest for that whole time, so it will look too high.
+    missingEarlier: loan.type !== 'hand' && days(from, pays.length ? pays[0].date : today) > 45,
+  };
+}
+
+// Words that suggest a purchase is a loan repayment. Whole words, in the shop name and notes.
+const LOAN_WORDS = ['emi', 'loan', 'repayment', 'repay', 'installment', 'instalment', 'home loan', 'personal loan', 'hand loan', 'borrowed', 'lender', 'prepayment', 'part payment'];
+const WORD_RE = new RegExp('(?:^|[^a-z0-9])(' + LOAN_WORDS.map((w) => w.replace(/ /g, '\\s+')).join('|') + ')(?![a-z0-9])', 'i');
+function looksLoanRelated({ merchant = '', notes = '', category = '' } = {}) {
+  return category === 'emi' || WORD_RE.test(`${merchant} ${notes}`);
+}
+
+return { LOAN_TYPES, LOAN_TYPE_LABEL, emiFor, validateLoan, loanStatus, LOAN_WORDS, looksLoanRelated };
+})();
+
 const __m_recommend = (() => {
 // Recommendation engine: "where are you spending, and how much?" → best card from the wallet.
 // Pure and deterministic. Semantics are specified in spec/RECOMMEND.md and pinned by
@@ -2171,7 +2303,7 @@ const icon = (name) => raw(`<svg class="i" aria-hidden="true"><use href="#i-${es
 
 return { escapeHtml, raw, html, icon };
 })();
-const __core = Object.assign({}, __m_ids, __m_money, __m_sensitive, __m_schema, __m_card, __m_backup, __m_rulepack, __m_feedates, __m_purchases, __m_vehicles, __m_policies, __m_merchants, __m_appliances, __m_subscriptions, __m_recommend, __m_uihtml);
+const __core = Object.assign({}, __m_ids, __m_money, __m_sensitive, __m_schema, __m_card, __m_backup, __m_rulepack, __m_feedates, __m_purchases, __m_vehicles, __m_policies, __m_merchants, __m_appliances, __m_subscriptions, __m_loans, __m_recommend, __m_uihtml);
 
 </script>
 <script>
@@ -2183,7 +2315,8 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL,
   validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
-  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary } = __core;
+  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary,
+  validateLoan, emiFor, loanStatus, looksLoanRelated, LOAN_TYPES, LOAN_TYPE_LABEL } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -2197,10 +2330,10 @@ const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank tr
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false }, db: null, canWrite: true,
+  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -2743,6 +2876,7 @@ function logForm() {
     <div class="field"><label for="l-notes">Notes (optional)</label><input id="l-notes" name="notes" value="${d.notes || ''}" autocomplete="off"></div>
     ${vehicleBox(d)}
     ${applianceBox(d)}
+    ${loanBox(d)}
     ${subscriptionBox(d)}
     ${d.recommendedCardId && d.cardId && d.recommendedCardId !== d.cardId ? html`<p class="hint">EKFBA suggested ${cardLabel(cardById(d.recommendedCardId) || { nickname: 'another card' })}; this records the card you actually used.</p>` : ''}
     ${state.logConfirmDelete ? html`<div class="box bad">Delete this purchase? It will be removed from your totals.
@@ -2798,6 +2932,26 @@ function applianceBox(d) {
           ${['device', 'appliance'].map((g) => { const list = items.filter((v) => (v.group || groupOfType(v.type)) === g); return list.length ? html`<optgroup label="${g === 'device' ? 'Devices' : 'Appliances'}">${list.map(opt)}</optgroup>` : ''; })}</select>`
         : html`<p class="hint">No appliances or devices yet. Save this purchase, add them under Others, then edit it to pick one.</p>`}
       ${state.logErrors.applianceId ? html`<span class="ferr" role="alert">${state.logErrors.applianceId}</span>` : ''}
+    </div></div>`;
+}
+
+const activeLoans = (keepId) => state.loans.filter((l) => l.status !== 'closed' || l.id === keepId).sort((a, b) => a.name.localeCompare(b.name));
+const loanById = (id) => state.loans.find((l) => l.id === id);
+const loanForShop = (raw) => lastAtShop(raw, (p) => p.loanId)?.loanId || null;
+
+/** "Is this a loan repayment?" — shown for the EMI category and words like EMI, loan, repayment. */
+function loanBox(d) {
+  const ls = activeLoans(d.loanId);
+  const remembered = !d.id && !d.loanId ? loanForShop(d.merchant) : null;
+  const chosen = d.loanId || remembered || (ls.length === 1 ? ls[0].id : '');
+  const on = d.loanRelated ?? !!(d.loanId || remembered);
+  const show = on || looksLoanRelated(d);
+  return html`<div class="veh-box" id="loan-box" ${show ? '' : 'hidden'}>
+    <label class="check"><input type="checkbox" id="l-lrel" name="loanRelated" ${on ? 'checked' : ''}><span>Is this a loan repayment?</span></label>
+    <div class="field" id="loan-pick" ${on ? '' : 'hidden'}>
+      ${ls.length ? html`<label for="l-loan">Loan</label><select id="l-loan" name="loanId"><option value="">Choose…</option>${ls.map((l) => html`<option value="${l.id}" ${l.id === chosen ? 'selected' : ''}>${l.name} · ${LOAN_TYPE_LABEL[l.type]}</option>`)}</select>`
+        : html`<p class="hint">No loans yet. Save this purchase, add the loan under Others → Debts, then edit it to pick the loan.</p>`}
+      ${state.logErrors.loanId ? html`<span class="ferr" role="alert">${state.logErrors.loanId}</span>` : ''}
     </div></div>`;
 }
 
@@ -2943,6 +3097,8 @@ function readLogForm() {
     notes: f.notes, renameAll: !!box && !box.hidden && f.renameAll === 'on',
     vehicleRelated: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden,
     vehicleId: f.vehicleRelated === 'on' && !document.getElementById('veh-box')?.hidden ? (f.vehicleId || '') : null,
+    loanRelated: f.loanRelated === 'on' && !document.getElementById('loan-box')?.hidden,
+    loanId: f.loanRelated === 'on' && !document.getElementById('loan-box')?.hidden ? (f.loanId || '') : null,
     applianceRelated: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden,
     applianceId: f.applianceRelated === 'on' && !document.getElementById('app-box')?.hidden ? (f.applianceId || '') : null,
     subscription: f.isSubscription === 'on' ? { every: f.every || 'monthly', ...(f.every === 'custom' ? { count: String(f.everyCount || '').trim(), unit: f.everyUnit } : {}), ...(f.variable === 'on' ? { variable: true } : {}) } : null };
@@ -2970,6 +3126,7 @@ async function savePurchase(confirmedDuplicate) {
   const existing = draft.id ? allPurchases().find((p) => p.id === draft.id) : null;
   const r = validatePurchase({ ...draft, id: draft.id || uuid() }, existing);
   if (draft.vehicleRelated && !draft.vehicleId && activeVehicles().length) { r.ok = false; r.errors = { ...(r.errors || {}), vehicleId: 'Pick the vehicle, or untick “Is this vehicle related?”.' }; }
+  if (draft.loanRelated && !draft.loanId && activeLoans().length) { r.ok = false; r.errors = { ...(r.errors || {}), loanId: 'Pick the loan, or untick “Is this a loan repayment?”.' }; }
   if (draft.applianceRelated && !draft.applianceId && activeAppliances().length) { r.ok = false; r.errors = { ...(r.errors || {}), applianceId: 'Pick the appliance or device, or untick the box.' }; }
   if (!r.ok) { state.logDraft = draft; state.logErrors = r.errors; return render(); }
   const p = r.purchase;
@@ -3051,7 +3208,7 @@ function spendsView() {
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery) && (!state.spendVehicle || p.vehicleId === state.spendVehicle) && (!state.spendAppliance || p.applianceId === state.spendAppliance));
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery) && (!state.spendVehicle || p.vehicleId === state.spendVehicle) && (!state.spendAppliance || p.applianceId === state.spendAppliance) && (!state.spendLoan || p.loanId === state.spendLoan));
   const daily = dailySpend(ps, range.start, range.end, t);
   const dayTotals = {};
   for (const p of list) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
@@ -3101,7 +3258,8 @@ function spendsView() {
     <h2 id="purchases-h">Purchases</h2>
     ${ps.length ? html`<div class="p-search"><input id="p-search" type="search" placeholder="Search by shop or outlet" aria-label="Search purchases by shop or outlet" value="${state.spendQuery}" list="p-shops" autocomplete="off" enterkeyhint="search">
       <datalist id="p-shops">${[...new Set(ps.filter((p) => p.date >= range.start && p.date <= range.end).map((p) => formatShopName(p.merchant)))].sort().map((n) => html`<option value="${n}">`)}</datalist></div>` : ''}
-    ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendAppliance || state.spendQuery.trim() ? html`<div class="chips filters">
+    ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendAppliance || state.spendLoan || state.spendQuery.trim() ? html`<div class="chips filters">
+      ${state.spendLoan ? html`<button class="chip" aria-pressed="true" data-action="spend-loan" data-id="${state.spendLoan}">${loanById(state.spendLoan)?.name || 'Loan'} ✕</button>` : ''}
       ${state.spendAppliance ? html`<button class="chip" aria-pressed="true" data-action="spend-appliance" data-id="${state.spendAppliance}">${applianceById(state.spendAppliance)?.name || 'Appliance'} ✕</button>` : ''}
       ${state.spendVehicle ? html`<button class="chip" aria-pressed="true" data-action="spend-vehicle" data-id="${state.spendVehicle}">${vehicleById(state.spendVehicle)?.name || 'Vehicle'} ✕</button>` : ''}
       ${state.spendDay ? html`<button class="chip" aria-pressed="true" data-action="spend-day" data-day="${state.spendDay}">${fmtShort(state.spendDay)} ✕</button>` : ''}
@@ -3113,7 +3271,7 @@ function spendsView() {
       : html`<section class="list">${list.slice(0, state.purchaseLimit).map((p, i, shown) => { const c = cardById(p.cardId); const st = STATUS_PILL[p.status]; return html`
         ${i === 0 || shown[i - 1].date !== p.date ? html`<div class="day-h"><span>${fmtDay(p.date, t)}</span><span class="num">${formatPaise(dayTotals[p.date] || 0)}</span></div>` : ''}
         <button class="row purchase" data-action="log-edit" data-id="${p.id}">
-          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}${p.applianceId && applianceById(p.applianceId) ? ' · ' + applianceById(p.applianceId).name : ''}${p.subscription?.every ? ' · ↻ ' + subscriptionLabel(p.subscription) : ''}</div></div>
+          <div><div class="ins">${formatShopName(p.merchant)}</div><div class="meta">${CAT_LABEL[p.category] || p.category} · ${c ? cardLabel(c) : 'Unknown card'}${p.vehicleId && vehicleById(p.vehicleId) ? ' · ' + vehicleById(p.vehicleId).name : ''}${p.applianceId && applianceById(p.applianceId) ? ' · ' + applianceById(p.applianceId).name : ''}${p.loanId && loanById(p.loanId) ? ' · ' + loanById(p.loanId).name : ''}${p.subscription?.every ? ' · ↻ ' + subscriptionLabel(p.subscription) : ''}</div></div>
           <div class="right"><span class="num ${p.status === 'cancelled' ? 'strike' : ''}">${formatPaise(p.amountPaise)}</span>
             ${st ? html`<span class="pill ${st[0]}">${p.status === 'refunded' ? `Refunded ${formatPaise(p.refundPaise)}` : st[1]}</span>` : ''}</div>
         </button>`; })}</section>
@@ -3143,10 +3301,105 @@ function othersView() {
       <span><small>Paid in ${monthName}</small><b class="num">${formatPaise(sm.paidPaise)}</b></span>
       <span class="${sm.includesNonMonthly ? 'due-odd' : ''}" ${sm.includesNonMonthly ? html`title="Includes a payment that is not monthly or 28-day, so this due amount is only for ${monthName}"` : ''}><small>Due in ${monthName}</small><b class="num">~${formatPaise(sm.duePaise)}</b></span>
     </span>`;
+  const loans = activeLoans();
+  const owed = loans.reduce((a, l) => a + loanStatus(l, ps, t).outstandingPaise, 0);
   return html`${accordion('subs', 'Subscriptions', subTotals, false, () => subscriptionsView(ps))}
+    ${accordion('loans', 'Debts', loans.length ? html`<span class="sub-totals"><span><small>${loans.length} loan${loans.length === 1 ? '' : 's'} · outstanding</small><b class="num">${formatPaise(roundRupee(owed))}</b></span></span>` : 'None added', false, () => loansView(ps), !!state.loanDraft)}
     ${accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}` : 'None added', false, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft)}
     ${accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft)}
     ${accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft)}`;
+}
+
+const roundRupee = (p) => Math.round(p / 100) * 100;
+
+/** Debts: outstanding per loan after the repayments logged; tap a loan to see its repayments. */
+function loansView(ps) {
+  const t = today();
+  const loans = activeLoans();
+  const closed = state.loans.filter((l) => l.status === 'closed').length;
+  const pct = (bps) => `${(bps / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}%`;
+  const monthYear = (ym) => new Date(ym + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+  return html`${state.canWrite && !state.loanDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="loan-new">Add loan</button></div>` : ''}
+    ${state.loanDraft ? loanForm() : ''}
+    ${!state.ready.loans ? html`<div class="empty"><p>Loading…</p></div>`
+      : !loans.length ? (state.loanDraft ? '' : html`<div class="empty"><p>Add home loans, personal loans and hand loans. When you log an EMI or repayment, tick “Is this a loan repayment?” and the outstanding updates.</p></div>`)
+      : html`<section class="list">${loans.map((l) => {
+        const st = loanStatus(l, ps, t);
+        const hand = l.type === 'hand';
+        const terms = hand ? ['Flexible', l.annualRateBps ? pct(l.annualRateBps) + ' (not charged here)' : '', l.emiPaise ? `usually ${formatPaise(l.emiPaise)}` : ''].filter(Boolean).join(' · ')
+          : `EMI ${formatPaise(l.emiPaise)} · ${pct(l.annualRateBps)} · ${l.termMonths} months`;
+        return html`<article class="row veh-row ${state.spendLoan === l.id ? 'selected' : ''}">
+          <button class="veh-main" data-action="spend-loan" data-id="${l.id}">
+            <div class="spend-top"><span class="ins">${l.name}</span><span class="num loan-out">${formatPaise(roundRupee(st.outstandingPaise))}<small class="meta">outstanding</small></span></div>
+            <div class="meta">${LOAN_TYPE_LABEL[l.type]}${l.lender ? ' · ' + l.lender : ''}</div>
+            <div class="bar thin" role="img" aria-label="${st.paidPercent}% repaid"><span style="width:${st.paidPercent}%"></span></div>
+            <div class="meta">${terms}</div>
+            <div class="meta">${st.outstandingPaise === 0 ? 'Fully repaid ✓' : `${st.paidPercent}% repaid`}${st.payments ? ` · ${st.payments} payment${st.payments === 1 ? '' : 's'}, last ${fmtShort(st.lastPaid)}` : ' · no repayments logged yet'}${st.interestPaise ? ` · interest so far ${formatPaise(st.interestPaise)}` : ''}${!hand && st.emisLeft ? ` · about ${st.emisLeft} EMIs left (ends ~${monthYear(st.endsAround)})` : ''}</div>
+          </button>
+          ${state.canWrite ? html`<button class="btn ghost small" data-action="loan-edit" data-id="${l.id}" aria-label="Edit ${l.name}">Edit</button>` : ''}
+          ${st.missingEarlier ? html`<p class="hint warn-note">Earlier EMIs aren't logged, so interest for that time is counted and the outstanding looks too high. Tap Edit → “Already paying this loan?” and enter the outstanding from your loan statement.</p>` : ''}
+        </article>`; })}</section>
+        <p class="hint">Outstanding is worked out from the repayments you log: interest is added for the days between payments at the loan's rate, then each payment is taken off. Hand loans are amount borrowed minus repayments. Your lender's statement is the final word.</p>`}
+    ${closed ? html`<p class="hint">${closed} closed loan${closed === 1 ? '' : 's'} hidden; their repayments are kept.</p>` : ''}`;
+}
+
+function loanForm() {
+  const d = state.loanDraft, e = state.loanErrors;
+  const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
+  const rup = (p) => (p == null ? '' : String(p / 100));
+  const type = d.type || 'home';
+  const opt = type === 'hand' ? ' (optional)' : '';
+  return html`<form class="panel" id="loan-form" novalidate>
+    <h2>${d.id ? 'Edit loan' : 'Add loan'}</h2>
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <fieldset class="seg seg4" aria-label="Type">${LOAN_TYPES.map((k) => html`<label><input type="radio" name="type" value="${k}" ${type === k ? 'checked' : ''}><span>${LOAN_TYPE_LABEL[k].replace(' loan', '')}</span></label>`)}</fieldset>
+    <div class="two">
+      <div class="field"><label for="n-name">Name</label><input id="n-name" name="name" value="${d.name || ''}" placeholder="SBI home loan, From Ravi…" autocomplete="off">${err('name')}</div>
+      <div class="field"><label for="n-lender">Lender (optional)</label><input id="n-lender" name="lender" value="${d.lender || ''}" placeholder="Bank or person" autocomplete="off">${err('lender')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="n-principal">Amount borrowed (₹)</label><input id="n-principal" name="principal" inputmode="decimal" value="${rup(d.principalPaise)}" autocomplete="off">${err('principalPaise')}</div>
+      <div class="field"><label for="n-start">Started on</label><input id="n-start" name="startDate" type="date" value="${d.startDate || ''}">${err('startDate')}</div>
+    </div>
+    <div class="two three">
+      <div class="field"><label for="n-rate">Interest % a year<span class="opt">${opt}</span></label><input id="n-rate" name="rate" inputmode="decimal" value="${d.annualRateBps != null ? String(d.annualRateBps / 100) : ''}" placeholder="8.5" autocomplete="off">${err('annualRateBps')}</div>
+      <div class="field"><label for="n-term">Term (months)<span class="opt">${opt}</span></label><input id="n-term" name="term" inputmode="numeric" value="${d.termMonths ?? ''}" placeholder="240" autocomplete="off">${err('termMonths')}</div>
+      <div class="field"><label for="n-emi">EMI (₹)<span class="opt">${opt}</span></label><input id="n-emi" name="emi" inputmode="decimal" value="${rup(d.emiPaise)}" autocomplete="off">${err('emiPaise')}</div>
+    </div>
+    <p class="hint" id="emi-calc"></p>
+    <details class="opening" ${d.openingPaise != null ? 'open' : ''}><summary>Already paying this loan? Start from today's outstanding</summary>
+      <div class="two" style="margin-top:10px">
+        <div class="field"><label for="n-open">Outstanding (₹)</label><input id="n-open" name="opening" inputmode="decimal" value="${rup(d.openingPaise)}" autocomplete="off">${err('openingPaise')}</div>
+        <div class="field"><label for="n-open-date">As on</label><input id="n-open-date" name="openingDate" type="date" value="${d.openingDate || today()}">${err('openingDate')}</div>
+      </div>
+      <p class="hint">Use the figure from your loan statement. Repayments logged after this date reduce it.</p>
+    </details>
+    <div class="field"><label for="n-notes">Notes (optional)</label><input id="n-notes" name="notes" value="${d.notes || ''}" autocomplete="off">${err('notes')}</div>
+    <p class="hint">Don't enter loan account numbers.</p>
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save loan'}</button><button class="btn ghost" type="button" data-action="loan-cancel">Cancel</button>
+      ${d.id ? html`<button class="btn ghost small danger-text push-right" type="button" data-action="loan-close">Mark as closed</button>` : ''}</div>
+  </form>`;
+}
+
+async function saveLoan(patch = {}) {
+  if (state.busy || !state.db) return;
+  const f = Object.fromEntries(new FormData(document.getElementById('loan-form')));
+  const money = (v) => (String(v ?? '').trim() === '' ? null : parseRupeesToPaise(v) ?? -1);
+  const num = (v, scale = 1) => { const t = String(v ?? '').trim(); if (t === '') return null; const n = Number(t); return Number.isFinite(n) ? Math.round(n * scale) : -1; };
+  const opening = document.querySelector('#loan-form details.opening')?.open ? money(f.opening) : null;
+  const draft = { ...state.loanDraft, type: f.type, name: f.name, lender: f.lender, principalPaise: money(f.principal), startDate: f.startDate,
+    annualRateBps: num(f.rate, 100), termMonths: num(f.term), emiPaise: money(f.emi), openingPaise: opening, openingDate: opening != null ? f.openingDate : '', notes: f.notes, ...patch };
+  const existing = draft.id ? loanById(draft.id) : null;
+  const r = validateLoan({ ...draft, id: draft.id || uuid() }, existing);
+  if (!r.ok) { state.loanDraft = draft; state.loanErrors = r.errors; return render(); }
+  state.busy = true; render();
+  try {
+    await state.db.collection('loans').doc(r.loan.id).set(r.loan);
+    state.loanDraft = null; state.loanErrors = {};
+    if (r.loan.status === 'closed' && state.spendLoan === r.loan.id) state.spendLoan = null;
+    toast(r.loan.status === 'closed' ? `${r.loan.name} closed` : existing ? 'Loan updated' : `${r.loan.name} added`);
+  } catch (e) { state.loanErrors = { _form: friendly(e) }; }
+  state.busy = false; render();
 }
 
 /** A collapsible Others section: header with a one-line summary; body only when open. */
@@ -3481,6 +3734,34 @@ function afterRender() {
     document.getElementById('p-vehicle-f').hidden = ptype.value !== 'Motor';
     if (ptype.value === '__new__') document.getElementById('p-newtype')?.focus();
   });
+  const lbox = document.getElementById('loan-box');
+  if (lbox) {
+    const lrel = document.getElementById('l-lrel'), lpick = document.getElementById('loan-pick'), lsel = document.getElementById('l-loan');
+    const notesL = document.getElementById('l-notes'), catL = document.getElementById('l-category');
+    const refreshL = () => {
+      if (!lbox.isConnected) return;
+      const remembered = !state.logDraft?.id ? loanForShop(shop.value) : null;
+      if (remembered && !lrel.dataset.touched) { lrel.checked = true; if (lsel) lsel.value = remembered; }
+      lbox.hidden = !(looksLoanRelated({ merchant: shop.value, notes: notesL.value, category: catL.value }) || lrel.checked);
+      lpick.hidden = !lrel.checked;
+    };
+    lrel.addEventListener('change', () => { lrel.dataset.touched = '1'; refreshL(); });
+    [shop, notesL].forEach((x) => x?.addEventListener('input', () => setTimeout(refreshL)));
+    shop?.addEventListener('change', () => setTimeout(refreshL)); catL?.addEventListener('change', refreshL);
+  }
+  const lf = document.getElementById('loan-form');
+  if (lf) {
+    const emiHint = () => {
+      const g = (n) => lf.elements[n]?.value || '';
+      const P = parseRupeesToPaise(g('principal')), rate = parseFloat(g('rate')), n = parseInt(g('term'), 10);
+      const e = P && n > 0 && rate >= 0 ? emiFor(P, Math.round(rate * 100), n) : null;
+      const el = document.getElementById('emi-calc');
+      if (el) el.textContent = e ? `Works out to ${formatPaise(e)} a month. Leave EMI blank to use this.` : '';
+    };
+    ['principal', 'rate', 'term'].forEach((n) => lf.elements[n]?.addEventListener('input', emiHint));
+    lf.querySelectorAll('input[name=type]').forEach((r) => r.addEventListener('change', () => { lf.querySelectorAll('.opt').forEach((o) => { o.textContent = r.value === 'hand' ? ' (optional)' : ''; }); }));
+    emiHint();
+  }
   const abox = document.getElementById('app-box');
   if (abox) {
     const arel = document.getElementById('l-arel'), apick = document.getElementById('app-pick'), asel = document.getElementById('l-appliance');
@@ -3584,6 +3865,17 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'loan-new') { state.loanDraft = { type: 'home' }; state.loanErrors = {}; render(); document.getElementById('loan-form')?.scrollIntoView({ block: 'start' }); document.getElementById('n-name')?.focus(); }
+  else if (a === 'loan-edit') { state.loanDraft = { ...loanById(id) }; state.loanErrors = {}; render(); document.getElementById('loan-form')?.scrollIntoView({ block: 'start' }); }
+  else if (a === 'loan-cancel') { state.loanDraft = null; state.loanErrors = {}; render(); }
+  else if (a === 'loan-close') saveLoan({ status: 'closed' });
+  else if (a === 'spend-loan') {
+    const fromOthers = state.tab === 'others';
+    state.spendLoan = fromOthers ? id : (state.spendLoan === id ? null : id); state.purchaseLimit = 10;
+    if (fromOthers) { state.tab = 'spends'; state.spendPeriod = 'year'; }
+    render();
+    if (state.spendLoan) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start' });
+  }
   else if (a === 'pay-new') {
     const cardId = id || (state.spendCard && cardById(state.spendCard)?.kind === 'credit' ? state.spendCard : (state.cards.filter((c) => c.kind === 'credit' && c.status === 'active').length === 1 ? state.cards.find((c) => c.kind === 'credit' && c.status === 'active').id : ''));
     state.payDraft = { cardId, date: today(), amountPaise: cardId ? dueNow(cardId) : null, where: state.tab === 'wallet' ? 'card' : 'spends' };
@@ -3648,6 +3940,7 @@ $app.addEventListener('submit', async (ev) => {
   if (ev.target.id === 'pol-form') { ev.preventDefault(); savePolicy(); return; }
   if (ev.target.id === 'app-form') { ev.preventDefault(); saveAppliance(); return; }
   if (ev.target.id === 'pay-form') { ev.preventDefault(); savePayment(); return; }
+  if (ev.target.id === 'loan-form') { ev.preventDefault(); saveLoan(); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -3682,17 +3975,17 @@ function safeRender() {
   if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
   if (f && f.id === 'p-search') return renderKeepingSearch();
-  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.closest('#app-form') || f.closest('#pay-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.closest('#app-form') || f.closest('#pay-form') || f.closest('#loan-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 
 render();
 
 (async () => {
-  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true, loans: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
   const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
   if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
-  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true, loans: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
   state.db = db;
   render();
   db.collection('cards').onSnapshot((snap) => {
@@ -3706,6 +3999,11 @@ render();
     state.ready.rulePacks = true;
     safeRender();
   }, () => { state.ready.rulePacks = true; });
+  db.collection('loans').onSnapshot((snap) => {
+    state.loans = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.loans = true;
+    safeRender();
+  }, () => { state.ready.loans = true; });
   db.collection('billPayments').onSnapshot((snap) => {
     state.billPayments = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     state.ready.billPayments = true;
