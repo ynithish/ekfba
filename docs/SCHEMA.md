@@ -49,3 +49,6 @@ Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations
 ## Claude page: appliances and subscriptions (22 Oct 2026)
 - Collection `appliances/{id}`: `{ id, name, type, group: appliance|device, brand, purchaseDate, warrantyUntil, amc: {provider, startDate, endDate, amountPaise, notes}|null, notes, status, createdAt, updatedAt }`.
 - Purchases gain `applianceId` (string|null) and `subscription` (`{ every: 28d|monthly|56d|84d|quarterly|halfyearly|yearly }` or null). Next due = purchase date + period.
+
+## Claude page: bill payments (29 Oct 2026)
+- Collection `billPayments/{id}`: `{ id, cardId (credit card paid), date, amountPaise, fromCardId|null (debit card / bank transfer used), note, createdAt, updatedAt }`. Not purchases; never counted as spend.

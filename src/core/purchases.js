@@ -205,13 +205,16 @@ export function dueDateFor(billDate, dueDay) {
 }
 
 /**
- * Bill dates for a credit card with a statement (bill generation) day. Returns null without one.
- * { lastBill, lastDue, lastBilledPaise, nextBill, nextDue, unbilledPaise, payBy } where payBy is the next
- * payment date that has not passed (the last bill's due date if still ahead, else the next bill's), with the
- * amount logged for that bill: { date, bill, amountPaise, billed }. billed=false means the bill is not generated
- * yet, so amountPaise is what is logged in the current cycle so far.
+ * Bill dates and amounts for a credit card with a statement (bill generation) day. Returns null without one.
+ * Amounts come from logged purchases; `payments` are bill payments ({ cardId, date, amountPaise }).
+ * Payments made after the last bill date pay that bill first; anything extra counts against the next bill.
+ * Returns {
+ *   lastBill, lastDue, lastBilledPaise, lastPaidPaise, lastRemainingPaise, settledBill (last bill fully paid?),
+ *   nextBill, nextDue, unbilledPaise, unbilledDuePaise (after any extra payment), payBy
+ * } where payBy is the next payment still to make: the last bill if its due date is ahead and it is not fully
+ * paid, else the next bill: { date, bill, amountPaise, paidPaise, remainingPaise, billed }.
  */
-export function billingInfo(card, purchases, today) {
+export function billingInfo(card, purchases, today, payments = []) {
   if (card.kind !== 'credit') return null;
   const cur = periodContaining('statement_cycle', today, card);
   if (!cur) return null;
@@ -222,11 +225,43 @@ export function billingInfo(card, purchases, today) {
   const lastDue = dueDateFor(lastBill, card.dueDay);
   const nextBill = cur.end;
   const nextDue = dueDateFor(nextBill, card.dueDay);
+  const lastBilledPaise = sum(prev);
+  const unbilledPaise = sum(cur);
+  const paidSinceBill = payments.filter((x) => x.cardId === card.id && x.date > lastBill && x.date <= today)
+    .reduce((a, x) => a + (x.amountPaise || 0), 0);
+  const lastPaidPaise = Math.min(paidSinceBill, lastBilledPaise);
+  const lastRemainingPaise = lastBilledPaise - lastPaidPaise;
+  const extra = paidSinceBill - lastPaidPaise;
+  const unbilledDuePaise = Math.max(0, unbilledPaise - extra);
+  const settledBill = lastBilledPaise > 0 && lastRemainingPaise === 0;
+  // Nothing left to pay on the last bill (paid, or nothing logged for it): point at the next bill instead.
+  const lastOpen = lastDue && lastDue >= today && lastRemainingPaise > 0;
   return {
-    lastBill, lastDue, lastBilledPaise: sum(prev), lastCycle: prev,
-    nextBill, nextDue, unbilledPaise: sum(cur), currentCycle: cur,
-    payBy: lastDue && lastDue >= today ? { date: lastDue, bill: lastBill, amountPaise: sum(prev), billed: true } : nextDue ? { date: nextDue, bill: nextBill, amountPaise: sum(cur), billed: false } : null,
+    lastBill, lastDue, lastBilledPaise, lastPaidPaise, lastRemainingPaise, settledBill, paidSinceBillPaise: paidSinceBill, lastCycle: prev,
+    nextBill, nextDue, unbilledPaise, unbilledDuePaise, currentCycle: cur,
+    payBy: lastOpen ? { date: lastDue, bill: lastBill, amountPaise: lastBilledPaise, paidPaise: lastPaidPaise, remainingPaise: lastRemainingPaise, billed: true }
+      : nextDue ? { date: nextDue, bill: nextBill, amountPaise: unbilledPaise, paidPaise: Math.min(extra, unbilledPaise), remainingPaise: unbilledDuePaise, billed: false } : null,
   };
+}
+
+/** Validates a credit card bill payment: { cardId, date, amountPaise, fromCardId?, note? }. */
+export function validateBillPayment(d, existing = null, now = Date.now()) {
+  const errors = {};
+  const x = {
+    cardId: d.cardId || '',
+    date: d.date,
+    amountPaise: d.amountPaise,
+    fromCardId: d.fromCardId || null,
+    note: String(d.note || '').trim(),
+  };
+  if (!x.cardId) errors.cardId = 'Which credit card did you pay?';
+  if (!isDate(x.date)) errors.date = 'Pick the payment date.';
+  if (!(Number.isInteger(x.amountPaise) && x.amountPaise > 0 && x.amountPaise <= MAX_PAISE)) errors.amountPaise = 'Enter the amount paid.';
+  if (x.note.length > 200) errors.note = 'Keep the note under 200 characters.';
+  const s = scanForSensitiveData({ note: x.note });
+  if (s) errors[s.path] = `Not saved: ${s.reason}.`;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, payment: { ...x, id: existing?.id || d.id, createdAt: existing?.createdAt || d.createdAt || now, updatedAt: now } };
 }
 
 /* ---------------- Per-day spending ---------------- */

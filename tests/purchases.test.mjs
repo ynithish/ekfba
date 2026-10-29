@@ -120,10 +120,10 @@ test('credit card bill and payment dates', async () => {
   assert.equal(b.nextBill, '2026-10-15');
   assert.equal(b.nextDue, '2026-11-04');
   assert.equal(b.unbilledPaise, 130000);
-  assert.deepEqual(b.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000, billed: false });
+  assert.deepEqual(b.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000, paidPaise: 0, remainingPaise: 130000, billed: false });
   const b2 = billingInfo(card, ps, '2026-10-20');
   assert.equal(b2.lastBilledPaise, 130000);
-  assert.deepEqual(b2.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000, billed: true });
+  assert.deepEqual(b2.payBy, { date: '2026-11-04', bill: '2026-10-15', amountPaise: 130000, paidPaise: 0, remainingPaise: 130000, billed: true });
   // A purchase after the bill date is not part of that payment.
   assert.equal(billingInfo(card, [...ps, { cardId: 'c', date: '2026-10-18', amountPaise: 99900, status: 'completed' }], '2026-10-20').payBy.amountPaise, 130000);
   assert.equal(billingInfo({ ...card, kind: 'debit' }, ps, '2026-10-09'), null);
@@ -153,4 +153,30 @@ test('dailySpend: per-day totals, today, average over elapsed days, highest day'
   assert.equal(past.elapsedDays, 30);
   assert.equal(past.averagePaise, 3300); // ₹33.30 rounds to ₹33
   assert.equal(past.todayPaise, 0);
+});
+
+test('bill payments reduce the amount due', async () => {
+  const { billingInfo, validateBillPayment } = await import('../src/core/purchases.js');
+  const card = { id: 'c', kind: 'credit', statementDay: 12, dueDay: 28 };
+  const ps = [
+    { cardId: 'c', date: '2026-10-01', amountPaise: 1000000, status: 'completed' }, // on the 12 Oct bill
+    { cardId: 'c', date: '2026-10-20', amountPaise: 200000, status: 'completed' },  // next bill
+  ];
+  const pay = (date, amountPaise) => ({ cardId: 'c', date, amountPaise });
+  let b = billingInfo(card, ps, '2026-10-25', [pay('2026-10-22', 400000)]);
+  assert.deepEqual([b.payBy.bill, b.payBy.amountPaise, b.payBy.paidPaise, b.payBy.remainingPaise, b.payBy.billed], ['2026-10-12', 1000000, 400000, 600000, true]);
+  // Paying the rest settles it; the next payment shown is the next bill.
+  b = billingInfo(card, ps, '2026-10-25', [pay('2026-10-22', 400000), pay('2026-10-24', 600000)]);
+  assert.equal(b.settledBill, true);
+  assert.deepEqual([b.payBy.bill, b.payBy.remainingPaise, b.payBy.billed], ['2026-11-12', 200000, false]);
+  // Paying extra counts against the next bill.
+  b = billingInfo(card, ps, '2026-10-25', [pay('2026-10-22', 1050000)]);
+  assert.equal(b.unbilledDuePaise, 150000);
+  assert.equal(b.payBy.paidPaise, 50000);
+  // A payment before the bill date, another card's payment, or a future-dated one does not count.
+  b = billingInfo(card, ps, '2026-10-25', [pay('2026-10-10', 999), { ...pay('2026-10-22', 500000), cardId: 'x' }, pay('2026-10-30', 500000)]);
+  assert.equal(b.payBy.remainingPaise, 1000000);
+  assert.equal(validateBillPayment({ cardId: 'c', date: '2026-10-22', amountPaise: 0 }).ok, false);
+  assert.equal(validateBillPayment({ cardId: 'c', date: '2026-10-22', amountPaise: 500, note: 'OTP is 123456' }).ok, false);
+  assert.equal(validateBillPayment({ id: 'p', cardId: 'c', date: '2026-10-22', amountPaise: 500, fromCardId: 'd' }, null, 1).payment.fromCardId, 'd');
 });

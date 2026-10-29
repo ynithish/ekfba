@@ -243,6 +243,11 @@ button.stat.good b { color: var(--ok); }
 .sub-totals b { font-family: var(--display); font-size: 18px; font-weight: 700; }
 .sub-totals .due-odd b { color: var(--soon); }
 .due-odd-note { color: var(--soon); }
+.paid-ok { color: var(--ok); font-weight: 600; }
+.pay-hist { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.pay-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pay-list li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px 6px 12px; font-size: 14px; }
+.pay-list li > span:first-child { flex: 1; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
 .acc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .acc-head { width: 100%; display: grid; grid-template-columns: 1fr auto 20px; align-items: center; gap: 10px; padding: 14px 16px; background: none; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; min-height: 56px; }
 .acc-title { font-family: var(--display); font-weight: 700; font-size: 17px; }
@@ -1301,13 +1306,16 @@ function dueDateFor(billDate, dueDay) {
 }
 
 /**
- * Bill dates for a credit card with a statement (bill generation) day. Returns null without one.
- * { lastBill, lastDue, lastBilledPaise, nextBill, nextDue, unbilledPaise, payBy } where payBy is the next
- * payment date that has not passed (the last bill's due date if still ahead, else the next bill's), with the
- * amount logged for that bill: { date, bill, amountPaise, billed }. billed=false means the bill is not generated
- * yet, so amountPaise is what is logged in the current cycle so far.
+ * Bill dates and amounts for a credit card with a statement (bill generation) day. Returns null without one.
+ * Amounts come from logged purchases; `payments` are bill payments ({ cardId, date, amountPaise }).
+ * Payments made after the last bill date pay that bill first; anything extra counts against the next bill.
+ * Returns {
+ *   lastBill, lastDue, lastBilledPaise, lastPaidPaise, lastRemainingPaise, settledBill (last bill fully paid?),
+ *   nextBill, nextDue, unbilledPaise, unbilledDuePaise (after any extra payment), payBy
+ * } where payBy is the next payment still to make: the last bill if its due date is ahead and it is not fully
+ * paid, else the next bill: { date, bill, amountPaise, paidPaise, remainingPaise, billed }.
  */
-function billingInfo(card, purchases, today) {
+function billingInfo(card, purchases, today, payments = []) {
   if (card.kind !== 'credit') return null;
   const cur = periodContaining('statement_cycle', today, card);
   if (!cur) return null;
@@ -1318,11 +1326,43 @@ function billingInfo(card, purchases, today) {
   const lastDue = dueDateFor(lastBill, card.dueDay);
   const nextBill = cur.end;
   const nextDue = dueDateFor(nextBill, card.dueDay);
+  const lastBilledPaise = sum(prev);
+  const unbilledPaise = sum(cur);
+  const paidSinceBill = payments.filter((x) => x.cardId === card.id && x.date > lastBill && x.date <= today)
+    .reduce((a, x) => a + (x.amountPaise || 0), 0);
+  const lastPaidPaise = Math.min(paidSinceBill, lastBilledPaise);
+  const lastRemainingPaise = lastBilledPaise - lastPaidPaise;
+  const extra = paidSinceBill - lastPaidPaise;
+  const unbilledDuePaise = Math.max(0, unbilledPaise - extra);
+  const settledBill = lastBilledPaise > 0 && lastRemainingPaise === 0;
+  // Nothing left to pay on the last bill (paid, or nothing logged for it): point at the next bill instead.
+  const lastOpen = lastDue && lastDue >= today && lastRemainingPaise > 0;
   return {
-    lastBill, lastDue, lastBilledPaise: sum(prev), lastCycle: prev,
-    nextBill, nextDue, unbilledPaise: sum(cur), currentCycle: cur,
-    payBy: lastDue && lastDue >= today ? { date: lastDue, bill: lastBill, amountPaise: sum(prev), billed: true } : nextDue ? { date: nextDue, bill: nextBill, amountPaise: sum(cur), billed: false } : null,
+    lastBill, lastDue, lastBilledPaise, lastPaidPaise, lastRemainingPaise, settledBill, paidSinceBillPaise: paidSinceBill, lastCycle: prev,
+    nextBill, nextDue, unbilledPaise, unbilledDuePaise, currentCycle: cur,
+    payBy: lastOpen ? { date: lastDue, bill: lastBill, amountPaise: lastBilledPaise, paidPaise: lastPaidPaise, remainingPaise: lastRemainingPaise, billed: true }
+      : nextDue ? { date: nextDue, bill: nextBill, amountPaise: unbilledPaise, paidPaise: Math.min(extra, unbilledPaise), remainingPaise: unbilledDuePaise, billed: false } : null,
   };
+}
+
+/** Validates a credit card bill payment: { cardId, date, amountPaise, fromCardId?, note? }. */
+function validateBillPayment(d, existing = null, now = Date.now()) {
+  const errors = {};
+  const x = {
+    cardId: d.cardId || '',
+    date: d.date,
+    amountPaise: d.amountPaise,
+    fromCardId: d.fromCardId || null,
+    note: String(d.note || '').trim(),
+  };
+  if (!x.cardId) errors.cardId = 'Which credit card did you pay?';
+  if (!isDate(x.date)) errors.date = 'Pick the payment date.';
+  if (!(Number.isInteger(x.amountPaise) && x.amountPaise > 0 && x.amountPaise <= MAX_PAISE)) errors.amountPaise = 'Enter the amount paid.';
+  if (x.note.length > 200) errors.note = 'Keep the note under 200 characters.';
+  const s = scanForSensitiveData({ note: x.note });
+  if (s) errors[s.path] = `Not saved: ${s.reason}.`;
+  if (Object.keys(errors).length) return { ok: false, errors };
+  return { ok: true, payment: { ...x, id: existing?.id || d.id, createdAt: existing?.createdAt || d.createdAt || now, updatedAt: now } };
 }
 
 /* ---------------- Per-day spending ---------------- */
@@ -1357,7 +1397,7 @@ function dailySpend(purchases, start, end, today) {
   };
 }
 
-return { PURCHASE_STATUSES, monthKey, validatePurchase, findDuplicates, netSpend, flattenMonths, periodContaining, previousPeriod, totals, countsToward, milestoneProgress, dueDateFor, billingInfo, dailySpend };
+return { PURCHASE_STATUSES, monthKey, validatePurchase, findDuplicates, netSpend, flattenMonths, periodContaining, previousPeriod, totals, countsToward, milestoneProgress, dueDateFor, billingInfo, validateBillPayment, dailySpend };
 })();
 
 const __m_vehicles = (() => {
@@ -2139,7 +2179,7 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateRulePack, diffRulePacks, offerStatus, packFreshness, packMatchesCard, offersForCard, localDate, daysBetween,
   CATEGORIES, nextAnniversary, renewalStatus, feeCalendarLink, REMINDER_OFFSETS, buildBackup, validateBackup, mergeRecords, uuid,
   parseQuery, recommend, explain, MERCHANTS, validatePurchase, findDuplicates, netSpend, flattenMonths, monthKey,
-  periodContaining, totals, milestoneProgress, formatShopName, billingInfo, dailySpend,
+  periodContaining, totals, milestoneProgress, formatShopName, billingInfo, validateBillPayment, dailySpend,
   validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL,
   validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
@@ -2157,10 +2197,10 @@ const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank tr
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false }, db: null, canWrite: true,
+  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -2291,7 +2331,7 @@ function billBox(c) {
   if (c.kind !== 'credit') return '';
   if (!c.statementDay) return html`<p class="hint">Add the bill generation day and payment due day (Edit) to see bill dates and payment reminders.</p>`;
   const t = today();
-  const b = billingInfo(c, allPurchases(), t);
+  const b = billingInfo(c, allPurchases(), t, state.billPayments);
   const due = b.payBy;
   const calLink = (date, before) => {
     const start = new Date(Date.parse(date + 'T00:00:00Z') - before * 86400000).toISOString().slice(0, 10);
@@ -2302,12 +2342,13 @@ function billBox(c) {
   };
   return html`<div><div class="label">Bills</div>
     <dl class="kv">
-      ${due ? html`<dt>Payment due</dt><dd><b class="num">${formatPaise(due.amountPaise)}</b>* by ${fmtDate(due.date)} · ${due.billed ? `bill of ${fmtDate(due.bill)}` : `logged so far; bill on ${fmtDate(due.bill)}`}</dd>` : ''}
-      <dt>Last Bill</dt><dd>${fmtDate(b.lastBill)}${b.lastDue ? ` · Payment Date ${fmtDate(b.lastDue)}` : ''} · <b class="num">${formatPaise(b.lastBilledPaise)}</b>*</dd>
+      ${due ? html`<dt>Payment due</dt><dd><b class="num">${formatPaise(due.remainingPaise)}</b>* by ${fmtDate(due.date)} · ${due.billed ? `bill of ${fmtDate(due.bill)}` : `logged so far; bill on ${fmtDate(due.bill)}`}${due.paidPaise ? ` · ${formatPaise(due.paidPaise)} already paid` : ''}</dd>` : ''}
+      <dt>Last Bill</dt><dd>${fmtDate(b.lastBill)}${b.lastDue ? ` · Payment Date ${fmtDate(b.lastDue)}` : ''} · <b class="num">${formatPaise(b.lastBilledPaise)}</b>*${b.settledBill ? html` · <span class="paid-ok">paid ✓</span>` : b.lastPaidPaise ? ` · ${formatPaise(b.lastPaidPaise)} paid, ${formatPaise(b.lastRemainingPaise)} left` : ''}</dd>
       <dt>Next Bill</dt><dd>${fmtDate(b.nextBill)}${b.nextDue ? ` · Payment Date ${fmtDate(b.nextDue)}` : ''} · <b class="num">${formatPaise(b.unbilledPaise)}</b> so far*</dd>
     </dl>
     ${due ? html`<div class="rem" style="margin-top:8px">${[3, 0].map((n) => { const l = calLink(due.date, n); const lbl = n ? `Remind ${n} days before ${fmtShort(due.date)}` : `Remind on ${fmtShort(due.date)}`; return l ? html`<a href="${l}" target="_blank" rel="noopener">${lbl}</a>` : ''; })}</div>` : html`<p class="hint">Add the payment due day to see when to pay.</p>`}
-    <p class="hint">* Amounts are purchases logged here up to the bill date; your bank statement is the final word.</p></div>`;
+    ${payHistory(c)}
+    <p class="hint">* Amounts are purchases logged here up to the bill date, less bill payments you record; your bank statement is the final word.</p></div>`;
 }
 
 function cardDetail(c, fee, pack) {
@@ -2801,13 +2842,83 @@ function renameText(orig, next, others) {
   return existing ? `This purchase moves to shop “${next}” (${plural(existing)} there already)` : `This purchase will be saved under the new shop name “${next}”`;
 }
 
+/** Bill payments for one card: newest first, with a button to record another. */
+function payHistory(c) {
+  const list = state.billPayments.filter((x) => x.cardId === c.id).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  return html`<div class="pay-hist">
+    <div class="h-row"><div class="label">Bill payments</div>${state.canWrite && !state.payDraft ? html`<button class="btn ghost small" data-action="pay-new" data-id="${c.id}">Record payment</button>` : ''}</div>
+    ${state.payDraft && state.payDraft.cardId === c.id && state.payDraft.where === 'card' ? payForm() : ''}
+    ${list.length ? html`<ul class="pay-list">${list.slice(0, 6).map((x) => { const from = x.fromCardId ? cardById(x.fromCardId) : null; return html`<li>
+        <span>${fmtDate(x.date)}${from ? ` · from ${cardLabel(from)}` : ''}${x.note ? ` · ${x.note}` : ''}</span><b class="num">${formatPaise(x.amountPaise)}</b>
+        ${state.canWrite ? (state.payConfirmDel === x.id ? html`<span class="actions"><button class="btn danger small" data-action="pay-del-yes" data-id="${x.id}">Delete</button><button class="btn ghost small" data-action="pay-del-no">Keep</button></span>`
+          : html`<button class="btn ghost small" data-action="pay-del" data-id="${x.id}" aria-label="Delete payment of ${formatPaise(x.amountPaise)}">✕</button>`) : ''}</li>`; })}</ul>`
+      : html`<p class="hint">No payments recorded yet.</p>`}
+  </div>`;
+}
+
+function payForm() {
+  const d = state.payDraft, e = state.payErrors;
+  const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
+  const credit = state.cards.filter((c) => c.kind === 'credit' && (c.status === 'active' || c.id === d.cardId));
+  const sources = state.cards.filter((c) => c.kind !== 'credit' && (c.status === 'active' || c.id === d.fromCardId));
+  const rup = (p) => (p == null ? '' : String(p / 100));
+  return html`<form class="panel" id="pay-form" novalidate>
+    <h2>Record bill payment</h2>
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <div class="two">
+      <div class="field"><label for="b-card">Credit card paid</label><select id="b-card" name="cardId"><option value="">Choose…</option>${credit.map((c) => html`<option value="${c.id}" ${c.id === d.cardId ? 'selected' : ''}>${cardLabel(c)}</option>`)}</select>${err('cardId')}</div>
+      <div class="field"><label for="b-amount">Amount paid (₹)</label><input id="b-amount" name="amount" inputmode="decimal" value="${rup(d.amountPaise)}" autocomplete="off">${err('amountPaise')}</div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="b-date">Date paid</label><input id="b-date" name="date" type="date" value="${d.date || today()}">${err('date')}</div>
+      <div class="field"><label for="b-from">Paid from (optional)</label><select id="b-from" name="fromCardId"><option value="">Not recorded</option>${sources.map((c) => html`<option value="${c.id}" ${c.id === d.fromCardId ? 'selected' : ''}>${cardLabel(c)}</option>`)}</select></div>
+    </div>
+    <div class="field"><label for="b-note">Note (optional)</label><input id="b-note" name="note" value="${d.note || ''}" autocomplete="off">${err('note')}</div>
+    <p class="hint">A bill payment is not a purchase: it lowers the amount due on the card and is not counted in your spends.</p>
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save payment'}</button><button class="btn ghost" type="button" data-action="pay-cancel">Cancel</button></div>
+  </form>`;
+}
+
+/** Amount still due on a card right now (what the payment form suggests). */
+function dueNow(cardId) {
+  const c = cardById(cardId);
+  const b = c ? billingInfo(c, allPurchases(), today(), state.billPayments) : null;
+  return b?.payBy?.remainingPaise || null;
+}
+
+async function savePayment() {
+  if (state.busy || !state.db) return;
+  const f = Object.fromEntries(new FormData(document.getElementById('pay-form')));
+  const amount = String(f.amount || '').trim() === '' ? 0 : (parseRupeesToPaise(f.amount) ?? -1);
+  const draft = { ...state.payDraft, cardId: f.cardId, amountPaise: amount, date: f.date, fromCardId: f.fromCardId || null, note: f.note };
+  const r = validateBillPayment({ ...draft, id: draft.id || uuid() });
+  if (!r.ok) { state.payDraft = draft; state.payErrors = r.errors; return render(); }
+  state.busy = true; render();
+  try {
+    await state.db.collection('billPayments').doc(r.payment.id).set(r.payment);
+    const c = cardById(r.payment.cardId);
+    state.payDraft = null; state.payErrors = {};
+    toast(`Payment of ${formatPaise(r.payment.amountPaise)} recorded${c ? ' for ' + cardLabel(c) : ''}`);
+  } catch (e) { state.payErrors = { _form: friendly(e) }; }
+  state.busy = false; render();
+}
+
+async function deletePayment(id) {
+  if (!state.db) return;
+  try { await state.db.collection('billPayments').doc(id).delete(); state.payConfirmDel = null; toast('Payment deleted'); }
+  catch (e) { state.loadErr = friendly(e); }
+  render();
+}
+
 function billLine(c, ps, t) {
-  const b = billingInfo(c, ps, t);
+  const b = billingInfo(c, ps, t, state.billPayments);
   if (!b) return '';
   const pay = b.payBy;
   const days = pay ? daysBetween(t, pay.date) : null;
-  const items = [{ date: b.nextBill, node: html`<span>Next Bill ${fmtShort(b.nextBill)} · <b class="num">${formatPaise(b.unbilledPaise)}</b> so far*</span>` }];
-  if (pay) items.push({ date: pay.date, node: html`<span class="${days <= 3 ? 'due-soon' : ''}">Payment Date ${fmtShort(pay.date)} · <b class="num">${formatPaise(pay.amountPaise)}</b>${pay.billed ? ' due' : ' so far'}*</span>` });
+  const extraPaid = b.unbilledPaise - b.unbilledDuePaise;
+  const items = [{ date: b.nextBill, node: html`<span>Next Bill ${fmtShort(b.nextBill)} · <b class="num">${formatPaise(b.unbilledDuePaise)}</b> so far*${extraPaid ? ` (${formatPaise(extraPaid)} paid)` : ''}</span>` }];
+  if (pay) items.push({ date: pay.date, node: html`<span class="${days <= 3 && pay.remainingPaise ? 'due-soon' : ''}">Payment Date ${fmtShort(pay.date)} · <b class="num">${formatPaise(pay.remainingPaise)}</b>${pay.billed ? ' due' : ' so far'}*${pay.paidPaise ? ` (${formatPaise(pay.paidPaise)} paid)` : ''}</span>` });
+  if (b.settledBill && b.lastDue && b.lastDue >= t) items.push({ date: b.lastBill, node: html`<span class="paid-ok">${fmtShort(b.lastBill)} bill paid ✓</span>` });
   items.sort((x, y) => x.date.localeCompare(y.date));
   return html`<div class="meta bill-line">${items.map((x, i) => html`${i ? ' · ' : ''}${x.node}`)}</div>`;
 }
@@ -2981,7 +3092,9 @@ function spendsView() {
         <div class="bar"><span style="width:${Math.round((v * 100) / maxCard)}%"></span></div>
         ${billLine(c, ps, t)}
       </button>`; })}</section>
-      ${cardsShown.some((c) => billingInfo(c, ps, t)?.payBy) ? html`<p class="hint footnote">* Bill and payment amounts are from purchases logged here up to the bill date. Your bank statement is the final word.</p>` : ''}` : html`<div class="empty"><p>Add your cards in Cards first.</p></div>`}
+      ${cardsShown.some((c) => billingInfo(c, ps, t, state.billPayments)?.payBy) ? html`<p class="hint footnote">* Bill and payment amounts are from purchases logged here up to the bill date, less bill payments you record. Your bank statement is the final word.</p>` : ''}
+      ${state.canWrite && active.some((c) => c.kind === 'credit') && !state.payDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="pay-new">Record credit card bill payment</button></div>` : ''}
+      ${state.payDraft && state.payDraft.where === 'spends' ? payForm() : ''}` : html`<div class="empty"><p>Add your cards in Cards first.</p></div>`}
     ${cats.length ? html`<h2>By category</h2><section class="panel plain cat-list">${cats.map(([k, v]) => html`
       <button class="cat-row ${state.spendCategory === k ? 'selected' : ''}" data-action="spend-cat" data-cat="${k}" aria-pressed="${state.spendCategory === k}"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></button>`)}</section>` : ''}
     ${progress.length ? html`<h2>Card milestones</h2><section class="list">${progress}</section>` : ''}
@@ -3357,6 +3470,9 @@ function afterRender() {
     if (cat && sel && sel.value !== cat) { sel.value = cat; sel.classList.add('auto-filled'); setTimeout(() => sel.classList.remove('auto-filled'), 1200); }
   };
   shop?.addEventListener('change', pickCategory);
+  const bCard = document.getElementById('b-card');
+  bCard?.addEventListener('change', () => { const amt = document.getElementById('b-amount'); const due = dueNow(bCard.value); if (amt && !amt.dataset.touched) amt.value = due ? String(due / 100) : ''; });
+  document.getElementById('b-amount')?.addEventListener('input', (ev) => { ev.target.dataset.touched = '1'; });
   const amcBox = document.getElementById('a-amc');
   amcBox?.addEventListener('change', () => { document.getElementById('amc-fields').hidden = !amcBox.checked; });
   const ptype = document.getElementById('p-type');
@@ -3468,6 +3584,15 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'pay-new') {
+    const cardId = id || (state.spendCard && cardById(state.spendCard)?.kind === 'credit' ? state.spendCard : (state.cards.filter((c) => c.kind === 'credit' && c.status === 'active').length === 1 ? state.cards.find((c) => c.kind === 'credit' && c.status === 'active').id : ''));
+    state.payDraft = { cardId, date: today(), amountPaise: cardId ? dueNow(cardId) : null, where: state.tab === 'wallet' ? 'card' : 'spends' };
+    state.payErrors = {}; render(); document.getElementById('pay-form')?.scrollIntoView({ block: 'center' }); document.getElementById('b-amount')?.focus();
+  }
+  else if (a === 'pay-cancel') { state.payDraft = null; state.payErrors = {}; render(); }
+  else if (a === 'pay-del') { state.payConfirmDel = id; render(); }
+  else if (a === 'pay-del-no') { state.payConfirmDel = null; render(); }
+  else if (a === 'pay-del-yes') deletePayment(id);
   else if (a === 'acc') { const k = t.dataset.k; state.othersOpen = { ...state.othersOpen, [k]: !state.othersOpen[k] }; render(); }
   else if (a === 'app-new') { state.applianceDraft = { type: 'Mobile' }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); document.getElementById('a-name')?.focus(); }
   else if (a === 'app-edit') { state.applianceDraft = { ...applianceById(id) }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); }
@@ -3522,6 +3647,7 @@ $app.addEventListener('submit', async (ev) => {
   if (ev.target.id === 'veh-form') { ev.preventDefault(); saveVehicle(); return; }
   if (ev.target.id === 'pol-form') { ev.preventDefault(); savePolicy(); return; }
   if (ev.target.id === 'app-form') { ev.preventDefault(); saveAppliance(); return; }
+  if (ev.target.id === 'pay-form') { ev.preventDefault(); savePayment(); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -3556,17 +3682,17 @@ function safeRender() {
   if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
   if (f && f.id === 'p-search') return renderKeepingSearch();
-  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.closest('#app-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.closest('#app-form') || f.closest('#pay-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 
 render();
 
 (async () => {
-  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
   const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
   if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
-  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
   state.db = db;
   render();
   db.collection('cards').onSnapshot((snap) => {
@@ -3580,6 +3706,11 @@ render();
     state.ready.rulePacks = true;
     safeRender();
   }, () => { state.ready.rulePacks = true; });
+  db.collection('billPayments').onSnapshot((snap) => {
+    state.billPayments = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.billPayments = true;
+    safeRender();
+  }, () => { state.ready.billPayments = true; });
   db.collection('appliances').onSnapshot((snap) => {
     state.appliances = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     state.ready.appliances = true;

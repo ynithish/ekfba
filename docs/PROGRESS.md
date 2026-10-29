@@ -75,8 +75,9 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Subscriptions: purchase form "This repeats" with every 28/56/84 days, monthly, 3/6 months, yearly; remembered per shop; Others lists each subscription with its next due date (reminders later)
 - ✅ Subscriptions: "Other…" period (any number of days up to 730 or months up to 60, e.g. 7 or 13 months); "Amount changes each time" for bills like electricity and MyGate, listed as ~average of the last 3 with the last amount (22 Oct 2026)
 - ✅ Others layout (22 Oct 2026): Subscriptions on top with "Paid in <month>" and "Due by <month end>" (~, orange when it includes a non-monthly payment); Vehicles, Appliances & devices and Insurances are collapsible sections with a one-line summary
+- ✅ Credit card bill payments (29 Oct 2026): record a payment (card, amount prefilled with what's due, date, paid from, note) from Spends or the card's Bills; payments after a bill date pay that bill first, extra goes to the next bill; Payment Date shows what's left with "(₹X paid)", a paid bill shows ✓; payments are not counted as spend; list and delete on the card
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 59 unit tests; 136 page checks
+- Tests: 60 unit tests; 141 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)
