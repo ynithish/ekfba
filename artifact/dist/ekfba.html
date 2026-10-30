@@ -3335,6 +3335,7 @@ function othersView() {
   const vt = vehicleTotals(ps, range.start, range.end);
   const vs = activeVehicles();
   const vSpend = vs.reduce((a, v) => a + (vt[v.id]?.paise || 0), 0);
+  const vehInsSoon = vs.filter((v) => state.policies.some((x) => x.vehicleId === v.id && x.renewalDate && daysBetween(t, x.renewalDate) <= 60)).length;
   const items = activeAppliances();
   const amcSoon = items.filter((v) => v.amc?.endDate && daysBetween(t, v.amc.endDate) <= 60).length;
   const pols = state.policies;
@@ -3351,7 +3352,7 @@ function othersView() {
   const sections = {
     subs: () => accordion('subs', 'Subscriptions', subTotals, false, () => subscriptionsView(ps)),
     loans: () => accordion('loans', 'Debts', loans.length ? html`<span class="sub-totals"><span><small>${loans.length} loan${loans.length === 1 ? '' : 's'} · outstanding</small><b class="num">${formatPaise(roundRupee(owed))}</b></span></span>` : 'None added', false, () => loansView(ps), !!state.loanDraft),
-    vehicles: () => accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}` : 'None added', false, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft),
+    vehicles: () => accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}${vehInsSoon ? ` · ${vehInsSoon} insurance${vehInsSoon === 1 ? '' : 's'} due soon` : ''}` : 'None added', vehInsSoon > 0, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft),
     appliances: () => accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft),
     family: () => accordion('family', 'Family members', state.family.length ? state.family.map((m) => m.name).sort((a, b) => a.localeCompare(b)).join(', ') : 'None added', false, () => familyView(), !!state.memberDraft),
     policies: () => accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft),
@@ -3799,6 +3800,17 @@ async function deletePolicy(id) {
   render();
 }
 
+/** The vehicle's insurance renewal (soonest Motor policy linked to it), as a status line. */
+function vehicleInsurance(v) {
+  const t = today();
+  const pols = state.policies.filter((x) => x.vehicleId === v.id && x.renewalDate).sort((a, b) => a.renewalDate.localeCompare(b.renewalDate));
+  if (!pols.length) return html`<div class="meta">Insurance: not added · add a Motor policy in Insurances and pick this vehicle</div>`;
+  const p = pols[0];
+  const days = daysBetween(t, p.renewalDate);
+  const st = renewalStatus(days);
+  return html`<div class="amc-line"><span class="pill ${PILL[st.key]}">Insurance · ${st.label}</span><span class="meta">${p.insurer} · renews ${fmtDate(p.renewalDate)} (${rel(days)})</span></div>`;
+}
+
 /** Vehicles: spend per vehicle in the period; tap to see its purchases; add or edit vehicles. */
 function vehiclesView(ps, range, periodName) {
   const vt = vehicleTotals(ps, range.start, range.end);
@@ -3815,6 +3827,7 @@ function vehiclesView(ps, range, periodName) {
             <div class="spend-top"><span class="ins">${v.name} <small class="meta">${VEHICLE_TYPE_LABEL[v.type]}</small></span><span class="num">${formatPaise(t?.paise || 0)}</span></div>
             <div class="bar thin"><span style="width:${Math.round(((t?.paise || 0) * 100) / max)}%"></span></div>
             <div class="meta">${t ? `${t.count} purchase${t.count === 1 ? '' : 's'} · Fuel ${formatPaise(t.fuelPaise)} · Other ${formatPaise(t.paise - t.fuelPaise)}` : 'No spends'} ${periodName} · tap to see purchases</div>
+            ${vehicleInsurance(v)}
           </button>
           ${state.canWrite ? html`<button class="btn ghost small" data-action="veh-edit" data-id="${v.id}" aria-label="Edit ${v.name}">Edit</button>` : ''}
         </article>`; })}</section>`}

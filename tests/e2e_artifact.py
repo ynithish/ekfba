@@ -337,6 +337,7 @@ def main():
         page.click('.people-pick .chip-check:has-text("Nithish")')
         page.fill('#p-date', (_dt.date.today() + _dt.timedelta(days=200)).isoformat()); page.click('#pol-form [type=submit]'); page.wait_for_selector('#pol-form', state='detached')
         check('motor policy shows its vehicle', 'Motor · Swift' in page.inner_text('.list[aria-label=Insurances]'))
+        check('vehicle shows its insurance renewal', 'Insurance · On track' in page.inner_text('.veh-row:has-text("Swift")') and 'ICICI Lombard · renews' in page.inner_text('.veh-row:has-text("Swift")'))
         check('sorted by renewal date', page.locator('.list[aria-label=Insurances] .ins').first.inner_text() == 'Care Health Insurance')
         check('no person filter on Insurances', page.locator('[aria-label="Filter by person"]').count() == 0 and page.locator('.list[aria-label=Insurances] > .row').count() == 2)
         if page.locator('.row:has-text("ICICI Lombard") [data-action=pol-del]').count() == 0: page.click('.row-head:has-text("ICICI Lombard")')

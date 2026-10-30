@@ -80,7 +80,7 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Family members (30 Oct 2026): Others → Family members (name, optional relation; add, edit, remove; rename updates policies). Insurance "Who is covered" is now tick boxes of family members with an inline "Add a family member"; card holder suggestions include family. Seeded with the 4 names from the policies
 - ✅ Others: "Reorder sections" mode with up/down arrows; order saved in `settings/others` (30 Oct 2026)
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 65 unit tests; 165 page checks
+- Tests: 65 unit tests; 166 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)
