@@ -6,7 +6,7 @@ import { validatePurchase } from '../src/core/purchases.js';
 test('vehicle validation', () => {
   const r = validateVehicle({ id: 'v1', name: '  Swift ', type: 'car' }, null, 5);
   assert.equal(r.ok, true);
-  assert.deepEqual(r.vehicle, { name: 'Swift', type: 'car', notes: '', status: 'active', id: 'v1', createdAt: 5, updatedAt: 5 });
+  assert.deepEqual(r.vehicle, { name: 'Swift', type: 'car', notes: '', status: 'active', rc: null, puc: null, id: 'v1', createdAt: 5, updatedAt: 5 });
   assert.equal(validateVehicle({ name: '' }).ok, false);
   assert.equal(validateVehicle({ name: 'Bike', type: 'rocket' }).vehicle.type, 'car');
   assert.equal(validateVehicle({ name: 'Activa', notes: 'card 4111 1111 1111 1111' }).ok, false);
@@ -33,4 +33,15 @@ test('purchases keep the vehicle; totals per vehicle', () => {
     { ...base, status: 'completed' },
   ];
   assert.deepEqual(vehicleTotals(ps, '2026-10-01', '2026-10-31'), { v1: { paise: 230000, count: 2, fuelPaise: 200000 } });
+});
+
+test('vehicle RC and PUC details', () => {
+  const r = validateVehicle({ id: 'v', name: 'Swift', rc: { number: 'ts 09 ab 1234', validUntil: '2035-03-01', url: 'https://drive.google.com/rc' }, puc: { lastDate: '2026-03-10', expiryDate: '2027-03-09', url: 'https://drive.google.com/puc' } }, null, 1);
+  assert.equal(r.ok, true);
+  assert.equal(r.vehicle.rc.number, 'TS 09 AB 1234');
+  assert.equal(r.vehicle.puc.expiryDate, '2027-03-09');
+  assert.equal(validateVehicle({ name: 'Swift' }).vehicle.puc, null);
+  assert.ok(validateVehicle({ name: 'Swift', puc: { lastDate: '2026-03-10' } }).errors['puc.expiryDate']);
+  assert.ok(validateVehicle({ name: 'Swift', puc: { lastDate: '2026-03-10', expiryDate: '2026-03-01' } }).errors['puc.expiryDate']);
+  assert.ok(validateVehicle({ name: 'Swift', rc: { url: 'drive.google.com/x' } }).errors['rc.url']);
 });

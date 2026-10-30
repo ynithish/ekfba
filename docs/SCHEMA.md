@@ -59,3 +59,7 @@ Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations
 
 ## Claude page: family (30 Oct 2026)
 - Collection `family/{id}`: `{ id, name, relation ('' or Self/Spouse/Son/Daughter/Father/Mother/Brother/Sister/Other), createdAt, updatedAt }`. Policies still store names in `people[]`.
+
+## Claude page: RC/PUC and ID documents (30 Oct 2026)
+- `vehicles/{id}` gains `rc: { number, validUntil, url } | null` and `puc: { lastDate, expiryDate, url } | null`.
+- `family/{id}` gains `documents: [{ type, number, url, label }]` (owner-only page; numbers shown masked).

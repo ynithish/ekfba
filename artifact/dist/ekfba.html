@@ -257,6 +257,18 @@ button.stat.good b { color: var(--ok); }
 .add-member { display: flex; gap: 8px; margin-top: 8px; }
 .add-member input { flex: 1; min-width: 0; min-height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; }
 .fam-name { color: var(--ink); }
+.fam-list li { align-items: flex-start; }
+.id-docs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.id-doc { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 13px; color: var(--ink); background: var(--surface); }
+.id-doc a { color: var(--accent); }
+.doc3 { display: grid; grid-template-columns: 140px 1fr; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.doc3 .wide { grid-column: 1 / -1; }
+.doc3 select, .doc3 input { min-height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; min-width: 0; width: 100%; }
+.doc3 .ferr { grid-column: 1 / -1; }
+.veh-docs { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; }
+.veh-row:has(.veh-docs) { flex-wrap: wrap; }
+.subform { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.subform legend { font-weight: 600; font-size: 14px; padding: 0 4px; }
 .veh-row:has(.warn-note) { flex-wrap: wrap; }
 .warn-note { color: var(--soon); flex-basis: 100%; }
 .loan-out { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; flex: none; }
@@ -1433,19 +1445,39 @@ const { netSpend } = __m_purchases;
 const VEHICLE_TYPES = ['car', 'bike', 'scooter', 'other'];
 const VEHICLE_TYPE_LABEL = { car: 'Car', bike: 'Bike', scooter: 'Scooter', other: 'Other vehicle' };
 
-/** Validates a vehicle draft. Returns { ok, vehicle } or { ok: false, errors }. */
+const isDate = (x) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(Date.parse(x + 'T00:00:00Z')) && new Date(x + 'T00:00:00Z').toISOString().slice(0, 10) === x;
+const isHttps = (u) => /^https:\/\/\S+$/i.test(u || '');
+
+/** Validates a vehicle draft (with optional RC and PUC details). Returns { ok, vehicle } or { ok: false, errors }. */
 function validateVehicle(d, existing = null, now = Date.now()) {
   const errors = {};
+  const str = (x) => String(x || '').trim();
+  const rcIn = d.rc || {}, pucIn = d.puc || {};
+  const rc = { number: str(rcIn.number).toUpperCase().replace(/\s+/g, ' '), validUntil: str(rcIn.validUntil), url: str(rcIn.url) };
+  const puc = { lastDate: str(pucIn.lastDate), expiryDate: str(pucIn.expiryDate), url: str(pucIn.url) };
   const v = {
     name: String(d.name || '').trim(),
     type: VEHICLE_TYPES.includes(d.type) ? d.type : 'car',
     notes: String(d.notes || '').trim(),
     status: d.status === 'archived' ? 'archived' : 'active',
+    rc: rc.number || rc.validUntil || rc.url ? rc : null,
+    puc: puc.lastDate || puc.expiryDate || puc.url ? puc : null,
   };
   if (!v.name) errors.name = 'Give the vehicle a name, for example "Swift" or "Activa".';
   if (v.name.length > 40) errors.name = 'Keep the name under 40 characters.';
   if (v.notes.length > 300) errors.notes = 'Notes are too long (300 characters).';
-  const s = scanForSensitiveData({ name: v.name, notes: v.notes });
+  if (v.rc) {
+    if (v.rc.number.length > 15) errors['rc.number'] = 'Registration numbers are up to 15 characters, like TS 09 AB 1234.';
+    if (v.rc.validUntil && !isDate(v.rc.validUntil)) errors['rc.validUntil'] = 'Use a valid date.';
+    if (v.rc.url && !isHttps(v.rc.url)) errors['rc.url'] = 'Paste a link that starts with https://';
+  }
+  if (v.puc) {
+    if (v.puc.lastDate && !isDate(v.puc.lastDate)) errors['puc.lastDate'] = 'Use a valid date.';
+    if (!isDate(v.puc.expiryDate)) errors['puc.expiryDate'] = 'Add the PUC expiry date.';
+    else if (v.puc.lastDate && isDate(v.puc.lastDate) && v.puc.expiryDate <= v.puc.lastDate) errors['puc.expiryDate'] = 'Expiry must be after the PUC date.';
+    if (v.puc.url && !isHttps(v.puc.url)) errors['puc.url'] = 'Paste a link that starts with https://';
+  }
+  const s = scanForSensitiveData({ name: v.name, notes: v.notes, rc: v.rc && v.rc.number });
   if (s) errors[s.path] = `Not saved: ${s.reason}.`;
   if (Object.keys(errors).length) return { ok: false, errors };
   return { ok: true, vehicle: { ...v, id: existing?.id || d.id, createdAt: existing?.createdAt || d.createdAt || now, updatedAt: now } };
@@ -2034,16 +2066,46 @@ const __m_family = (() => {
 // Family members: the people policies cover and cards belong to. Names only (and an optional relation).
 
 const { scanForSensitiveData } = __m_sensitive;
+const ID_DOC_TYPES = ['Aadhaar', 'PAN', 'Driving Licence', 'Passport', 'Voter ID', 'Other'];
+const isHttps = (u) => /^https:\/\/\S+$/i.test(u || '');
+
+/** Shows only the last 4 characters of an ID number: "•••• •••• 1234". */
+function maskId(n) {
+  const s = String(n || '').replace(/\s+/g, '');
+  if (s.length <= 4) return s;
+  return '•'.repeat(Math.min(8, s.length - 4)).replace(/(.{4})/g, '$1 ').trim() + ' ' + s.slice(-4);
+}
+
+/** Normalises and checks one ID document row: { type, number, url }. Returns [doc, error|null]. */
+function checkIdDoc(x) {
+  const doc = { type: ID_DOC_TYPES.includes(x.type) ? x.type : 'Other', number: String(x.number || '').trim().toUpperCase().replace(/\s+/g, ' '), url: String(x.url || '').trim(), label: String(x.label || '').trim() };
+  const compact = doc.number.replace(/[\s-]/g, '');
+  if (!doc.number && !doc.url) return [doc, 'Add the number, the link, or both.'];
+  if (doc.type === 'Aadhaar' && doc.number && !/^\d{12}$/.test(compact)) return [doc, 'Aadhaar numbers have 12 digits.'];
+  if (doc.type === 'Aadhaar' && doc.number) doc.number = compact.replace(/(\d{4})(?=\d)/g, '$1 ');
+  if (doc.type === 'PAN' && doc.number && !/^[A-Z]{5}\d{4}[A-Z]$/.test(compact)) return [doc, 'PAN looks like ABCDE1234F.'];
+  if (doc.type === 'PAN') doc.number = compact;
+  if (doc.number.length > 30) return [doc, 'Keep the number under 30 characters.'];
+  if (doc.url && !isHttps(doc.url)) return [doc, 'Paste a link that starts with https://'];
+  if (doc.label.length > 40) return [doc, 'Keep the name under 40 characters.'];
+  return [doc, null];
+}
+
 const RELATIONS = ['Self', 'Spouse', 'Son', 'Daughter', 'Father', 'Mother', 'Brother', 'Sister', 'Other'];
 
 /** Validates a family member. `others` are the existing members, to stop duplicate names. */
 function validateMember(d, others = [], existing = null, now = Date.now()) {
   const errors = {};
   const m = { name: String(d.name || '').trim().replace(/\s+/g, ' '), relation: RELATIONS.includes(d.relation) ? d.relation : '' };
+  m.documents = (d.documents || []).filter((x) => String(x.number || '').trim() || String(x.url || '').trim()).map((x, i) => {
+    const [doc, err] = checkIdDoc(x);
+    if (err) errors[`documents.${i}`] = err;
+    return doc;
+  });
   if (!m.name) errors.name = 'Enter a name.';
   if (m.name.length > 40) errors.name = 'Keep the name under 40 characters.';
   if (m.name && others.some((o) => o.id !== (existing?.id || d.id) && o.name.toLowerCase() === m.name.toLowerCase())) errors.name = `${m.name} is already in the family list.`;
-  const s = scanForSensitiveData({ name: m.name });
+  const s = scanForSensitiveData({ name: m.name, docs: m.documents.map((x) => x.url) });
   if (s) errors[s.path] = `Not saved: ${s.reason}.`;
   if (Object.keys(errors).length) return { ok: false, errors };
   return { ok: true, member: { ...m, id: existing?.id || d.id, createdAt: existing?.createdAt || d.createdAt || now, updatedAt: now } };
@@ -2056,7 +2118,7 @@ function renameInPolicies(policies, from, to) {
     .map((p) => ({ ...p, people: [...new Set(p.people.map((n) => (n.toLowerCase() === lc ? to : n)))] }));
 }
 
-return { RELATIONS, validateMember, renameInPolicies };
+return { ID_DOC_TYPES, maskId, checkIdDoc, RELATIONS, validateMember, renameInPolicies };
 })();
 
 const __m_recommend = (() => {
@@ -2361,7 +2423,7 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
   SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary,
   validateLoan, emiFor, loanStatus, looksLoanRelated, LOAN_TYPES, LOAN_TYPE_LABEL,
-  validateMember, renameInPolicies, RELATIONS } = __core;
+  validateMember, renameInPolicies, RELATIONS, ID_DOC_TYPES, maskId } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -3336,6 +3398,7 @@ function othersView() {
   const vs = activeVehicles();
   const vSpend = vs.reduce((a, v) => a + (vt[v.id]?.paise || 0), 0);
   const vehInsSoon = vs.filter((v) => state.policies.some((x) => x.vehicleId === v.id && x.renewalDate && daysBetween(t, x.renewalDate) <= 60)).length;
+  const pucSoon = vs.filter((v) => v.puc?.expiryDate && daysBetween(t, v.puc.expiryDate) <= 30).length;
   const items = activeAppliances();
   const amcSoon = items.filter((v) => v.amc?.endDate && daysBetween(t, v.amc.endDate) <= 60).length;
   const pols = state.policies;
@@ -3352,7 +3415,7 @@ function othersView() {
   const sections = {
     subs: () => accordion('subs', 'Subscriptions', subTotals, false, () => subscriptionsView(ps)),
     loans: () => accordion('loans', 'Debts', loans.length ? html`<span class="sub-totals"><span><small>${loans.length} loan${loans.length === 1 ? '' : 's'} · outstanding</small><b class="num">${formatPaise(roundRupee(owed))}</b></span></span>` : 'None added', false, () => loansView(ps), !!state.loanDraft),
-    vehicles: () => accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}${vehInsSoon ? ` · ${vehInsSoon} insurance${vehInsSoon === 1 ? '' : 's'} due soon` : ''}` : 'None added', vehInsSoon > 0, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft),
+    vehicles: () => accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}${vehInsSoon ? ` · ${vehInsSoon} insurance${vehInsSoon === 1 ? '' : 's'} due soon` : ''}${pucSoon ? ` · ${pucSoon} PUC due` : ''}` : 'None added', vehInsSoon + pucSoon > 0, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft),
     appliances: () => accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft),
     family: () => accordion('family', 'Family members', state.family.length ? state.family.map((m) => m.name).sort((a, b) => a.localeCompare(b)).join(', ') : 'None added', false, () => familyView(), !!state.memberDraft),
     policies: () => accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft),
@@ -3467,7 +3530,8 @@ function familyView() {
     ${state.memberDraft ? memberForm() : ''}
     ${!list.length ? (state.memberDraft ? '' : html`<div class="empty"><p>Add the people in your family. They can then be ticked as covered on insurance policies and picked as card holders.</p></div>`)
       : html`<ul class="pay-list fam-list">${list.map((m) => html`<li>
-        <span><b class="fam-name">${m.name}</b>${m.relation ? ` · ${m.relation}` : ''}${uses(m.name) ? ` · ${uses(m.name)}` : ''}</span>
+        <span><b class="fam-name">${m.name}</b>${m.relation ? ` · ${m.relation}` : ''}${uses(m.name) ? ` · ${uses(m.name)}` : ''}
+          ${(m.documents || []).length ? html`<span class="id-docs">${m.documents.map((x) => html`<span class="id-doc"><b>${x.type === 'Other' && x.label ? x.label : x.type}</b>${x.number ? html` <span class="num">${maskId(x.number)}</span>` : ''}${x.url ? html` · <a href="${x.url}" target="_blank" rel="noopener">View</a>` : ''}</span>`)}</span>` : ''}</span>
         ${state.canWrite ? (state.memberConfirmDel === m.id ? html`<span class="actions"><button class="btn danger small" data-action="mem-del-yes" data-id="${m.id}">Remove</button><button class="btn ghost small" data-action="mem-del-no">Keep</button></span>`
           : html`<span class="actions"><button class="btn ghost small" data-action="mem-edit" data-id="${m.id}">Edit</button><button class="btn ghost small" data-action="mem-del" data-id="${m.id}" aria-label="Remove ${m.name}">✕</button></span>`) : ''}</li>`)}</ul>
         <p class="hint">Removing someone here doesn't change policies that already list them. Renaming updates their policies too.</p>`}`;
@@ -3482,14 +3546,30 @@ function memberForm() {
       <div class="field"><label for="m-name">Name</label><input id="m-name" name="name" value="${d.name || ''}" autocomplete="off">${e.name ? html`<span class="ferr" role="alert">${e.name}</span>` : ''}</div>
       <div class="field"><label for="m-rel">Relation (optional)</label><select id="m-rel" name="relation"><option value="">—</option>${RELATIONS.map((r) => html`<option ${d.relation === r ? 'selected' : ''}>${r}</option>`)}</select></div>
     </div>
+    ${d.id ? html`<fieldset class="subform"><legend>Documents</legend>
+      ${(d.documents || []).map((x, i) => html`<div class="doc3" data-doc="${i}">
+        <select name="dtype${i}" aria-label="Document type">${ID_DOC_TYPES.map((k) => html`<option ${x.type === k ? 'selected' : ''}>${k}</option>`)}</select>
+        <input name="dnum${i}" value="${x.number || ''}" placeholder="Document number" aria-label="Document number" autocomplete="off">
+        <input class="wide" name="durl${i}" value="${x.url || ''}" placeholder="Document: Google Drive link (https://…)" aria-label="Document link" autocomplete="off">
+        <button type="button" class="btn ghost small wide" data-action="mem-rm-doc" data-i="${i}">Remove</button>
+        ${e['documents.' + i] ? html`<span class="ferr" role="alert">${e['documents.' + i]}</span>` : ''}</div>`)}
+      <div><button type="button" class="btn ghost small" data-action="mem-add-doc">Add document</button></div>
+      <p class="hint">Aadhaar, PAN, driving licence, passport… Upload the file to Google Drive, choose Share → Copy link, and paste it. Only you can open this page; numbers are shown masked (last 4) in the list.</p>
+    </fieldset>` : html`<p class="hint">Save first, then tap Edit to add documents like Aadhaar, PAN or driving licence.</p>`}
     <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save'}</button><button class="btn ghost" type="button" data-action="mem-cancel">Cancel</button></div>
   </form>`;
+}
+
+function readMemberForm() {
+  const f = Object.fromEntries(new FormData(document.getElementById('mem-form')));
+  const documents = (state.memberDraft.documents || []).map((x, i) => ({ ...x, type: f['dtype' + i] ?? x.type, number: f['dnum' + i] ?? x.number, url: f['durl' + i] ?? x.url }));
+  return { ...state.memberDraft, name: f.name, relation: f.relation, documents };
 }
 
 async function saveMember() {
   if (state.busy || !state.db) return;
   const f = Object.fromEntries(new FormData(document.getElementById('mem-form')));
-  const draft = { ...state.memberDraft, name: f.name, relation: f.relation };
+  const draft = readMemberForm();
   const existing = draft.id ? state.family.find((m) => m.id === draft.id) : null;
   const r = validateMember({ ...draft, id: draft.id || uuid() }, state.family, existing);
   if (!r.ok) { state.memberDraft = draft; state.memberErrors = r.errors; return render(); }
@@ -3800,11 +3880,19 @@ async function deletePolicy(id) {
   render();
 }
 
+/** PUC status line: expiry with a status (Overdue / Urgent within 7 days / Renews soon within 30 / On track). */
+function vehiclePuc(v) {
+  if (!v.puc?.expiryDate) return html`<div class="meta">PUC: not added</div>`;
+  const days = daysBetween(today(), v.puc.expiryDate);
+  const [cls, label] = days < 0 ? ['st-urgent', 'Expired'] : days <= 7 ? ['st-urgent', 'Expires soon'] : days <= 30 ? ['st-soon', 'Due soon'] : ['st-ok', 'Valid'];
+  return html`<div class="amc-line"><span class="pill ${cls}">PUC · ${label}</span><span class="meta">${v.puc.lastDate ? `checked ${fmtDate(v.puc.lastDate)} · ` : ''}${days < 0 ? 'expired' : 'expires'} ${fmtDate(v.puc.expiryDate)} (${rel(days)})</span></div>`;
+}
+
 /** The vehicle's insurance renewal (soonest Motor policy linked to it), as a status line. */
 function vehicleInsurance(v) {
   const t = today();
   const pols = state.policies.filter((x) => x.vehicleId === v.id && x.renewalDate).sort((a, b) => a.renewalDate.localeCompare(b.renewalDate));
-  if (!pols.length) return html`<div class="meta">Insurance: not added · add a Motor policy in Insurances and pick this vehicle</div>`;
+  if (!pols.length) return html`<div class="meta">Insurance: not linked (pick this vehicle on a Motor policy)</div>`;
   const p = pols[0];
   const days = daysBetween(t, p.renewalDate);
   const st = renewalStatus(days);
@@ -3828,8 +3916,13 @@ function vehiclesView(ps, range, periodName) {
             <div class="bar thin"><span style="width:${Math.round(((t?.paise || 0) * 100) / max)}%"></span></div>
             <div class="meta">${t ? `${t.count} purchase${t.count === 1 ? '' : 's'} · Fuel ${formatPaise(t.fuelPaise)} · Other ${formatPaise(t.paise - t.fuelPaise)}` : 'No spends'} ${periodName} · tap to see purchases</div>
             ${vehicleInsurance(v)}
+            ${vehiclePuc(v)}
           </button>
           ${state.canWrite ? html`<button class="btn ghost small" data-action="veh-edit" data-id="${v.id}" aria-label="Edit ${v.name}">Edit</button>` : ''}
+          ${v.rc || v.puc?.url ? html`<div class="veh-docs meta">
+            ${v.rc ? html`<span>RC${v.rc.number ? ' ' + v.rc.number : ''}${v.rc.validUntil ? ` · valid till ${fmtDate(v.rc.validUntil)}` : ''}</span>${v.rc.url ? html`<a href="${v.rc.url}" target="_blank" rel="noopener">View RC</a>` : ''}` : ''}
+            ${v.puc?.url ? html`<a href="${v.puc.url}" target="_blank" rel="noopener">View PUC certificate</a>` : ''}
+          </div>` : ''}
         </article>`; })}</section>`}
     ${archived.length ? html`<p class="hint">${archived.length} archived vehicle${archived.length === 1 ? '' : 's'} hidden; their past purchases are kept.</p>` : ''}`;
 }
@@ -3842,6 +3935,21 @@ function vehicleForm() {
     ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
     <div class="field"><label for="v-name">Name</label><input id="v-name" name="name" value="${d.name || ''}" placeholder="For example Swift or Activa" autocomplete="off">${err('name')}</div>
     <fieldset class="seg seg4" aria-label="Type">${VEHICLE_TYPES.map((k) => html`<label><input type="radio" name="type" value="${k}" ${(d.type || 'car') === k ? 'checked' : ''}><span>${k === 'other' ? 'Other' : VEHICLE_TYPE_LABEL[k]}</span></label>`)}</fieldset>
+    <fieldset class="subform"><legend>Registration (RC)</legend>
+      <div class="two">
+        <div class="field"><label for="v-rc">Registration number</label><input id="v-rc" name="rcNumber" value="${d.rc?.number || ''}" placeholder="TS 09 AB 1234" autocomplete="off">${err('rc.number')}</div>
+        <div class="field"><label for="v-rc-valid">RC valid till (optional)</label><input id="v-rc-valid" name="rcValid" type="date" value="${d.rc?.validUntil || ''}">${err('rc.validUntil')}</div>
+      </div>
+      <div class="field"><label for="v-rc-url">RC document (Google Drive link)</label><input id="v-rc-url" name="rcUrl" value="${d.rc?.url || ''}" placeholder="https://drive.google.com/…" autocomplete="off">${err('rc.url')}</div>
+    </fieldset>
+    <fieldset class="subform"><legend>Pollution check (PUC)</legend>
+      <div class="two">
+        <div class="field"><label for="v-puc-last">Last PUC date</label><input id="v-puc-last" name="pucLast" type="date" value="${d.puc?.lastDate || ''}">${err('puc.lastDate')}</div>
+        <div class="field"><label for="v-puc-exp">PUC expiry</label><input id="v-puc-exp" name="pucExpiry" type="date" value="${d.puc?.expiryDate || ''}">${err('puc.expiryDate')}</div>
+      </div>
+      <div class="field"><label for="v-puc-url">PUC certificate (Google Drive link)</label><input id="v-puc-url" name="pucUrl" value="${d.puc?.url || ''}" placeholder="https://drive.google.com/…" autocomplete="off">${err('puc.url')}</div>
+      <p class="hint">The expiry date is printed on the certificate (usually 6 or 12 months after the check).</p>
+    </fieldset>
     <div class="field"><label for="v-notes">Notes (optional)</label><input id="v-notes" name="notes" value="${d.notes || ''}" autocomplete="off">${err('notes')}</div>
     <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save vehicle'}</button><button class="btn ghost" type="button" data-action="veh-cancel">Cancel</button>
       ${d.id ? html`<button class="btn ghost small danger-text push-right" type="button" data-action="veh-archive">Archive</button>` : ''}</div>
@@ -3851,7 +3959,8 @@ function vehicleForm() {
 async function saveVehicle(patch = {}) {
   if (state.busy || !state.db) return;
   const f = Object.fromEntries(new FormData(document.getElementById('veh-form')));
-  const draft = { ...state.vehicleDraft, name: f.name, type: f.type, notes: f.notes, ...patch };
+  const draft = { ...state.vehicleDraft, name: f.name, type: f.type, notes: f.notes,
+    rc: { number: f.rcNumber, validUntil: f.rcValid, url: f.rcUrl }, puc: { lastDate: f.pucLast, expiryDate: f.pucExpiry, url: f.pucUrl }, ...patch };
   const existing = draft.id ? vehicleById(draft.id) : null;
   const r = validateVehicle({ ...draft, id: draft.id || uuid() }, existing);
   if (!r.ok) { state.vehicleDraft = draft; state.vehicleErrors = r.errors; return render(); }
@@ -4043,6 +4152,8 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'mem-new') { state.memberDraft = {}; state.memberErrors = {}; render(); document.getElementById('m-name')?.focus(); }
   else if (a === 'mem-edit') { state.memberDraft = { ...state.family.find((m) => m.id === id) }; state.memberErrors = {}; render(); document.getElementById('m-name')?.focus(); }
   else if (a === 'mem-cancel') { state.memberDraft = null; state.memberErrors = {}; render(); }
+  else if (a === 'mem-add-doc') { state.memberDraft = readMemberForm(); state.memberDraft.documents = [...(state.memberDraft.documents || []), { type: ID_DOC_TYPES[0], number: '', url: '' }]; render(); document.querySelector('#mem-form .doc3:last-of-type input')?.focus(); }
+  else if (a === 'mem-rm-doc') { state.memberDraft = readMemberForm(); state.memberDraft.documents.splice(Number(t.dataset.i), 1); render(); }
   else if (a === 'mem-del') { state.memberConfirmDel = id; render(); }
   else if (a === 'mem-del-no') { state.memberConfirmDel = null; render(); }
   else if (a === 'mem-del-yes') deleteMember(id);

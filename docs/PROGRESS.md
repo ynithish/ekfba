@@ -79,8 +79,10 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Debts (29 Oct 2026): home, personal, hand and other loans in Others (after Subscriptions) with amount, start date, interest %, term, EMI (worked out if blank), optional "already paying" outstanding as on a date. Purchase form asks "Is this a loan repayment?" (EMI category or words like EMI, loan, repayment). Outstanding: reducing balance, interest accrued daily between logged repayments; hand loans = amount minus repayments. Shows % repaid, interest so far, EMIs left and end month; warns when earlier EMIs are missing
 - ✅ Family members (30 Oct 2026): Others → Family members (name, optional relation; add, edit, remove; rename updates policies). Insurance "Who is covered" is now tick boxes of family members with an inline "Add a family member"; card holder suggestions include family. Seeded with the 4 names from the policies
 - ✅ Others: "Reorder sections" mode with up/down arrows; order saved in `settings/others` (30 Oct 2026)
+- ✅ Vehicles: RC (registration number, valid till, Drive link) and PUC (last date, expiry, certificate link) with PUC status; vehicle shows insurance renewal from its Motor policy (30 Oct 2026)
+- ✅ Family members: documents per person (type: Aadhaar/PAN/Driving Licence/Passport/Voter ID/Other, number, Drive link); Aadhaar 12 digits and PAN format checked; numbers masked to last 4 in the list (30 Oct 2026)
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 65 unit tests; 166 page checks
+- Tests: 67 unit tests; 174 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)
