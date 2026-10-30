@@ -246,6 +246,17 @@ button.stat.good b { color: var(--ok); }
 .two.three { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 460px) { .two.three { grid-template-columns: 1fr 1fr; } .two.three > :last-child { grid-column: 1 / -1; } }
 .opt { color: var(--muted); font-weight: 400; }
+.people-pick { border: 0; padding: 0; margin: 0; }
+.people-pick legend { font-size: 13px; color: var(--muted); margin-bottom: 6px; padding: 0; }
+.chip-check { position: relative; }
+.chip-check input { position: absolute; opacity: 0; inset: 0; }
+.chip-check span { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; cursor: pointer; }
+.chip-check input:checked + span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip-check input:checked + span::before { content: '✓ '; white-space: pre; }
+.chip-check input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.add-member { display: flex; gap: 8px; margin-top: 8px; }
+.add-member input { flex: 1; min-width: 0; min-height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; }
+.fam-name { color: var(--ink); }
 .veh-row:has(.warn-note) { flex-wrap: wrap; }
 .warn-note { color: var(--soon); flex-basis: 100%; }
 .loan-out { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; flex: none; }
@@ -293,7 +304,8 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
   SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary,
-  validateLoan, emiFor, loanStatus, looksLoanRelated, LOAN_TYPES, LOAN_TYPE_LABEL } = __core;
+  validateLoan, emiFor, loanStatus, looksLoanRelated, LOAN_TYPES, LOAN_TYPE_LABEL,
+  validateMember, renameInPolicies, RELATIONS } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -307,10 +319,10 @@ const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank tr
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
 const state = {
-  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false }, db: null, canWrite: true,
+  tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], family: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false, family: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, memberDraft: null, memberErrors: {}, memberConfirmDel: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -670,7 +682,7 @@ function cardForm() {
   const e = state.formErrors || {};
   const err = (f) => (e[f] ? html`<span class="ferr" role="alert">${e[f]}</span>` : '');
   const opt = (v, cur, label = v) => html`<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
-  const names = [...new Set(state.cards.map((x) => x.holderName).filter(Boolean))].sort();
+  const names = [...new Set([...state.family.map((x) => x.name), ...state.cards.map((x) => x.holderName)].filter(Boolean))].sort();
   const rup = (p) => (p == null ? '' : String(p / 100));
   return html`<form class="panel" id="card-form" novalidate>
     <h2>${c.id ? 'Edit card' : 'New card'}</h2>
@@ -1284,6 +1296,7 @@ function othersView() {
     ${accordion('loans', 'Debts', loans.length ? html`<span class="sub-totals"><span><small>${loans.length} loan${loans.length === 1 ? '' : 's'} · outstanding</small><b class="num">${formatPaise(roundRupee(owed))}</b></span></span>` : 'None added', false, () => loansView(ps), !!state.loanDraft)}
     ${accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}` : 'None added', false, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft)}
     ${accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft)}
+    ${accordion('family', 'Family members', state.family.length ? state.family.map((m) => m.name).sort((a, b) => a.localeCompare(b)).join(', ') : 'None added', false, () => familyView(), !!state.memberDraft)}
     ${accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft)}`;
 }
 
@@ -1377,6 +1390,83 @@ async function saveLoan(patch = {}) {
     toast(r.loan.status === 'closed' ? `${r.loan.name} closed` : existing ? 'Loan updated' : `${r.loan.name} added`);
   } catch (e) { state.loanErrors = { _form: friendly(e) }; }
   state.busy = false; render();
+}
+
+/** Family members: the people policies cover and cards belong to. */
+function familyView() {
+  const list = [...state.family].sort((a, b) => (RELATIONS.indexOf(a.relation) + 1 || 99) - (RELATIONS.indexOf(b.relation) + 1 || 99) || a.name.localeCompare(b.name));
+  const uses = (n) => {
+    const lc = n.toLowerCase();
+    const pol = state.policies.filter((p) => peopleOf(p).some((x) => x.toLowerCase() === lc)).length;
+    const cards = state.cards.filter((c) => (c.holderName || '').toLowerCase() === lc).length;
+    return [pol ? `${pol} polic${pol === 1 ? 'y' : 'ies'}` : '', cards ? `${cards} card${cards === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  };
+  return html`${state.canWrite && !state.memberDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="mem-new">Add family member</button></div>` : ''}
+    ${state.memberDraft ? memberForm() : ''}
+    ${!list.length ? (state.memberDraft ? '' : html`<div class="empty"><p>Add the people in your family. They can then be ticked as covered on insurance policies and picked as card holders.</p></div>`)
+      : html`<ul class="pay-list fam-list">${list.map((m) => html`<li>
+        <span><b class="fam-name">${m.name}</b>${m.relation ? ` · ${m.relation}` : ''}${uses(m.name) ? ` · ${uses(m.name)}` : ''}</span>
+        ${state.canWrite ? (state.memberConfirmDel === m.id ? html`<span class="actions"><button class="btn danger small" data-action="mem-del-yes" data-id="${m.id}">Remove</button><button class="btn ghost small" data-action="mem-del-no">Keep</button></span>`
+          : html`<span class="actions"><button class="btn ghost small" data-action="mem-edit" data-id="${m.id}">Edit</button><button class="btn ghost small" data-action="mem-del" data-id="${m.id}" aria-label="Remove ${m.name}">✕</button></span>`) : ''}</li>`)}</ul>
+        <p class="hint">Removing someone here doesn't change policies that already list them. Renaming updates their policies too.</p>`}`;
+}
+
+function memberForm() {
+  const d = state.memberDraft, e = state.memberErrors;
+  return html`<form class="panel" id="mem-form" novalidate>
+    <h2>${d.id ? 'Edit family member' : 'Add family member'}</h2>
+    ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
+    <div class="two">
+      <div class="field"><label for="m-name">Name</label><input id="m-name" name="name" value="${d.name || ''}" autocomplete="off">${e.name ? html`<span class="ferr" role="alert">${e.name}</span>` : ''}</div>
+      <div class="field"><label for="m-rel">Relation (optional)</label><select id="m-rel" name="relation"><option value="">—</option>${RELATIONS.map((r) => html`<option ${d.relation === r ? 'selected' : ''}>${r}</option>`)}</select></div>
+    </div>
+    <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save'}</button><button class="btn ghost" type="button" data-action="mem-cancel">Cancel</button></div>
+  </form>`;
+}
+
+async function saveMember() {
+  if (state.busy || !state.db) return;
+  const f = Object.fromEntries(new FormData(document.getElementById('mem-form')));
+  const draft = { ...state.memberDraft, name: f.name, relation: f.relation };
+  const existing = draft.id ? state.family.find((m) => m.id === draft.id) : null;
+  const r = validateMember({ ...draft, id: draft.id || uuid() }, state.family, existing);
+  if (!r.ok) { state.memberDraft = draft; state.memberErrors = r.errors; return render(); }
+  state.busy = true; render();
+  try {
+    await state.db.collection('family').doc(r.member.id).set(r.member);
+    // A rename carries over to the policies that list the old name.
+    if (existing && existing.name !== r.member.name) {
+      for (const p of renameInPolicies(state.policies, existing.name, r.member.name)) await state.db.collection('policies').doc(p.id).set({ ...p, updatedAt: Date.now() });
+    }
+    state.memberDraft = null; state.memberErrors = {};
+    toast(existing ? 'Saved' : `${r.member.name} added`);
+  } catch (e) { state.memberErrors = { _form: friendly(e) }; }
+  state.busy = false; render();
+}
+
+async function addMemberFromPolicy() {
+  const inp = document.getElementById('p-new-member');
+  const name = inp?.value.trim().replace(/\s+/g, ' ');
+  if (!name || !state.db) return;
+  state.policyDraft = readPolicyForm();
+  const existing = state.family.find((m) => m.name.toLowerCase() === name.toLowerCase());
+  if (!existing) {
+    const r = validateMember({ name, id: uuid() }, state.family);
+    if (!r.ok) { state.policyErrors = { ...state.policyErrors, people: Object.values(r.errors)[0] }; return render(); }
+    try { await state.db.collection('family').doc(r.member.id).set(r.member); state.family = [...state.family.filter((m) => m.id !== r.member.id), r.member]; }
+    catch (e) { state.policyErrors = { ...state.policyErrors, people: friendly(e) }; return render(); }
+  }
+  const nm = existing ? existing.name : name;
+  if (!state.policyDraft.people.some((x) => x.toLowerCase() === nm.toLowerCase())) state.policyDraft.people.push(nm);
+  render();
+  document.getElementById('p-new-member')?.focus();
+}
+
+async function deleteMember(id) {
+  if (!state.db) return;
+  try { await state.db.collection('family').doc(id).delete(); state.memberConfirmDel = null; toast('Removed'); }
+  catch (e) { state.loadErr = friendly(e); }
+  render();
 }
 
 /** A collapsible Others section: header with a one-line summary; body only when open. */
@@ -1552,7 +1642,8 @@ function policyForm() {
   const types = [...new Set([...POLICY_TYPES, ...state.policies.map((x) => x.type).filter(Boolean)])];
   const isNewType = d.type === '__new__' || (d.type && !types.includes(d.type));
   const ppl = Array.isArray(d.people) ? d.people.join(', ') : (d.people || '');
-  const known = policyPeople(state.policies);
+  const chosen = Array.isArray(d.people) ? d.people : String(d.people || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const people = [...new Set([...state.family.map((m) => m.name), ...chosen])].sort((a, b) => a.localeCompare(b));
   const vs = activeVehicles(d.vehicleId);
   return html`<form class="panel" id="pol-form" novalidate>
     <h2>${d.id ? 'Edit policy' : 'New policy'}</h2>
@@ -1563,8 +1654,11 @@ function policyForm() {
     </div>
     <div class="field" id="p-newtype-f" ${isNewType ? '' : 'hidden'}><label for="p-newtype">New type name</label><input id="p-newtype" name="newType" value="${isNewType && d.type !== '__new__' ? d.type : ''}" placeholder="Pet, Gadget, Personal accident…" autocomplete="off"></div>
     <div class="field" id="p-vehicle-f" ${d.type === 'Motor' ? '' : 'hidden'}><label for="p-vehicle">Vehicle (optional)</label><select id="p-vehicle" name="vehicleId"><option value="">None</option>${vs.map((v) => html`<option value="${v.id}" ${v.id === d.vehicleId ? 'selected' : ''}>${v.name} · ${VEHICLE_TYPE_LABEL[v.type]}</option>`)}</select></div>
-    <div class="field"><label for="p-people">Who is covered</label><input id="p-people" name="people" value="${ppl}" placeholder="Names, separated by commas" autocomplete="off">
-      ${known.length ? html`<div class="chips small-chips">${known.map((n) => html`<button type="button" class="chip" data-action="pol-add-person" data-name="${n}">+ ${n}</button>`)}</div>` : ''}</div>
+    <fieldset class="field people-pick"><legend>Who is covered</legend>
+      <div class="chips">${people.map((n) => html`<label class="chip-check"><input type="checkbox" name="person" value="${n}" ${chosen.some((x) => x.toLowerCase() === n.toLowerCase()) ? 'checked' : ''}><span>${n}</span></label>`)}</div>
+      <div class="add-member"><input id="p-new-member" placeholder="Add a family member" aria-label="New family member's name" autocomplete="off"><button type="button" class="btn ghost small" data-action="pol-add-member">Add</button></div>
+      ${err('people')}
+      <p class="hint">New names are also saved to Family members (Others).</p></fieldset>
     <div class="two">
       <div class="field"><label for="p-date">Renewal date</label><input id="p-date" name="renewalDate" type="date" value="${d.renewalDate || ''}">${err('renewalDate')}</div>
       <div class="field"><label for="p-coverage">Coverage (optional)</label><input id="p-coverage" name="coverage" value="${d.coverage || ''}" placeholder="Family floater, sum insured, add-ons…" autocomplete="off">${err('coverage')}</div>
@@ -1587,7 +1681,8 @@ function readPolicyForm() {
   const f = Object.fromEntries(new FormData(document.getElementById('pol-form')));
   const docs = (state.policyDraft.documents || []).map((_, i) => ({ kind: f['dkind' + i], label: f['dlabel' + i], url: f['durl' + i] }));
   const type = f.type === '__new__' ? String(f.newType || '').trim() || '__new__' : f.type;
-  return { ...state.policyDraft, insurer: f.insurer, type, people: f.people, renewalDate: f.renewalDate, coverage: f.coverage, comments: f.comments,
+  const people = new FormData(document.getElementById('pol-form')).getAll('person');
+  return { ...state.policyDraft, insurer: f.insurer, type, people, renewalDate: f.renewalDate, coverage: f.coverage, comments: f.comments,
     vehicleId: type === 'Motor' ? (f.vehicleId || null) : null, documents: docs };
 }
 
@@ -1700,6 +1795,7 @@ function afterRender() {
     if (cat && sel && sel.value !== cat) { sel.value = cat; sel.classList.add('auto-filled'); setTimeout(() => sel.classList.remove('auto-filled'), 1200); }
   };
   shop?.addEventListener('change', pickCategory);
+  document.getElementById('p-new-member')?.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); addMemberFromPolicy(); } });
   const bCard = document.getElementById('b-card');
   bCard?.addEventListener('change', () => { const amt = document.getElementById('b-amount'); const due = dueNow(bCard.value); if (amt && !amt.dataset.touched) amt.value = due ? String(due / 100) : ''; });
   document.getElementById('b-amount')?.addEventListener('input', (ev) => { ev.target.dataset.touched = '1'; });
@@ -1842,6 +1938,12 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'log-delete-no') { state.logConfirmDelete = false; render(); }
   else if (a === 'log-delete') deletePurchase();
   else if (a === 'log-save-anyway') savePurchase(true);
+  else if (a === 'mem-new') { state.memberDraft = {}; state.memberErrors = {}; render(); document.getElementById('m-name')?.focus(); }
+  else if (a === 'mem-edit') { state.memberDraft = { ...state.family.find((m) => m.id === id) }; state.memberErrors = {}; render(); document.getElementById('m-name')?.focus(); }
+  else if (a === 'mem-cancel') { state.memberDraft = null; state.memberErrors = {}; render(); }
+  else if (a === 'mem-del') { state.memberConfirmDel = id; render(); }
+  else if (a === 'mem-del-no') { state.memberConfirmDel = null; render(); }
+  else if (a === 'mem-del-yes') deleteMember(id);
   else if (a === 'loan-new') { state.loanDraft = { type: 'home' }; state.loanErrors = {}; render(); document.getElementById('loan-form')?.scrollIntoView({ block: 'start' }); document.getElementById('n-name')?.focus(); }
   else if (a === 'loan-edit') { state.loanDraft = { ...loanById(id) }; state.loanErrors = {}; render(); document.getElementById('loan-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'loan-cancel') { state.loanDraft = null; state.loanErrors = {}; render(); }
@@ -1885,12 +1987,7 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'pol-del-yes') deletePolicy(id);
   else if (a === 'pol-add-doc') { state.policyDraft = readPolicyForm(); state.policyDraft.documents.push({ kind: DOC_KINDS[0], label: '', url: '' }); render(); }
   else if (a === 'pol-rm-doc') { state.policyDraft = readPolicyForm(); state.policyDraft.documents.splice(Number(t.dataset.i), 1); render(); }
-  else if (a === 'pol-add-person') {
-    const inp = document.getElementById('p-people'); const n = t.dataset.name;
-    const cur = inp.value.split(',').map((x) => x.trim()).filter(Boolean);
-    if (!cur.some((x) => x.toLowerCase() === n.toLowerCase())) inp.value = [...cur, n].join(', ');
-    inp.focus();
-  }
+  else if (a === 'pol-add-member') addMemberFromPolicy();
   else if (a === 'veh-new') { state.vehicleDraft = { type: 'car' }; state.vehicleErrors = {}; render(); document.getElementById('veh-form')?.scrollIntoView({ block: 'center' }); document.getElementById('v-name')?.focus(); }
   else if (a === 'veh-edit') { state.vehicleDraft = { ...vehicleById(id) }; state.vehicleErrors = {}; render(); document.getElementById('veh-form')?.scrollIntoView({ block: 'center' }); }
   else if (a === 'veh-cancel') { state.vehicleDraft = null; state.vehicleErrors = {}; render(); }
@@ -1918,6 +2015,7 @@ $app.addEventListener('submit', async (ev) => {
   if (ev.target.id === 'app-form') { ev.preventDefault(); saveAppliance(); return; }
   if (ev.target.id === 'pay-form') { ev.preventDefault(); savePayment(); return; }
   if (ev.target.id === 'loan-form') { ev.preventDefault(); saveLoan(); return; }
+  if (ev.target.id === 'mem-form') { ev.preventDefault(); saveMember(); return; }
   if (ev.target.id !== 'card-form') return;
   ev.preventDefault();
   if (state.busy) return;
@@ -1952,17 +2050,17 @@ function safeRender() {
   if (state.askResult && state.askText) { const wallet = state.cards.filter((c) => c.status === 'active').map((c) => ({ card: c, pack: activePack(c.id)?.pack || null })); const q = state.askResult.query; state.askResult = state.askResult.needs ? state.askResult : recommend(wallet, q, today()); }
   const f = document.activeElement;
   if (f && f.id === 'p-search') return renderKeepingSearch();
-  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.closest('#app-form') || f.closest('#pay-form') || f.closest('#loan-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
+  if (f && f.closest && (f.closest('#card-form') || f.closest('#log-form') || f.closest('#veh-form') || f.closest('#pol-form') || f.closest('#app-form') || f.closest('#pay-form') || f.closest('#loan-form') || f.closest('#mem-form') || f.id === 'pack-text' || f.id === 'ask-q')) return;
   render();
 }
 
 render();
 
 (async () => {
-  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true, loans: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
+  if (!window.claude || !window.claude.use) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true, loans: true, family: true }; state.loadErr = 'Saving is not available in this view.'; return render(); }
   const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
   if (user) { try { const w = await user.can('data.write'); state.canWrite = w !== false; } catch (e) {} }
-  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true, loans: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
+  if (!db) { state.ready = { cards: true, rulePacks: true, months: true, vehicles: true, policies: true, appliances: true, billPayments: true, loans: true, family: true }; state.loadErr = 'Sign in to claude.ai to see and save your cards.'; return render(); }
   state.db = db;
   render();
   db.collection('cards').onSnapshot((snap) => {
@@ -1976,6 +2074,11 @@ render();
     state.ready.rulePacks = true;
     safeRender();
   }, () => { state.ready.rulePacks = true; });
+  db.collection('family').onSnapshot((snap) => {
+    state.family = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    state.ready.family = true;
+    safeRender();
+  }, () => { state.ready.family = true; });
   db.collection('loans').onSnapshot((snap) => {
     state.loans = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     state.ready.loans = true;

@@ -77,8 +77,9 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Others layout (22 Oct 2026): Subscriptions on top with "Paid in <month>" and "Due by <month end>" (~, orange when it includes a non-monthly payment); Vehicles, Appliances & devices and Insurances are collapsible sections with a one-line summary
 - ✅ Credit card bill payments (29 Oct 2026): record a payment (card, amount prefilled with what's due, date, paid from, note) from Spends or the card's Bills; payments after a bill date pay that bill first, extra goes to the next bill; Payment Date shows what's left with "(₹X paid)", a paid bill shows ✓; payments are not counted as spend; list and delete on the card
 - ✅ Debts (29 Oct 2026): home, personal, hand and other loans in Others (after Subscriptions) with amount, start date, interest %, term, EMI (worked out if blank), optional "already paying" outstanding as on a date. Purchase form asks "Is this a loan repayment?" (EMI category or words like EMI, loan, repayment). Outstanding: reducing balance, interest accrued daily between logged repayments; hand loans = amount minus repayments. Shows % repaid, interest so far, EMIs left and end month; warns when earlier EMIs are missing
+- ✅ Family members (30 Oct 2026): Others → Family members (name, optional relation; add, edit, remove; rename updates policies). Insurance "Who is covered" is now tick boxes of family members with an inline "Add a family member"; card holder suggestions include family. Seeded with the 4 names from the policies
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 64 unit tests; 153 page checks
+- Tests: 65 unit tests; 160 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)
