@@ -267,6 +267,10 @@ details.opening summary { cursor: pointer; color: var(--accent); font-size: 14px
 .pay-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .pay-list li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px 6px 12px; font-size: 14px; }
 .pay-list li > span:first-child { flex: 1; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.reorder-bar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: -6px; }
+.acc.reordering .acc-head { grid-template-columns: 1fr auto; cursor: default; }
+.move-btns { display: flex; gap: 6px; }
+.move-btns .btn { min-width: 44px; font-size: 18px; }
 .acc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .acc-head { width: 100%; display: grid; grid-template-columns: 1fr auto 20px; align-items: center; gap: 10px; padding: 14px 16px; background: none; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; min-height: 56px; }
 .acc-title { font-family: var(--display); font-weight: 700; font-size: 17px; }
@@ -2374,7 +2378,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], family: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false, family: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, memberDraft: null, memberErrors: {}, memberConfirmDel: null, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -3344,12 +3348,17 @@ function othersView() {
     </span>`;
   const loans = activeLoans();
   const owed = loans.reduce((a, l) => a + loanStatus(l, ps, t).outstandingPaise, 0);
-  return html`${accordion('subs', 'Subscriptions', subTotals, false, () => subscriptionsView(ps))}
-    ${accordion('loans', 'Debts', loans.length ? html`<span class="sub-totals"><span><small>${loans.length} loan${loans.length === 1 ? '' : 's'} · outstanding</small><b class="num">${formatPaise(roundRupee(owed))}</b></span></span>` : 'None added', false, () => loansView(ps), !!state.loanDraft)}
-    ${accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}` : 'None added', false, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft)}
-    ${accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft)}
-    ${accordion('family', 'Family members', state.family.length ? state.family.map((m) => m.name).sort((a, b) => a.localeCompare(b)).join(', ') : 'None added', false, () => familyView(), !!state.memberDraft)}
-    ${accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft)}`;
+  const sections = {
+    subs: () => accordion('subs', 'Subscriptions', subTotals, false, () => subscriptionsView(ps)),
+    loans: () => accordion('loans', 'Debts', loans.length ? html`<span class="sub-totals"><span><small>${loans.length} loan${loans.length === 1 ? '' : 's'} · outstanding</small><b class="num">${formatPaise(roundRupee(owed))}</b></span></span>` : 'None added', false, () => loansView(ps), !!state.loanDraft),
+    vehicles: () => accordion('vehicles', 'Vehicles', vs.length ? `${plural(vs.length, 'vehicle', 'vehicles')} · ${formatPaise(vSpend)} ${periodName}` : 'None added', false, () => vehiclesView(ps, range, periodName), !!state.vehicleDraft),
+    appliances: () => accordion('appliances', 'Appliances & devices', items.length ? `${plural(items.length, 'item', 'items')}${amcSoon ? ` · ${plural(amcSoon, 'AMC', 'AMCs')} due soon` : ''}` : 'None added', amcSoon > 0, () => appliancesView(ps, range, periodName), !!state.applianceDraft),
+    family: () => accordion('family', 'Family members', state.family.length ? state.family.map((m) => m.name).sort((a, b) => a.localeCompare(b)).join(', ') : 'None added', false, () => familyView(), !!state.memberDraft),
+    policies: () => accordion('policies', 'Insurances', pols.length ? `${plural(pols.length, 'policy', 'policies')}${polSoon ? ` · ${polSoon} renew${polSoon === 1 ? 's' : ''} soon` : ''}` : 'None added', polSoon > 0, () => policiesView(), !!state.policyDraft),
+  };
+  const order = othersOrder();
+  return html`<div class="reorder-bar">${state.reordering ? html`<span class="meta">Use the arrows to move sections.</span><button class="btn small" data-action="reorder-done">Done</button>` : html`<button class="btn ghost small" data-action="reorder">Reorder sections</button>`}</div>
+    ${order.map((k, i) => sections[k](i, order.length))}`;
 }
 
 const roundRupee = (p) => Math.round(p / 100) * 100;
@@ -3522,7 +3531,38 @@ async function deleteMember(id) {
 }
 
 /** A collapsible Others section: header with a one-line summary; body only when open. */
+const OTHERS_SECTIONS = ['subs', 'loans', 'vehicles', 'appliances', 'family', 'policies'];
+const OTHERS_TITLE = { subs: 'Subscriptions', loans: 'Debts', vehicles: 'Vehicles', appliances: 'Appliances & devices', family: 'Family members', policies: 'Insurances' };
+/** The saved section order, with any section it doesn't know about added at the end. */
+function othersOrder() {
+  const saved = (state.othersOrder || []).filter((k) => OTHERS_SECTIONS.includes(k));
+  return [...new Set([...saved, ...OTHERS_SECTIONS])];
+}
+async function moveSection(key, dir) {
+  const order = othersOrder();
+  const i = order.indexOf(key), j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  state.othersOrder = order; render();
+  document.querySelector(`[data-action=move-sec][data-k="${key}"][data-dir="${dir}"]`)?.focus();
+  try { if (state.db) await state.db.collection('settings').doc('others').set({ order, updatedAt: Date.now() }); }
+  catch (e) { toast('Could not save the new order.'); }
+}
+
+/** A collapsible Others section: header with a one-line summary; body only when open. In reorder mode, up/down arrows instead. */
 function accordion(key, title, summary, attention, body, forceOpen) {
+  const order = othersOrder();
+  const i = order.indexOf(key);
+  if (state.reordering) {
+    return html`<section class="acc reordering">
+      <div class="acc-head" id="${key}-h">
+        <span class="acc-title">${title}</span>
+        <span class="move-btns">
+          <button class="btn ghost small" data-action="move-sec" data-k="${key}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move ${title} up">↑</button>
+          <button class="btn ghost small" data-action="move-sec" data-k="${key}" data-dir="1" ${i === order.length - 1 ? 'disabled' : ''} aria-label="Move ${title} down">↓</button>
+        </span>
+      </div></section>`;
+  }
   const open = forceOpen || !!state.othersOpen[key];
   return html`<section class="acc ${open ? 'open' : ''}">
     <button class="acc-head" id="${key}-h" data-action="acc" data-k="${key}" aria-expanded="${open}">
@@ -4016,6 +4056,9 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'pay-del') { state.payConfirmDel = id; render(); }
   else if (a === 'pay-del-no') { state.payConfirmDel = null; render(); }
   else if (a === 'pay-del-yes') deletePayment(id);
+  else if (a === 'reorder') { state.reordering = true; render(); }
+  else if (a === 'reorder-done') { state.reordering = false; render(); }
+  else if (a === 'move-sec') moveSection(t.dataset.k, Number(t.dataset.dir));
   else if (a === 'acc') { const k = t.dataset.k; state.othersOpen = { ...state.othersOpen, [k]: !state.othersOpen[k] }; render(); }
   else if (a === 'app-new') { state.applianceDraft = { type: 'Mobile' }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); document.getElementById('a-name')?.focus(); }
   else if (a === 'app-edit') { state.applianceDraft = { ...applianceById(id) }; state.applianceErrors = {}; render(); document.getElementById('app-form')?.scrollIntoView({ block: 'start' }); }
@@ -4126,6 +4169,11 @@ render();
     state.ready.rulePacks = true;
     safeRender();
   }, () => { state.ready.rulePacks = true; });
+  db.collection('settings').onSnapshot((snap) => {
+    const o = snap.docs.find((d) => d.id === 'others');
+    if (o && Array.isArray(o.data().order)) state.othersOrder = o.data().order;
+    safeRender();
+  }, () => {});
   db.collection('family').onSnapshot((snap) => {
     state.family = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     state.ready.family = true;

@@ -467,6 +467,20 @@ def main():
         page.wait_for_function("() => !Object.values(window.__store.family).some(m => m.name === 'Adhyasree')", timeout=3000)
         check('member removed', 'Adhyasree' not in page.inner_text('#family-h'))
         page.screenshot(path=str(SHOTS / 'a8-others.png'), full_page=True)
+        # Reorder sections
+        order0 = [h.get_attribute('id') for h in page.locator('.acc-head').element_handles()]
+        check('default order starts with Subscriptions', order0[0] == 'subs-h')
+        page.click('[data-action=reorder]')
+        check('reorder mode shows arrows, first up disabled', page.locator('[data-action=move-sec]').count() == 12 and page.locator('#subs-h [data-dir="-1"]').is_disabled())
+        page.click('#policies-h [data-dir="-1"]'); page.click('#policies-h [data-dir="-1"]'); page.click('#policies-h [data-dir="-1"]'); page.click('#policies-h [data-dir="-1"]'); page.click('#policies-h [data-dir="-1"]')
+        page.screenshot(path=str(SHOTS / 'a10-reorder.png'))
+        page.click('[data-action=reorder-done]')
+        order1 = [h.get_attribute('id') for h in page.locator('.acc-head').element_handles()]
+        check('Insurances moved to the top', order1[0] == 'policies-h' and order1[1] == 'subs-h')
+        page.wait_for_function("() => (window.__store.settings || {}).others && window.__store.settings.others.order[0] === 'policies'", timeout=3000)
+        check('order saved', page.evaluate("() => window.__store.settings.others.order.length") == 6)
+        page.click('[data-tab=spends]'); page.click('[data-tab=others]')
+        check('order kept when coming back to Others', page.locator('.acc-head').first.get_attribute('id') == 'policies-h')
         page.click('[data-tab=spends]')
         page.screenshot(path=str(SHOTS / 'a6-spends.png'), full_page=True)
         page.click('[data-tab=ask]')
