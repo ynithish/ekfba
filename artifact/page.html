@@ -326,7 +326,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], family: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false, family: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyPerson: 'All', policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -1634,16 +1634,13 @@ function subscriptionsView(ps) {
 function policiesView() {
   const t = today();
   const all = sortPolicies(state.policies);
-  const people = policyPeople(all);
-  const who = people.includes(state.policyPerson) ? state.policyPerson : 'All';
-  const shown = who === 'All' ? all : all.filter((x) => peopleOf(x).includes(who));
+  const shown = all;
   const daysTo = (x) => (x.renewalDate ? daysBetween(t, x.renewalDate) : null);
   const soon = all.filter((x) => { const d = daysTo(x); return d !== null && d >= 0 && d <= 60; }).length;
   const overdue = all.filter((x) => { const d = daysTo(x); return d !== null && d < 0; }).length;
   return html`${state.canWrite && !state.policyDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="pol-new">Add policy</button></div>` : ''}
     ${state.policyDraft ? policyForm() : ''}
     ${all.length ? html`<p class="meta">${all.length} polic${all.length === 1 ? 'y' : 'ies'} · ${soon} renew${soon === 1 ? 's' : ''} in 60 days${overdue ? ` · ${overdue} overdue` : ''}</p>` : ''}
-    ${people.length > 1 ? html`<div class="chips" role="group" aria-label="Filter by person">${['All', ...people].map((n) => html`<button class="chip" data-action="pol-person" data-name="${n}" aria-pressed="${who === n}">${n}</button>`)}</div>` : ''}
     ${!state.ready.policies ? html`<div class="empty"><p>Loading policies…</p></div>`
       : !all.length ? (state.policyDraft ? '' : html`<div class="empty"><p>Add the insurer, type, who is covered and the renewal date. Status colours and calendar reminders follow from that.</p></div>`)
       : html`<section class="list" aria-label="Insurances">${shown.map((x) => policyRow(x, t))}</section>`}
@@ -2024,7 +2021,6 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'pol-edit') { const x = state.policies.find((p) => p.id === id); state.policyDraft = { ...x, people: peopleOf(x), documents: (x.documents || []).map((d) => ({ ...d })) }; state.policyErrors = {}; render(); document.getElementById('pol-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'pol-cancel') { state.policyDraft = null; state.policyErrors = {}; render(); }
   else if (a === 'pol-toggle') { state.policyOpen = state.policyOpen === id ? null : id; state.policyConfirmDel = null; render(); }
-  else if (a === 'pol-person') { state.policyPerson = t.dataset.name; render(); }
   else if (a === 'pol-del') { state.policyConfirmDel = id; render(); }
   else if (a === 'pol-del-no') { state.policyConfirmDel = null; render(); }
   else if (a === 'pol-del-yes') deletePolicy(id);
