@@ -207,6 +207,8 @@ button.stat.good b { color: var(--ok); }
 .daily { gap: 8px; }
 .day-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; }
 .day-stats b { font-weight: 600; }
+.link-btn.emi-line { font-size: 13px; color: var(--muted); text-decoration: none; text-align: left; margin-top: 4px; }
+.link-btn.emi-line b { color: var(--ink); }
 .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .days { display: flex; align-items: flex-end; gap: 2px; height: 96px; }
 .day { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; background: none; border: 0; padding: 0; cursor: pointer; }
@@ -2440,7 +2442,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], family: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false, family: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, spendEmi: false, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -3303,11 +3305,17 @@ function dailyView(daily, range, t) {
 const squash = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 function shopMatches(p, q) { const n = squash(q); return !n || squash(p.merchant).includes(n); }
 
+/** EMI and loan repayments: the EMI category, or a purchase linked to a loan. */
+const isEmiPayment = (p) => p.category === 'emi' || !!p.loanId;
+
 function spendsView() {
   const t = today();
   const range = periodContaining(state.spendPeriod === 'month' ? 'calendar_month' : state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year', t);
   const ps = allPurchases();
-  const tot = totals(ps, range.start, range.end);
+  // EMI and loan repayments are tracked separately: kept out of the spend totals, by card/category and the daily graph.
+  const spendOnly = ps.filter((p) => !isEmiPayment(p));
+  const tot = totals(spendOnly, range.start, range.end);
+  const emiTot = totals(ps.filter(isEmiPayment), range.start, range.end);
   const active = state.cards.filter((c) => c.status === 'active');
   // Highest spend first; cards with no spend in the period follow, alphabetically.
   const cardsShown = [...active, ...state.cards.filter((c) => c.status !== 'active' && tot.byCard[c.id])]
@@ -3315,10 +3323,10 @@ function spendsView() {
   const maxCard = Math.max(1, ...cardsShown.map((c) => tot.byCard[c.id] || 0));
   const cats = Object.entries(tot.byCategory).sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...cats.map((c) => c[1]));
-  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery) && (!state.spendVehicle || p.vehicleId === state.spendVehicle) && (!state.spendAppliance || p.applianceId === state.spendAppliance) && (!state.spendLoan || p.loanId === state.spendLoan));
-  const daily = dailySpend(ps, range.start, range.end, t);
+  const list = ps.filter((p) => p.date >= range.start && p.date <= range.end && (!state.spendCard || p.cardId === state.spendCard) && (!state.spendCategory || p.category === state.spendCategory) && (!state.spendDay || p.date === state.spendDay) && shopMatches(p, state.spendQuery) && (!state.spendVehicle || p.vehicleId === state.spendVehicle) && (!state.spendAppliance || p.applianceId === state.spendAppliance) && (!state.spendLoan || p.loanId === state.spendLoan) && (!state.spendEmi || isEmiPayment(p)));
+  const daily = dailySpend(spendOnly, range.start, range.end, t);
   const dayTotals = {};
-  for (const p of list) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
+  for (const p of list) if (!isEmiPayment(p)) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
   const periodName = { month: new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)}`, year: String(t.slice(0, 4)) }[state.spendPeriod];
   const pct = (v) => (tot.totalPaise ? Math.round((v * 100) / tot.totalPaise) : 0);
 
@@ -3347,6 +3355,7 @@ function spendsView() {
       <div class="meta">${periodName}</div>
       <div class="total-n num">${formatPaise(tot.totalPaise)}</div>
       <div class="meta">${tot.count} purchase${tot.count === 1 ? '' : 's'}${tot.pendingPaise ? ` · ${formatPaise(tot.pendingPaise)} pending` : ''}</div>
+      ${emiTot.totalPaise ? html`<button class="link-btn emi-line" data-action="spend-emi" aria-pressed="${state.spendEmi}">Excluding EMI payments: <b class="num">${formatPaise(emiTot.totalPaise)}</b></button>` : ''}
     </section>
     ${dailyView(daily, range, t)}
     <h2>By card</h2>
@@ -3365,7 +3374,8 @@ function spendsView() {
     <h2 id="purchases-h">Purchases</h2>
     ${ps.length ? html`<div class="p-search"><input id="p-search" type="search" placeholder="Search by shop or outlet" aria-label="Search purchases by shop or outlet" value="${state.spendQuery}" list="p-shops" autocomplete="off" enterkeyhint="search">
       <datalist id="p-shops">${[...new Set(ps.filter((p) => p.date >= range.start && p.date <= range.end).map((p) => formatShopName(p.merchant)))].sort().map((n) => html`<option value="${n}">`)}</datalist></div>` : ''}
-    ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendAppliance || state.spendLoan || state.spendQuery.trim() ? html`<div class="chips filters">
+    ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendAppliance || state.spendLoan || state.spendEmi || state.spendQuery.trim() ? html`<div class="chips filters">
+      ${state.spendEmi ? html`<button class="chip" aria-pressed="true" data-action="spend-emi">EMI payments ✕</button>` : ''}
       ${state.spendLoan ? html`<button class="chip" aria-pressed="true" data-action="spend-loan" data-id="${state.spendLoan}">${loanById(state.spendLoan)?.name || 'Loan'} ✕</button>` : ''}
       ${state.spendAppliance ? html`<button class="chip" aria-pressed="true" data-action="spend-appliance" data-id="${state.spendAppliance}">${applianceById(state.spendAppliance)?.name || 'Appliance'} ✕</button>` : ''}
       ${state.spendVehicle ? html`<button class="chip" aria-pressed="true" data-action="spend-vehicle" data-id="${state.spendVehicle}">${vehicleById(state.spendVehicle)?.name || 'Vehicle'} ✕</button>` : ''}
@@ -4157,6 +4167,7 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'mem-del') { state.memberConfirmDel = id; render(); }
   else if (a === 'mem-del-no') { state.memberConfirmDel = null; render(); }
   else if (a === 'mem-del-yes') deleteMember(id);
+  else if (a === 'spend-emi') { state.spendEmi = !state.spendEmi; state.purchaseLimit = 10; render(); if (state.spendEmi) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'loan-new') { state.loanDraft = { type: 'home' }; state.loanErrors = {}; render(); document.getElementById('loan-form')?.scrollIntoView({ block: 'start' }); document.getElementById('n-name')?.focus(); }
   else if (a === 'loan-edit') { state.loanDraft = { ...loanById(id) }; state.loanErrors = {}; render(); document.getElementById('loan-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'loan-cancel') { state.loanDraft = null; state.loanErrors = {}; render(); }
