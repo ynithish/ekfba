@@ -2530,6 +2530,14 @@ const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank o
 const STATUS_LABEL = { active: 'Active', deactivated: 'Deactivated', replaced: 'Replaced', archived: 'Archived' };
 const PERIOD_LABEL = { transaction: 'per transaction', statement_cycle: 'per statement cycle', calendar_month: 'per month',
   calendar_quarter: 'per quarter', calendar_year: 'per calendar year', card_year: 'per card year' };
+// Categories not offered when logging a purchase (owner's choice, 2 Nov 2026). They stay in the rule vocabulary,
+// so card rules and Ask keep working; a shop that maps to one of them is logged under the replacement instead.
+const HIDDEN_CATS = { rent: 'other', flights: 'travel', hotels: 'travel', international: 'travel', department_store: 'other', wallet_load: 'other', jewellery: 'other', government: 'other', cash_withdrawal: 'other' };
+/** Categories for the purchase dropdown: alphabetical, Other last; a hidden one only if the purchase already uses it. */
+function purchaseCategories(keep) {
+  return CATEGORIES.filter((c) => !HIDDEN_CATS[c] || c === keep)
+    .sort((a, b) => (a === 'other') - (b === 'other') || CAT_LABEL[a].localeCompare(CAT_LABEL[b]));
+}
 const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c === 'emi' ? 'EMI' : c.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')]));
 const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank transfer / Other' };
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
@@ -2972,7 +2980,7 @@ function askView() {
       <p class="hint">Type a shop, outlet or app name, with or without the amount. Recommendations use the rules saved on your cards; offers are labelled when they may be out of date.</p>`;
   }
   if (r.needs) {
-    const cats = ['grocery', 'dining', 'food_delivery', 'fuel', 'electronics', 'apparel', 'online_shopping', 'travel', 'flights', 'hotels', 'utilities', 'telecom', 'healthcare', 'entertainment', 'jewellery', 'rent', 'insurance', 'education', 'other'];
+    const cats = purchaseCategories().filter((c) => !['emi', 'tax'].includes(c));
     return html`${out}<section class="panel"><h2>What kind of spend is ${r.query.merchantGuess ? '“' + r.query.merchantGuess + '”' : 'this'}?</h2>
       <p class="hint">I don't know this shop yet. Pick the closest type and I'll compare your cards.</p>
       <div class="chips">${cats.map((c) => html`<button class="chip" data-action="ask-cat" data-cat="${c}">${CAT_LABEL[c] || c}</button>`)}</div></section>`;
@@ -3060,8 +3068,7 @@ function logForm() {
   const cards = state.cards.filter((c) => c.status === 'active' || c.id === d.cardId);
   const known = [...new Set([...allPurchases().map((p) => formatShopName(p.merchant)), ...MERCHANTS.map((m) => m.name)])].slice(0, 400);
   const rup = (p) => (p == null ? '' : String(p / 100));
-  const cats = CATEGORIES.filter((c) => c !== 'cash_withdrawal' || c === d.category)
-    .sort((a, b) => CAT_LABEL[a].localeCompare(CAT_LABEL[b]));
+  const cats = purchaseCategories(d.category);
   return html`<form class="panel" id="log-form" novalidate>
     <h2>${d.id ? 'Edit purchase' : 'Log purchase'}</h2>
     ${state.logDup ? html`<div class="box warn"><strong>This looks already logged.</strong> ${state.logDup.length === 1 ? 'A purchase' : `${state.logDup.length} purchases`} with the same date, card, amount and shop exist${state.logDup.length === 1 ? 's' : ''}.
@@ -3287,9 +3294,9 @@ function categoryForShop(raw) {
   const name = formatShopName(raw);
   if (!name) return null;
   const mine = allPurchases().find((p) => formatShopName(p.merchant) === name);
-  if (mine) return mine.category;
+  if (mine) return HIDDEN_CATS[mine.category] && mine.category !== 'cash_withdrawal' ? HIDDEN_CATS[mine.category] : mine.category;
   const m = MERCHANTS.find((x) => x.name === name);
-  return m ? m.categories[0] : null;
+  return m ? (HIDDEN_CATS[m.categories[0]] || m.categories[0]) : null;
 }
 
 function readLogForm() {
