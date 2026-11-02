@@ -281,7 +281,7 @@ details.opening summary { cursor: pointer; color: var(--accent); font-size: 14px
 .pay-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .pay-list li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px 6px 12px; font-size: 14px; }
 .pay-list li > span:first-child { flex: 1; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
-.plan-list li { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 4px 10px; padding: 10px 12px; }
+.plan-list li { display: grid; grid-template-columns: minmax(56px, auto) 1fr auto; align-items: center; gap: 4px 10px; padding: 10px 12px; }
 .plan-list li.overdue { border-color: var(--urgent); }
 .plan-date { color: var(--muted); font-size: 13px; }
 .plan-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; color: var(--ink); }
@@ -3575,23 +3575,40 @@ function forecastItems(ym) {
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
 }
 
+const FORECAST_MONTHS = 4; // this month + next 3; anything after shows under "Later"
+
+/** After the month window: the next date of each planned payment, insurance and AMC renewal, and PUC expiry. */
+function forecastLater(afterYm) {
+  const after = monthBounds(afterYm).end;
+  const nextAfter = (first, spec) => { let d = first, g = 0; while (d && d <= after && spec && g++ < 800) d = nextDueDate(d, spec); return d && d > after ? d : null; };
+  const out = [];
+  for (const p of state.planned.filter((x) => x.status !== 'done')) { const d = nextAfter(p.dueDate, p.repeat); if (d) out.push({ date: d, label: p.name, kind: 'Planned', amountPaise: p.amountPaise || null, plannedId: p.id, repeat: p.repeat }); }
+  for (const x of state.policies) { const d = nextAfter(x.renewalDate, { every: 'yearly' }); if (d) out.push({ date: d, label: `${x.insurer} (${x.type})`, kind: 'Insurance', amountPaise: x.premiumPaise || null }); }
+  for (const a of activeAppliances().filter((a) => a.amc?.endDate)) { const d = nextAfter(a.amc.endDate, { every: 'yearly' }); if (d) out.push({ date: d, label: `${a.name} AMC`, kind: 'AMC', amountPaise: a.amc.amountPaise || null }); }
+  for (const v of activeVehicles().filter((v) => v.puc?.expiryDate && v.puc.expiryDate > after)) out.push({ date: v.puc.expiryDate, label: `${v.name} PUC`, kind: 'PUC', amountPaise: null });
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
+}
+
 function plannedView() {
   const t = today();
-  const months = [0, 1, 2].map((n) => addMonths(t.slice(0, 7), n));
-  const ym = months[state.forecastOffset] || months[0];
-  const items = forecastItems(ym);
+  const months = Array.from({ length: FORECAST_MONTHS }, (_, n) => addMonths(t.slice(0, 7), n));
+  const later = state.forecastOffset === FORECAST_MONTHS;
+  const ym = later ? null : (months[state.forecastOffset] || months[0]);
+  const items = later ? forecastLater(months[months.length - 1]) : forecastItems(ym);
   const ft = forecastTotals(items);
+  const when = later ? `after ${monthLabel(months[months.length - 1])}` : `in ${monthLabel(ym)}`;
   return html`${state.canWrite && !state.plannedDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="plan-new">Add upcoming payment</button></div>` : ''}
     ${state.plannedDraft ? plannedForm() : ''}
-    <div class="chips" role="group" aria-label="Month">${months.map((m, i) => html`<button class="chip" data-action="plan-month" data-i="${i}" aria-pressed="${m === ym}">${monthLabel(m, true)}</button>`)}</div>
+    <div class="chips" role="group" aria-label="Month">${months.map((m, i) => html`<button class="chip" data-action="plan-month" data-i="${i}" aria-pressed="${!later && m === ym}">${monthLabel(m, true)}</button>`)}<button class="chip" data-action="plan-month" data-i="${FORECAST_MONTHS}" aria-pressed="${later}">Later</button></div>
     <section class="total plan-total">
-      <div class="meta">Expected in ${monthLabel(ym)}</div>
+      <div class="meta">Expected ${when}</div>
       <div class="total-n num">~${formatPaise(roundRupee(ft.knownPaise))}</div>
       <div class="meta">${ft.count} payment${ft.count === 1 ? '' : 's'}${ft.unknownCount ? ` · ${ft.unknownCount} with amount not known yet (not in the total)` : ''}</div>
     </section>
-    ${!items.length ? html`<div class="empty"><p>Nothing expected in ${monthLabel(ym)}. Add school fees, property tax and other one-off or yearly payments with “Add upcoming payment”.</p></div>`
+    ${later && items.length ? html`<p class="hint">The next date of each upcoming payment, insurance and AMC renewal and PUC expiry after these months. Subscriptions, EMIs and card bills repeat monthly, so they're only in the month views.</p>` : ''}
+    ${!items.length ? html`<div class="empty"><p>Nothing expected ${when}. Add school fees, property tax and other one-off or yearly payments with “Add upcoming payment”.</p></div>`
       : html`<ul class="pay-list plan-list">${items.map((x) => html`<li class="${x.overdue ? 'overdue' : ''}">
-          <span class="plan-date num">${fmtShort(x.date)}</span>
+          <span class="plan-date num">${later ? fmtDate(x.date) : fmtShort(x.date)}</span>
           <span class="plan-main"><b>${x.label}</b><small class="tag tag-${x.kind.replace(/\s/g, '').toLowerCase()}">${x.kind}</small>${x.overdue ? html`<small class="tag tag-overdue">Overdue</small>` : ''}</span>
           <span class="plan-amt num">${x.amountPaise ? `${x.approx ? '~' : ''}${formatPaise(x.amountPaise)}` : html`<small class="meta">Amount not known</small>`}</span>
           ${x.plannedId && state.canWrite ? plannedActions(x) : ''}
@@ -3650,8 +3667,8 @@ async function savePlanned() {
   try {
     await state.db.collection('planned').doc(r.planned.id).set(r.planned);
     state.plannedDraft = null; state.plannedErrors = {};
-    const ym = r.planned.dueDate.slice(0, 7), months = [0, 1, 2].map((n) => addMonths(today().slice(0, 7), n));
-    if (months.includes(ym)) state.forecastOffset = months.indexOf(ym);
+    const ym = r.planned.dueDate.slice(0, 7), months = Array.from({ length: FORECAST_MONTHS }, (_, n) => addMonths(today().slice(0, 7), n));
+    state.forecastOffset = months.includes(ym) ? months.indexOf(ym) : (ym > months[months.length - 1] ? FORECAST_MONTHS : 0);
     toast(existing ? 'Saved' : `${r.planned.name} added`);
   } catch (e) { state.plannedErrors = { _form: friendly(e) }; }
   state.busy = false; render();
