@@ -345,13 +345,14 @@ const PERIOD_LABEL = { transaction: 'per transaction', statement_cycle: 'per sta
   calendar_quarter: 'per quarter', calendar_year: 'per calendar year', card_year: 'per card year' };
 // Categories not offered when logging a purchase (owner's choice, 2 Nov 2026). They stay in the rule vocabulary,
 // so card rules and Ask keep working; a shop that maps to one of them is logged under the replacement instead.
-const HIDDEN_CATS = { rent: 'other', flights: 'travel', hotels: 'travel', international: 'travel', department_store: 'other', wallet_load: 'other', jewellery: 'other', government: 'other', cash_withdrawal: 'other' };
+// Dining and Food delivery are one category, shown as "Food" (stored as 'dining').
+const HIDDEN_CATS = { food_delivery: 'dining', rent: 'other', flights: 'travel', hotels: 'travel', international: 'travel', department_store: 'other', wallet_load: 'other', jewellery: 'other', government: 'other', cash_withdrawal: 'other' };
 /** Categories for the purchase dropdown: alphabetical, Other last; a hidden one only if the purchase already uses it. */
 function purchaseCategories(keep) {
   return CATEGORIES.filter((c) => !HIDDEN_CATS[c] || c === keep)
     .sort((a, b) => (a === 'other') - (b === 'other') || CAT_LABEL[a].localeCompare(CAT_LABEL[b]));
 }
-const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c === 'emi' ? 'EMI' : c.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')]));
+const CAT_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c, c === 'emi' ? 'EMI' : c === 'dining' ? 'Food' : c.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')]));
 const KIND_LABEL = { credit: 'Credit card', debit: 'Debit card', other: 'Bank transfer / Other' };
 const PILL = { ok: 'st-ok', soon: 'st-soon', urgent: 'st-urgent', none: 'st-quiet' };
 
