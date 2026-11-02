@@ -35,12 +35,14 @@ export function validatePolicy(d, existing = null, now = Date.now()) {
     comments: String(d.comments || '').trim(),
     documents: (d.documents || []).map((x) => ({ kind: DOC_KINDS.includes(x.kind) ? x.kind : 'Other', label: String(x.label || '').trim() || x.kind || 'Document', url: String(x.url || '').trim() })),
     vehicleId: typeof d.vehicleId === 'string' && d.vehicleId ? d.vehicleId : null,
+    premiumPaise: d.premiumPaise ?? null,
   };
   if (!p.insurer) errors.insurer = 'Enter the insurance company.';
   if (p.insurer.length > 80) errors.insurer = 'Keep the name under 80 characters.';
   if (!p.type) errors.type = 'Pick the type of insurance.';
   if (p.type.length > 30) errors.type = 'Keep the type under 30 characters.';
   if (!isDate(p.renewalDate)) errors.renewalDate = 'Pick a valid renewal date.';
+  if (p.premiumPaise !== null && !(Number.isInteger(p.premiumPaise) && p.premiumPaise > 0)) errors.premiumPaise = 'Enter the premium in rupees, or leave it blank.';
   if (p.coverage.length > 200) errors.coverage = 'Keep coverage under 200 characters.';
   if (p.comments.length > 1000) errors.comments = 'Comments are too long (1000 characters).';
   p.documents.forEach((x, i) => { if (!isHttps(x.url)) errors[`documents.${i}`] = 'Document links must start with https://'; });

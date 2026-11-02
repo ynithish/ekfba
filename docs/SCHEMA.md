@@ -63,3 +63,7 @@ Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations
 ## Claude page: RC/PUC and ID documents (30 Oct 2026)
 - `vehicles/{id}` gains `rc: { number, validUntil, url } | null` and `puc: { lastDate, expiryDate, url } | null`.
 - `family/{id}` gains `documents: [{ type, number, url, label }]` (owner-only page; numbers shown masked).
+
+## Claude page: planned payments (2 Nov 2026)
+- Collection `planned/{id}`: `{ id, name, dueDate, amountPaise|null, repeat: null|{every, count?, unit?}, notes, status: active|done, lastPaid, createdAt, updatedAt }`.
+- `policies/{id}` gains optional `premiumPaise`.

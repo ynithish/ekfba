@@ -82,8 +82,9 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Vehicles: RC (registration number, valid till, Drive link) and PUC (last date, expiry, certificate link) with PUC status; vehicle shows insurance renewal from its Motor policy (30 Oct 2026)
 - ✅ Family members: documents per person (type: Aadhaar/PAN/Driving Licence/Passport/Voter ID/Other, number, Drive link); Aadhaar 12 digits and PAN format checked; numbers masked to last 4 in the list (30 Oct 2026)
 - ✅ EMI payments (EMI category or linked to a loan) kept out of Spends total, by card, by category, daily graph and day totals; "Excluding EMI payments: ₹X" under the total (hidden at ₹0), tap to list them (31 Oct 2026)
+- ✅ Upcoming payments (2 Nov 2026): Others section (after Subscriptions) to add one-off or repeating payments with optional amount (school fees, municipal tax…); month view (this + next 2 months) combining them with subscriptions, loan EMIs, insurance renewals (new optional premium on policies), AMC and PUC renewals and credit card bills; total of known amounts, count of unknown; Paid (moves repeating ones on, closes one-offs) with optional log-as-purchase
 - ⬜ Revisit purchase categories (rename, merge, add); dropdown stays alphabetical for now
-- Tests: 67 unit tests; 177 page checks
+- Tests: 70 unit tests; 185 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)
