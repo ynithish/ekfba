@@ -3361,6 +3361,7 @@ async function savePurchase(confirmedDuplicate) {
         await state.db.collection('purchaseMonths').doc(m.id).set({ ...m, id: m.id, purchases: fixed, updatedAt: now });
       }
     }
+    if (draft.afterSave && !existing) { try { await afterPaidSaved(draft.afterSave, p); } catch (e) { toast('Saved the purchase, but could not update the due date.'); } }
     const card = cardById(p.cardId);
     state.logDraft = null; state.logErrors = {}; state.logDup = null;
     toast(existing ? 'Purchase updated' : `Saved: ${formatPaise(p.amountPaise)} on ${card ? cardLabel(card) : 'card'}`);
@@ -3550,27 +3551,27 @@ function forecastItems(ym) {
   const out = [];
   const push = (date, label, kind, amountPaise, extra = {}) => out.push({ date, label, kind, amountPaise: amountPaise || null, ...extra });
   for (const p of state.planned.filter((x) => x.status !== 'done')) {
-    if (ym === cur && p.dueDate < start) push(p.dueDate, p.name, 'Planned', p.amountPaise, { overdue: true, plannedId: p.id });
-    for (const d of datesInMonth(p.dueDate, p.repeat, ym)) push(d, p.name, 'Planned', p.amountPaise, { plannedId: p.id, overdue: d < t });
+    if (ym === cur && p.dueDate < start) push(p.dueDate, p.name, 'Planned', p.amountPaise, { overdue: true, plannedId: p.id, src: { type: 'planned', id: p.id } });
+    for (const d of datesInMonth(p.dueDate, p.repeat, ym)) push(d, p.name, 'Planned', p.amountPaise, { plannedId: p.id, overdue: d < t, src: { type: 'planned', id: p.id } });
   }
   for (const x of subscriptionsFrom(ps)) {
     const each = x.variable ? x.averagePaise : x.amountPaise;
-    if (ym === cur && x.nextDue < start) push(x.nextDue, x.merchant, 'Subscription', each, { approx: x.variable, overdue: true });
-    for (const d of datesInMonth(x.nextDue, x.sub, ym)) push(d, x.merchant, 'Subscription', each, { approx: x.variable, overdue: d < t });
+    if (ym === cur && x.nextDue < start) push(x.nextDue, x.merchant, 'Subscription', each, { approx: x.variable, overdue: true, src: { type: 'sub', key: x.key } });
+    for (const d of datesInMonth(x.nextDue, x.sub, ym)) push(d, x.merchant, 'Subscription', each, { approx: x.variable, overdue: d < t, src: { type: 'sub', key: x.key } });
   }
   for (const l of activeLoans().filter((l) => l.type !== 'hand' && l.emiPaise)) {
     const st = loanStatus(l, ps, t);
     if (!st.outstandingPaise || ym < l.startDate.slice(0, 7) || (st.endsAround && ym > st.endsAround)) continue;
     const day = Math.min(Number(l.startDate.slice(8)), Number(end.slice(8)));
-    push(`${ym}-${String(day).padStart(2, '0')}`, l.name, 'EMI', l.emiPaise);
+    push(`${ym}-${String(day).padStart(2, '0')}`, l.name, 'EMI', l.emiPaise, { src: { type: 'loan', id: l.id } });
   }
-  for (const x of state.policies) for (const d of datesInMonth(x.renewalDate, { every: 'yearly' }, ym)) push(d, `${x.insurer} (${x.type})`, 'Insurance', x.premiumPaise);
-  for (const a of activeAppliances().filter((a) => a.amc?.endDate)) for (const d of datesInMonth(a.amc.endDate, { every: 'yearly' }, ym)) push(d, `${a.name} AMC`, 'AMC', a.amc.amountPaise);
-  for (const v of activeVehicles().filter((v) => v.puc?.expiryDate)) for (const d of datesInMonth(v.puc.expiryDate, null, ym)) push(d, `${v.name} PUC`, 'PUC', null);
+  for (const x of state.policies) for (const d of datesInMonth(x.renewalDate, { every: 'yearly' }, ym)) push(d, `${x.insurer} (${x.type})`, 'Insurance', x.premiumPaise, { src: { type: 'policy', id: x.id } });
+  for (const a of activeAppliances().filter((a) => a.amc?.endDate)) for (const d of datesInMonth(a.amc.endDate, { every: 'yearly' }, ym)) push(d, `${a.name} AMC`, 'AMC', a.amc.amountPaise, { src: { type: 'amc', id: a.id } });
+  for (const v of activeVehicles().filter((v) => v.puc?.expiryDate)) for (const d of datesInMonth(v.puc.expiryDate, null, ym)) push(d, `${v.name} PUC`, 'PUC', null, { src: { type: 'puc', id: v.id } });
   for (const c of state.cards.filter((c) => c.status === 'active' && c.kind === 'credit')) {
     const b = billingInfo(c, ps, t, state.billPayments);
     const pay = b?.payBy;
-    if (pay && pay.date >= start && pay.date <= end && pay.remainingPaise) push(pay.date, `${cardLabel(c)} bill`, 'Card bill', pay.remainingPaise, { approx: !pay.billed });
+    if (pay && pay.date >= start && pay.date <= end && pay.remainingPaise) push(pay.date, `${cardLabel(c)} bill`, 'Card bill', pay.remainingPaise, { approx: !pay.billed, src: { type: 'card', id: c.id } });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
 }
@@ -3582,7 +3583,7 @@ function forecastLater(afterYm) {
   const after = monthBounds(afterYm).end;
   const nextAfter = (first, spec) => { let d = first, g = 0; while (d && d <= after && spec && g++ < 800) d = nextDueDate(d, spec); return d && d > after ? d : null; };
   const out = [];
-  for (const p of state.planned.filter((x) => x.status !== 'done')) { const d = nextAfter(p.dueDate, p.repeat); if (d) out.push({ date: d, label: p.name, kind: 'Planned', amountPaise: p.amountPaise || null, plannedId: p.id, repeat: p.repeat }); }
+  for (const p of state.planned.filter((x) => x.status !== 'done')) { const d = nextAfter(p.dueDate, p.repeat); if (d) out.push({ date: d, label: p.name, kind: 'Planned', amountPaise: p.amountPaise || null, plannedId: p.id, repeat: p.repeat, src: { type: 'planned', id: p.id } }); }
   for (const x of state.policies) { const d = nextAfter(x.renewalDate, { every: 'yearly' }); if (d) out.push({ date: d, label: `${x.insurer} (${x.type})`, kind: 'Insurance', amountPaise: x.premiumPaise || null }); }
   for (const a of activeAppliances().filter((a) => a.amc?.endDate)) { const d = nextAfter(a.amc.endDate, { every: 'yearly' }); if (d) out.push({ date: d, label: `${a.name} AMC`, kind: 'AMC', amountPaise: a.amc.amountPaise || null }); }
   for (const v of activeVehicles().filter((v) => v.puc?.expiryDate && v.puc.expiryDate > after)) out.push({ date: v.puc.expiryDate, label: `${v.name} PUC`, kind: 'PUC', amountPaise: null });
@@ -3600,36 +3601,96 @@ function plannedView() {
   return html`${state.canWrite && !state.plannedDraft ? html`<div class="acc-actions"><button class="btn ghost small" data-action="plan-new">Add upcoming payment</button></div>` : ''}
     ${state.plannedDraft ? plannedForm() : ''}
     <div class="chips" role="group" aria-label="Month">${months.map((m, i) => html`<button class="chip" data-action="plan-month" data-i="${i}" aria-pressed="${!later && m === ym}">${monthLabel(m, true)}</button>`)}<button class="chip" data-action="plan-month" data-i="${FORECAST_MONTHS}" aria-pressed="${later}">Later</button></div>
-    <section class="total plan-total">
+    ${later ? '' : html`<section class="total plan-total">
       <div class="meta">Expected ${when}</div>
       <div class="total-n num">~${formatPaise(roundRupee(ft.knownPaise))}</div>
       <div class="meta">${ft.count} payment${ft.count === 1 ? '' : 's'}${ft.unknownCount ? ` · ${ft.unknownCount} with amount not known yet (not in the total)` : ''}</div>
-    </section>
+    </section>`}
     ${later && items.length ? html`<p class="hint">The next date of each upcoming payment, insurance and AMC renewal and PUC expiry after these months. Subscriptions, EMIs and card bills repeat monthly, so they're only in the month views.</p>` : ''}
     ${!items.length ? html`<div class="empty"><p>Nothing expected ${when}. Add school fees, property tax and other one-off or yearly payments with “Add upcoming payment”.</p></div>`
       : html`<ul class="pay-list plan-list">${items.map((x) => html`<li class="${x.overdue ? 'overdue' : ''}">
           <span class="plan-date num">${later ? fmtDate(x.date) : fmtShort(x.date)}</span>
           <span class="plan-main"><b>${x.label}</b><small class="tag tag-${x.kind.replace(/\s/g, '').toLowerCase()}">${x.kind}</small>${x.overdue ? html`<small class="tag tag-overdue">Overdue</small>` : ''}</span>
           <span class="plan-amt num">${x.amountPaise ? `${x.approx ? '~' : ''}${formatPaise(x.amountPaise)}` : html`<small class="meta">Amount not known</small>`}</span>
-          ${x.plannedId && state.canWrite ? plannedActions(x) : ''}
+          ${state.canWrite ? rowActions(x, ym === t.slice(0, 7) || later) : ''}
         </li>`)}</ul>`}
+    ${ym === t.slice(0, 7) ? html`<p class="hint">Paid opens Add purchase filled in from the last payment; nothing is saved until you press Save.</p>` : ''}
     <p class="hint">Includes your upcoming payments plus subscriptions, loan EMIs, insurance renewals (add the premium on the policy to count it), AMC and PUC renewals and credit card bills. Amounts marked ~ are estimates.</p>`;
 }
 
-function plannedActions(x) {
-  const p = state.planned.find((y) => y.id === x.plannedId);
-  if (!p) return '';
-  const key = `${p.id}|${x.date}`;
-  if (state.plannedConfirm?.key === key && state.plannedConfirm.what === 'paid') return html`<span class="plan-act">
-      <button class="btn small" data-action="plan-paid-log" data-id="${p.id}" data-date="${x.date}">Paid · log purchase</button>
-      <button class="btn ghost small" data-action="plan-paid" data-id="${p.id}" data-date="${x.date}">Just mark paid</button>
-      <button class="btn ghost small" data-action="plan-cancel-confirm">Cancel</button></span>`;
-  if (state.plannedConfirm?.key === key && state.plannedConfirm.what === 'del') return html`<span class="plan-act">
+/** Row buttons: Paid (current month, and Later for planned ones) opens a filled-in purchase; planned ones also Edit / ✕. */
+function rowActions(x, allowPaid) {
+  const p = x.plannedId ? state.planned.find((y) => y.id === x.plannedId) : null;
+  const key = `${x.src?.type}|${x.src?.id || x.src?.key}|${x.date}`;
+  if (p && state.plannedConfirm?.key === key && state.plannedConfirm.what === 'del') return html`<span class="plan-act">
       <button class="btn danger small" data-action="plan-del-yes" data-id="${p.id}">Delete</button><button class="btn ghost small" data-action="plan-cancel-confirm">Keep</button></span>`;
-  return html`<span class="plan-act">
-      <button class="btn ghost small" data-action="plan-paid-ask" data-id="${p.id}" data-date="${x.date}">Paid</button>
-      <button class="btn ghost small" data-action="plan-edit" data-id="${p.id}">Edit</button>
-      <button class="btn ghost small" data-action="plan-del" data-id="${p.id}" data-date="${x.date}" aria-label="Delete ${p.name}">✕</button></span>`;
+  const paid = allowPaid && x.src && (x.src.type !== 'planned' || p) ? html`<button class="btn ghost small" data-action="fc-paid" data-src="${x.src.type}" data-id="${x.src.id || x.src.key}" data-date="${x.date}">Paid</button>` : '';
+  const edit = p ? html`<button class="btn ghost small" data-action="plan-edit" data-id="${p.id}">Edit</button><button class="btn ghost small" data-action="plan-del" data-key="${key}" aria-label="Delete ${p.name}">✕</button>` : '';
+  return paid || edit ? html`<span class="plan-act">${paid}${edit}</span>` : '';
+}
+
+/** The latest logged purchase matching `test`, as a template for a new one (no id, today's date). */
+function lastPurchaseLike(test) {
+  const last = allPurchases().find(test);
+  if (!last) return null;
+  const { id, createdAt, updatedAt, ...rest } = last;
+  return { ...rest, status: 'completed', refundPaise: 0, source: 'manual' };
+}
+
+/**
+ * "Paid" on an upcoming payment: open Add purchase (or the card payment form) filled in from the last payment of
+ * the same kind. Nothing is saved until you press Save; after saving, the source moves on (planned → next due /
+ * done; insurance and AMC → renewal date a year later).
+ */
+function forecastPaid(type, id, date) {
+  const t = today();
+  const base = { date: t, cardId: '', category: 'other', status: 'completed', source: 'manual' };
+  let draft = null;
+  if (type === 'card') {
+    state.tab = 'spends';
+    state.payDraft = { cardId: id, date: t, amountPaise: dueNow(id), where: 'spends' }; state.payErrors = {};
+    render(); document.getElementById('pay-form')?.scrollIntoView({ block: 'start' }); return;
+  }
+  if (type === 'planned') {
+    const p = state.planned.find((x) => x.id === id); if (!p) return;
+    draft = { ...base, ...(lastPurchaseLike((q) => formatShopName(q.merchant) === formatShopName(p.name)) || {}), merchant: p.name, amountPaise: p.amountPaise || lastPurchaseLike((q) => formatShopName(q.merchant) === formatShopName(p.name))?.amountPaise || 0, afterSave: { type, id } };
+  } else if (type === 'sub') {
+    const x = subscriptionsFrom(allPurchases()).find((s) => s.key === id); if (!x) return;
+    const tpl = lastPurchaseLike((q) => q.subscription?.every && formatShopName(q.merchant) === x.merchant && (q.applianceId || null) === x.applianceId && (q.vehicleId || null) === x.vehicleId);
+    draft = { ...base, ...(tpl || {}), merchant: x.merchant, amountPaise: x.variable ? 0 : x.amountPaise };
+  } else if (type === 'loan') {
+    const l = loanById(id); if (!l) return;
+    draft = { ...base, ...(lastPurchaseLike((q) => q.loanId === id) || { merchant: `${l.name} EMI`, category: 'emi' }), loanId: id, amountPaise: l.emiPaise || 0 };
+  } else if (type === 'policy') {
+    const x = state.policies.find((p) => p.id === id); if (!x) return;
+    draft = { ...base, ...(lastPurchaseLike((q) => formatShopName(q.merchant) === formatShopName(x.insurer)) || { category: 'insurance' }), merchant: x.insurer, amountPaise: x.premiumPaise || 0, vehicleId: x.vehicleId || null, afterSave: { type, id } };
+  } else if (type === 'amc') {
+    const a = applianceById(id); if (!a) return;
+    draft = { ...base, ...(lastPurchaseLike((q) => q.applianceId === id && /amc/i.test(q.merchant + ' ' + (q.notes || ''))) || {}), merchant: a.amc.provider || `${a.name} AMC`, notes: `${a.name} AMC`, applianceId: id, amountPaise: a.amc.amountPaise || 0, afterSave: { type, id } };
+  } else if (type === 'puc') {
+    const v = vehicleById(id); if (!v) return;
+    draft = { ...base, ...(lastPurchaseLike((q) => q.vehicleId === id && /\bpuc|pollution/i.test(q.merchant + ' ' + (q.notes || ''))) || { merchant: 'PUC check', notes: 'Pollution check' }), vehicleId: id, amountPaise: 0 };
+  }
+  if (!draft) return;
+  draft.date = t;
+  draft.vehicleRelated = !!draft.vehicleId || undefined; draft.applianceRelated = !!draft.applianceId || undefined; draft.loanRelated = !!draft.loanId || undefined;
+  state.tab = 'spends';
+  openLog(draft);
+}
+
+/** After a purchase from "Paid" is saved, move the source on. */
+async function afterPaidSaved(hook, purchase) {
+  const now = Date.now();
+  if (hook.type === 'planned') {
+    const p = state.planned.find((x) => x.id === hook.id);
+    if (p) await state.db.collection('planned').doc(p.id).set({ ...markPlannedPaid(p, purchase.date), updatedAt: now });
+  } else if (hook.type === 'policy') {
+    const x = state.policies.find((p) => p.id === hook.id);
+    if (x?.renewalDate) await state.db.collection('policies').doc(x.id).set({ ...x, renewalDate: nextDueDate(x.renewalDate, 'yearly'), premiumPaise: purchase.amountPaise || x.premiumPaise || null, updatedAt: now });
+  } else if (hook.type === 'amc') {
+    const a = applianceById(hook.id);
+    if (a?.amc?.endDate) await state.db.collection('appliances').doc(a.id).set({ ...a, amc: { ...a.amc, startDate: a.amc.endDate, endDate: nextDueDate(a.amc.endDate, 'yearly'), amountPaise: purchase.amountPaise || a.amc.amountPaise }, updatedAt: now });
+  }
 }
 
 function plannedForm() {
@@ -3672,20 +3733,6 @@ async function savePlanned() {
     toast(existing ? 'Saved' : `${r.planned.name} added`);
   } catch (e) { state.plannedErrors = { _form: friendly(e) }; }
   state.busy = false; render();
-}
-
-async function plannedPaid(id, date, alsoLog) {
-  const p = state.planned.find((x) => x.id === id);
-  if (!p || !state.db) return;
-  const t = today();
-  try {
-    const next = markPlannedPaid(p, t);
-    await state.db.collection('planned').doc(id).set({ ...next, updatedAt: Date.now() });
-    state.plannedConfirm = null;
-    toast(next.status === 'done' ? `${p.name} marked paid` : `${p.name} paid · next due ${fmtShort(next.dueDate)}`);
-    if (alsoLog) { state.tab = 'spends'; openLog({ date: t, merchant: p.name, amountPaise: p.amountPaise || 0, cardId: '', category: 'other', status: 'completed', source: 'manual' }); return; }
-  } catch (e) { state.loadErr = friendly(e); }
-  render();
 }
 
 /** Debts: outstanding per loan after the repayments logged; tap a loan to see its repayments. */
@@ -4451,11 +4498,9 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'plan-edit') { state.plannedDraft = { ...state.planned.find((x) => x.id === id) }; state.plannedErrors = {}; render(); document.getElementById('plan-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'plan-cancel') { state.plannedDraft = null; state.plannedErrors = {}; render(); }
   else if (a === 'plan-month') { state.forecastOffset = Number(t.dataset.i); render(); }
-  else if (a === 'plan-paid-ask') { state.plannedConfirm = { key: `${id}|${t.dataset.date}`, what: 'paid' }; render(); }
-  else if (a === 'plan-del') { state.plannedConfirm = { key: `${id}|${t.dataset.date}`, what: 'del' }; render(); }
+  else if (a === 'fc-paid') forecastPaid(t.dataset.src, id, t.dataset.date);
+  else if (a === 'plan-del') { state.plannedConfirm = { key: t.dataset.key, what: 'del' }; render(); }
   else if (a === 'plan-cancel-confirm') { state.plannedConfirm = null; render(); }
-  else if (a === 'plan-paid') plannedPaid(id, t.dataset.date, false);
-  else if (a === 'plan-paid-log') plannedPaid(id, t.dataset.date, true);
   else if (a === 'plan-del-yes') { (async () => { try { await state.db.collection('planned').doc(id).delete(); state.plannedConfirm = null; toast('Deleted'); } catch (e) { state.loadErr = friendly(e); } render(); })(); }
   else if (a === 'reorder') { state.reordering = true; render(); }
   else if (a === 'reorder-done') { state.reordering = false; render(); }
