@@ -87,7 +87,7 @@ export function subscriptionsFrom(purchases) {
  * includesNonMonthly = a payment in `due` repeats on another cycle (quarterly, yearly, custom…), so the
  * total is only for this month and will not repeat every month.
  */
-export function subscriptionMonthSummary(purchases, today) {
+export function subscriptionMonthSummary(purchases, today, cancelled = {}) {
   const [y, m] = today.split('-').map(Number);
   const monthStart = `${y}-${pad(m)}-01`;
   const monthEnd = `${y}-${pad(m)}-${pad(lastDay(y, m))}`;
@@ -98,7 +98,7 @@ export function subscriptionMonthSummary(purchases, today) {
     if (v) { paidPaise += v; paidCount++; }
   }
   let duePaise = 0, dueCount = 0, includesNonMonthly = false;
-  for (const s of subscriptionsFrom(purchases)) {
+  for (const s of activeSubscriptions(subscriptionsFrom(purchases), cancelled)) {
     const each = s.variable ? s.averagePaise : s.amountPaise;
     let d = s.nextDue, guard = 0;
     while (d && d <= monthEnd && guard++ < 40) {
@@ -109,3 +109,10 @@ export function subscriptionMonthSummary(purchases, today) {
   }
   return { paidPaise, paidCount, duePaise, dueCount, includesNonMonthly, monthStart, monthEnd };
 }
+
+/**
+ * Cancelled subscriptions are kept as { [key]: cancelledOn date }. A subscription counts as cancelled until a
+ * payment for it is logged after that date (you started it again).
+ */
+export const isCancelled = (sub, cancelled = {}) => !!cancelled[sub.key] && sub.last <= cancelled[sub.key];
+export function activeSubscriptions(subs, cancelled = {}) { return subs.filter((s) => !isCancelled(s, cancelled)); }

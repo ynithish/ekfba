@@ -236,6 +236,10 @@ button.stat.good b { color: var(--ok); }
 .amc-fields { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 10px; background: var(--accent-soft); }
 .amc-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .group-label { margin: 2px 0 -4px; }
+.sub-wrap { display: flex; flex-direction: column; }
+.sub-wrap .sub-row { border: 0; background: none; border-radius: 0; }
+.sub-cancel { padding: 0 14px 12px; display: flex; justify-content: flex-end; }
+.sub-cancel.box { display: block; margin: 0 12px 12px; padding: 10px 12px; }
 .sub-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; font: inherit; color: inherit; cursor: pointer; }
 .sub-row > div { min-width: 0; }
 .sub-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -1927,7 +1931,7 @@ function subscriptionsFrom(purchases) {
  * includesNonMonthly = a payment in `due` repeats on another cycle (quarterly, yearly, custom…), so the
  * total is only for this month and will not repeat every month.
  */
-function subscriptionMonthSummary(purchases, today) {
+function subscriptionMonthSummary(purchases, today, cancelled = {}) {
   const [y, m] = today.split('-').map(Number);
   const monthStart = `${y}-${pad(m)}-01`;
   const monthEnd = `${y}-${pad(m)}-${pad(lastDay(y, m))}`;
@@ -1938,7 +1942,7 @@ function subscriptionMonthSummary(purchases, today) {
     if (v) { paidPaise += v; paidCount++; }
   }
   let duePaise = 0, dueCount = 0, includesNonMonthly = false;
-  for (const s of subscriptionsFrom(purchases)) {
+  for (const s of activeSubscriptions(subscriptionsFrom(purchases), cancelled)) {
     const each = s.variable ? s.averagePaise : s.amountPaise;
     let d = s.nextDue, guard = 0;
     while (d && d <= monthEnd && guard++ < 40) {
@@ -1950,7 +1954,14 @@ function subscriptionMonthSummary(purchases, today) {
   return { paidPaise, paidCount, duePaise, dueCount, includesNonMonthly, monthStart, monthEnd };
 }
 
-return { SUBSCRIPTION_PERIODS, CUSTOM_UNITS, PERIOD_LABEL, subscriptionLabel, nextDueDate, normaliseSubscription, subscriptionsFrom, subscriptionMonthSummary };
+/**
+ * Cancelled subscriptions are kept as { [key]: cancelledOn date }. A subscription counts as cancelled until a
+ * payment for it is logged after that date (you started it again).
+ */
+const isCancelled = (sub, cancelled = {}) => !!cancelled[sub.key] && sub.last <= cancelled[sub.key];
+function activeSubscriptions(subs, cancelled = {}) { return subs.filter((s) => !isCancelled(s, cancelled)); }
+
+return { SUBSCRIPTION_PERIODS, CUSTOM_UNITS, PERIOD_LABEL, subscriptionLabel, nextDueDate, normaliseSubscription, subscriptionsFrom, subscriptionMonthSummary, isCancelled, activeSubscriptions };
 })();
 
 const __m_loans = (() => {
@@ -2518,7 +2529,7 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateVehicle, looksVehicleRelated, vehicleTotals, VEHICLE_TYPES, VEHICLE_TYPE_LABEL,
   validatePolicy, sortPolicies, allPeople: policyPeople, peopleOf, policyCalendarLink, POLICY_TYPES, DOC_KINDS,
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
-  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary,
+  SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary, activeSubscriptions, isCancelled,
   validateLoan, emiFor, loanStatus, looksLoanRelated, LOAN_TYPES, LOAN_TYPE_LABEL,
   validateMember, renameInPolicies, RELATIONS, ID_DOC_TYPES, maskId,
   validatePlanned, markPlannedPaid, datesInMonth, forecastTotals, addMonths, monthBounds } = __core;
@@ -2547,7 +2558,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], family: [], planned: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false, family: false, planned: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, spendEmi: false, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, plannedDraft: null, plannedErrors: {}, plannedConfirm: null, forecastOffset: 0, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, spendEmi: false, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, plannedDraft: null, plannedErrors: {}, plannedConfirm: null, forecastOffset: 0, subCancelled: {}, subConfirm: null, showCancelledSubs: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -3128,7 +3139,11 @@ const activeAppliances = (keepId) => state.appliances.filter((v) => v.status !==
 const applianceById = (id) => state.appliances.find((v) => v.id === id);
 function lastAtShop(raw, test) { const name = formatShopName(raw); return name ? allPurchases().find((p) => test(p) && formatShopName(p.merchant) === name) || null : null; }
 const applianceForShop = (raw) => lastAtShop(raw, (p) => p.applianceId)?.applianceId || null;
-const subscriptionForShop = (raw) => lastAtShop(raw, (p) => p.subscription?.every)?.subscription || null;
+const subscriptionForShop = (raw) => {
+  const name = formatShopName(raw);
+  const sub = name && activeSubscriptions(subscriptionsFrom(allPurchases()), state.subCancelled).find((x) => x.merchant === name);
+  return sub ? lastAtShop(raw, (p) => p.subscription?.every)?.subscription || null : null; // a cancelled one is not suggested again
+};
 
 /** "Is this for an appliance or device?" — shown for recharges, AC/RO service, repairs, AMC and similar words. */
 function applianceBox(d) {
@@ -3519,7 +3534,7 @@ function othersView() {
   const pols = state.policies;
   const polSoon = pols.filter((x) => x.renewalDate && daysBetween(t, x.renewalDate) <= 60).length;
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  const sm = subscriptionMonthSummary(ps, t);
+  const sm = subscriptionMonthSummary(ps, t, state.subCancelled);
   const monthName = new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short' });
   const subTotals = html`<span class="sub-totals">
       <span><small>Paid in ${monthName}</small><b class="num">${formatPaise(sm.paidPaise)}</b></span>
@@ -3562,7 +3577,7 @@ function forecastItems(ym) {
     if (ym === cur && p.dueDate < start) push(p.dueDate, p.name, 'Planned', p.amountPaise, { overdue: true, plannedId: p.id, src: { type: 'planned', id: p.id } });
     for (const d of datesInMonth(p.dueDate, p.repeat, ym)) push(d, p.name, 'Planned', p.amountPaise, { plannedId: p.id, overdue: d < t, src: { type: 'planned', id: p.id } });
   }
-  for (const x of subscriptionsFrom(ps)) {
+  for (const x of activeSubscriptions(subscriptionsFrom(ps), state.subCancelled)) {
     const each = x.variable ? x.averagePaise : x.amountPaise;
     if (ym === cur && x.nextDue < start) push(x.nextDue, x.merchant, 'Subscription', each, { approx: x.variable, overdue: true, src: { type: 'sub', key: x.key } });
     for (const d of datesInMonth(x.nextDue, x.sub, ym)) push(d, x.merchant, 'Subscription', each, { approx: x.variable, overdue: d < t, src: { type: 'sub', key: x.key } });
@@ -4065,22 +4080,43 @@ async function saveAppliance(patch = {}) {
 /** Subscriptions: one row per repeating spend, from its latest purchase, with the next due date. */
 function subscriptionsView(ps) {
   const t = today();
-  const subs = subscriptionsFrom(ps);
-  const m = subscriptionMonthSummary(ps, t);
+  const allSubs = subscriptionsFrom(ps);
+  const subs = activeSubscriptions(allSubs, state.subCancelled);
+  const cancelledSubs = allSubs.filter((x) => isCancelled(x, state.subCancelled));
+  const m = subscriptionMonthSummary(ps, t, state.subCancelled);
   const monthName = new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short' });
   return html`${m.includesNonMonthly ? html`<p class="hint due-odd-note">The due amount is in orange because it includes a payment that doesn't repeat every month (for example quarterly, yearly or every 7 months), so it applies to ${monthName} only.</p>` : ''}
-    ${!subs.length ? html`<div class="empty"><p>When you log a recharge, OTT plan, broadband bill or similar, tick “This repeats (subscription)” and pick how often. It shows up here with its next due date.</p></div>`
+    ${!subs.length ? html`<div class="empty"><p>${cancelledSubs.length ? 'No active subscriptions.' : 'When you log a recharge, OTT plan, broadband bill or similar, tick “This repeats (subscription)” and pick how often. It shows up here with its next due date.'}</p></div>`
       : html`<section class="list">${subs.map((x) => {
         const days = daysBetween(t, x.nextDue);
         const [cls, label] = days < 0 ? ['st-urgent', 'Overdue'] : days <= 7 ? ['st-soon', 'Due soon'] : ['st-ok', 'On track'];
         const linked = [x.applianceId && applianceById(x.applianceId)?.name, x.vehicleId && vehicleById(x.vehicleId)?.name].filter(Boolean).join(', ');
         const c = cardById(x.cardId);
-        return html`<button class="row sub-row" data-action="sub-open" data-shop="${x.merchant}">
+        const confirming = state.subConfirm === x.key;
+        return html`<article class="row sub-wrap"><button class="sub-row" data-action="sub-open" data-shop="${x.merchant}">
           <div><div class="ins">${x.merchant}</div><div class="meta">${x.label}${x.variable ? ' · amount varies' : ''}${linked ? ' · ' + linked : ''} · last ${fmtShort(x.last)}${c ? ' on ' + cardLabel(c) : ''}</div></div>
           <div class="right"><span class="pill ${cls}">${label}</span><span class="when">${x.variable ? `~${formatPaise(x.averagePaise)}` : formatPaise(x.amountPaise)} · ${fmtShort(x.nextDue)} (${rel(days)})</span>
             ${x.variable && x.count > 1 ? html`<span class="when">last ${formatPaise(x.amountPaise)} · avg of last ${Math.min(3, x.count)}</span>` : ''}</div>
-        </button>`; })}</section>
-        <p class="hint">Next due dates are worked out from the last payment you logged. Reminders will come later.</p>`}`;
+        </button>
+        ${state.canWrite ? (confirming
+          ? html`<div class="sub-cancel box warn">Cancel ${x.merchant}? It stops showing as due and leaves Upcoming payments. Past payments are kept.
+              <div class="actions" style="margin-top:8px"><button class="btn danger small" data-action="sub-cancel-yes" data-key="${x.key}">Yes, cancel it</button><button class="btn ghost small" data-action="sub-cancel-no">Keep it</button></div></div>`
+          : html`<div class="sub-cancel"><button class="btn ghost small" data-action="sub-cancel" data-key="${x.key}">Cancel subscription</button></div>`) : ''}
+        </article>`; })}</section>
+        <p class="hint">Next due dates are worked out from the last payment you logged. Reminders will come later.</p>`}
+    ${cancelledSubs.length ? html`<div><button class="link-btn" data-action="sub-show-cancelled">${state.showCancelledSubs ? 'Hide' : 'Show'} ${cancelledSubs.length} cancelled</button></div>
+      ${state.showCancelledSubs ? html`<ul class="pay-list">${cancelledSubs.map((x) => html`<li><span><b class="fam-name">${x.merchant}</b> · ${x.label} · cancelled ${fmtShort(state.subCancelled[x.key])} · last paid ${fmtShort(x.last)}</span>
+          ${state.canWrite ? html`<button class="btn ghost small" data-action="sub-restore" data-key="${x.key}">Restore</button>` : ''}</li>`)}</ul>
+        <p class="hint">Logging a new payment for a cancelled subscription starts it again.</p>` : ''}` : ''}`;
+}
+
+async function setSubCancelled(key, on) {
+  if (!state.db) return;
+  const next = { ...state.subCancelled };
+  if (on) next[key] = today(); else delete next[key];
+  state.subCancelled = next; state.subConfirm = null; render();
+  try { await state.db.collection('settings').doc('subscriptions').set({ cancelled: next, updatedAt: Date.now() }); toast(on ? 'Subscription cancelled' : 'Subscription restored'); }
+  catch (e) { toast('Could not save. Try again.'); }
 }
 
 function policiesView() {
@@ -4506,6 +4542,11 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'plan-edit') { state.plannedDraft = { ...state.planned.find((x) => x.id === id) }; state.plannedErrors = {}; render(); document.getElementById('plan-form')?.scrollIntoView({ block: 'start' }); }
   else if (a === 'plan-cancel') { state.plannedDraft = null; state.plannedErrors = {}; render(); }
   else if (a === 'plan-month') { state.forecastOffset = Number(t.dataset.i); render(); }
+  else if (a === 'sub-cancel') { state.subConfirm = t.dataset.key; render(); }
+  else if (a === 'sub-cancel-no') { state.subConfirm = null; render(); }
+  else if (a === 'sub-cancel-yes') setSubCancelled(t.dataset.key, true);
+  else if (a === 'sub-restore') setSubCancelled(t.dataset.key, false);
+  else if (a === 'sub-show-cancelled') { state.showCancelledSubs = !state.showCancelledSubs; render(); }
   else if (a === 'fc-paid') forecastPaid(t.dataset.src, id, t.dataset.date);
   else if (a === 'plan-del') { state.plannedConfirm = { key: t.dataset.key, what: 'del' }; render(); }
   else if (a === 'plan-cancel-confirm') { state.plannedConfirm = null; render(); }
@@ -4631,6 +4672,8 @@ render();
   db.collection('settings').onSnapshot((snap) => {
     const o = snap.docs.find((d) => d.id === 'others');
     if (o && Array.isArray(o.data().order)) state.othersOrder = o.data().order;
+    const sc = snap.docs.find((d) => d.id === 'subscriptions');
+    state.subCancelled = (sc && sc.data().cancelled) || {};
     safeRender();
   }, () => {});
   db.collection('family').onSnapshot((snap) => {

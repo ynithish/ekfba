@@ -98,3 +98,16 @@ test('subscription month summary: paid, due and non-monthly flag', async () => {
   assert.equal(r.duePaise, 34900 + 64900 + 180000);
   assert.equal(r.includesNonMonthly, true);
 });
+
+test('cancelled subscriptions', async () => {
+  const { subscriptionsFrom, activeSubscriptions, subscriptionMonthSummary } = await import('../src/core/subscriptions.js');
+  const b = { cardId: 'c', category: 'other', status: 'completed' };
+  const ps = [{ ...b, id: '1', merchant: 'Netflix', date: '2026-10-25', amountPaise: 64900, subscription: { every: 'monthly' } }];
+  const [x] = subscriptionsFrom(ps);
+  assert.equal(activeSubscriptions([x], { [x.key]: '2026-11-01' }).length, 0);
+  assert.equal(subscriptionMonthSummary(ps, '2026-11-04', { [x.key]: '2026-11-01' }).duePaise, 0);
+  assert.equal(subscriptionMonthSummary(ps, '2026-11-04').duePaise, 64900);
+  // Paying again after cancelling brings it back.
+  const again = subscriptionsFrom([...ps, { ...ps[0], id: '2', date: '2026-11-03' }]);
+  assert.equal(activeSubscriptions(again, { [x.key]: '2026-11-01' }).length, 1);
+});
