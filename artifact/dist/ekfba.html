@@ -3585,6 +3585,8 @@ function forecastItems(ym) {
   for (const l of activeLoans().filter((l) => l.type !== 'hand' && l.emiPaise)) {
     const st = loanStatus(l, ps, t);
     if (!st.outstandingPaise || ym < l.startDate.slice(0, 7) || (st.endsAround && ym > st.endsAround)) continue;
+    // Already paid this month: a repayment for this loan is logged in the month, so it is not expected any more.
+    if (ps.some((p) => p.loanId === l.id && p.date >= start && p.date <= end && p.status !== 'cancelled')) continue;
     const day = Math.min(Number(l.startDate.slice(8)), Number(end.slice(8)));
     push(`${ym}-${String(day).padStart(2, '0')}`, l.name, 'EMI', l.emiPaise, { src: { type: 'loan', id: l.id } });
   }

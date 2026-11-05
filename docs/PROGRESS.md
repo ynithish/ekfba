@@ -87,7 +87,7 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ Subscriptions can be cancelled (with confirm) and restored; cancelled ones leave the list, the month due total and Upcoming payments, aren't suggested on new purchases, and come back automatically if a new payment is logged. Stored in `settings/subscriptions` (4 Nov 2026)
 - ✅ Dining and Food delivery merged into one category shown as "Food" (stored as 'dining'); the 8 existing Food delivery purchases moved to Food (2 Nov 2026)
 - ✅ Purchase categories trimmed (2 Nov 2026, owner): Rent, Flights, Hotels, International, Department store, Wallet load, Jewellery, Government and Cash withdrawal hidden from Add purchase and Ask's follow-up (kept in the rule vocabulary; airline/hotel shops log as Travel, others as Other); list alphabetical with Other last
-- Tests: 71 unit tests; 199 page checks
+- Tests: 71 unit tests; 200 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)

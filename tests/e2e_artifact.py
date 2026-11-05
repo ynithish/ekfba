@@ -493,6 +493,7 @@ def main():
         check('rename carries over to policies', page.evaluate("() => !Object.values(window.__store.policies).some(p => p.people.includes('Nandini'))"))
         page.click('.fam-list li:has-text("Adhyasree") [data-action=mem-del]'); page.click('[data-action=mem-del-yes]')
         page.wait_for_function("() => !Object.values(window.__store.family).some(m => m.name === 'Adhyasree')", timeout=3000)
+        page.wait_for_function("() => !document.getElementById('family-h').innerText.includes('Adhyasree')", timeout=3000)
         check('member removed', 'Adhyasree' not in page.inner_text('#family-h'))
         # ID documents on a family member
         page.click('[data-action=mem-new]')
@@ -542,6 +543,7 @@ def main():
         check('Later shows next yearly renewals too', 'Insurance' in page.inner_text('.plan-list'))
         page.click('[data-action=plan-month][data-i="0"]')
         page.locator('.acc:has(#plan-h)').screenshot(path=str(SHOTS / 'a11-plan.png'))
+        check('a loan EMI already paid this month is not expected again', page.locator('.plan-list li:has-text("SBI home loan")').count() == 0)
         check('Paid shown on every item this month', page.locator('.plan-list li').count() == page.locator('.plan-list [data-action=fc-paid]').count())
         page.click('.plan-list li:has-text("Municipal tax") [data-action=fc-paid]')
         page.wait_for_selector('#log-form')
