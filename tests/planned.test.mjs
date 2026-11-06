@@ -30,3 +30,10 @@ test('projecting into a month and totals', () => {
   assert.equal(addMonths('2026-11', 2), '2027-01');
   assert.deepEqual(monthBounds('2027-02'), { start: '2027-02-01', end: '2027-02-28' });
 });
+
+test('planned payment type and family member', () => {
+  const r = validatePlanned({ name: 'Term 2 fees', dueDate: '2027-01-10', kind: 'School fees', memberId: 'm1', repeat: { every: 'quarterly' } });
+  assert.equal(r.planned.kind, 'School fees');
+  assert.equal(r.planned.memberId, 'm1');
+  assert.equal(validatePlanned({ name: 'X', dueDate: '2027-01-10', kind: 'Weird' }).planned.kind, 'Other');
+});

@@ -84,10 +84,11 @@ following the NLNLALD roadmap: online-only while testing, later merged into one 
 - ✅ EMI payments (EMI category or linked to a loan) kept out of Spends total, by card, by category, daily graph and day totals; "Excluding EMI payments: ₹X" under the total (hidden at ₹0), tap to list them (31 Oct 2026)
 - ✅ Upcoming payments (2 Nov 2026): Others section (after Subscriptions) to add one-off or repeating payments with optional amount (school fees, municipal tax…); month view (this + next 3 months, plus Later for anything after) combining them with subscriptions, loan EMIs, insurance renewals (new optional premium on policies), AMC and PUC renewals and credit card bills; total of known amounts, count of unknown; Paid (moves repeating ones on, closes one-offs) with optional log-as-purchase
 - ✅ Upcoming payments: Paid on every current-month item (and planned ones in Later) opens Add purchase filled in from the last payment of that kind (card bills open the bill-payment form); saved only on Save, then planned moves on/closes and insurance/AMC renewal dates move a year. Later view has no total box (2 Nov 2026)
+- ✅ Vaccinations per family member (vaccine, dose, given on, next due, certificate link); next due shown in the family list and in Upcoming payments, Paid logs a Healthcare purchase and marks it given. Upcoming payments gain a Type (School fees, Tax, Medical, Vaccination, Rent / maintenance, Other) and an optional family member, e.g. "Term 2 fees · Adhyasree" (6 Nov 2026)
 - ✅ Subscriptions can be cancelled (with confirm) and restored; cancelled ones leave the list, the month due total and Upcoming payments, aren't suggested on new purchases, and come back automatically if a new payment is logged. Stored in `settings/subscriptions` (4 Nov 2026)
 - ✅ Dining and Food delivery merged into one category shown as "Food" (stored as 'dining'); the 8 existing Food delivery purchases moved to Food (2 Nov 2026)
 - ✅ Purchase categories trimmed (2 Nov 2026, owner): Rent, Flights, Hotels, International, Department store, Wallet load, Jewellery, Government and Cash withdrawal hidden from Add purchase and Ask's follow-up (kept in the rule vocabulary; airline/hotel shops log as Travel, others as Other); list alphabetical with Other last
-- Tests: 71 unit tests; 200 page checks
+- Tests: 73 unit tests; 206 page checks
 
 ## Phase 5 — Milestones & reminders ⬜
 - ⬜ Period resolver; lounge and fee-reversal trackers; transaction eligibility statuses (Scenarios 3, 4, 5)

@@ -67,3 +67,8 @@ Encrypted: `{ format: "ekfba-encrypted", v: 1, kdf: {PBKDF2, SHA-256, iterations
 ## Claude page: planned payments (2 Nov 2026)
 - Collection `planned/{id}`: `{ id, name, dueDate, amountPaise|null, repeat: null|{every, count?, unit?}, notes, status: active|done, lastPaid, createdAt, updatedAt }`.
 - `policies/{id}` gains optional `premiumPaise`.
+
+## Claude page: vaccinations and payment types (6 Nov 2026)
+- `family/{id}` gains `vaccinations: [{ name, dose, givenOn, nextDue, url, notes }]`.
+- `planned/{id}` gains `kind` (Other | School fees | Tax | Medical | Vaccination | Rent / maintenance) and `memberId` (family member or null).
+- Upcoming payments (month view) is built from: planned payments, family vaccinations (nextDue), subscriptions, loan EMIs (skipped once paid that month), insurance renewals (premium), AMC renewals, PUC expiries and credit card bills.

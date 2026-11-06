@@ -267,10 +267,16 @@ button.stat.good b { color: var(--ok); }
 .id-docs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .id-doc { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 13px; color: var(--ink); background: var(--surface); }
 .id-doc a { color: var(--accent); }
-.doc3 { display: grid; grid-template-columns: 140px 1fr; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.doc3 { display: grid; grid-template-columns: minmax(0, 140px) minmax(0, 1fr); gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
 .doc3 .wide { grid-column: 1 / -1; }
 .doc3 select, .doc3 input { min-height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; min-width: 0; width: 100%; }
 .doc3 .ferr { grid-column: 1 / -1; }
+.doc3.vac { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.doc3 input[type=date] { min-width: 0; max-width: 100%; }
+.doc3 .mini input { width: 100%; }
+.doc3 .ferr { color: var(--urgent); font-size: 13px; }
+@media (max-width: 460px) { .doc3, .doc3.vac { grid-template-columns: minmax(0, 1fr); } }
+.doc3 .mini { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 .veh-docs { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; }
 .veh-row:has(.veh-docs) { flex-wrap: wrap; }
 .subform { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; margin: 0; }
@@ -293,6 +299,7 @@ details.opening summary { cursor: pointer; color: var(--accent); font-size: 14px
 .plan-act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .tag { font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; background: var(--quiet-bg); color: var(--muted); }
 .tag-planned { background: var(--accent-soft); color: var(--accent); }
+.tag-schoolfees, .tag-vaccination, .tag-medical { background: var(--ok-bg); color: var(--ok); }
 .tag-overdue { background: var(--urgent-bg); color: var(--urgent); }
 .plan-total .total-n { font-size: 28px; }
 .reorder-bar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: -6px; }
@@ -337,8 +344,8 @@ const { html, raw, escapeHtml, validateCard, cardLabel, NETWORKS, parseRupeesToP
   validateAppliance, looksApplianceRelated, itemTotals, APPLIANCE_TYPES, APPLIANCE_GROUP_LABEL, groupOfType,
   SUBSCRIPTION_PERIODS, PERIOD_LABEL: SUB_LABEL, nextDueDate, subscriptionsFrom, subscriptionLabel, subscriptionMonthSummary, activeSubscriptions, isCancelled,
   validateLoan, emiFor, loanStatus, looksLoanRelated, LOAN_TYPES, LOAN_TYPE_LABEL,
-  validateMember, renameInPolicies, RELATIONS, ID_DOC_TYPES, maskId,
-  validatePlanned, markPlannedPaid, datesInMonth, forecastTotals, addMonths, monthBounds } = __core;
+  validateMember, renameInPolicies, RELATIONS, ID_DOC_TYPES, maskId, nextVaccination,
+  validatePlanned, markPlannedPaid, datesInMonth, forecastTotals, addMonths, monthBounds, PLANNED_KINDS } = __core;
 
 const APP_VERSION = '0.3.0';
 const BANKS = ['American Express', 'AU Small Finance Bank', 'Axis Bank', 'Bank of Baroda', 'Canara Bank', 'Federal Bank', 'HDFC Bank',
@@ -1380,8 +1387,9 @@ function forecastItems(ym) {
   const out = [];
   const push = (date, label, kind, amountPaise, extra = {}) => out.push({ date, label, kind, amountPaise: amountPaise || null, ...extra });
   for (const p of state.planned.filter((x) => x.status !== 'done')) {
-    if (ym === cur && p.dueDate < start) push(p.dueDate, p.name, 'Planned', p.amountPaise, { overdue: true, plannedId: p.id, src: { type: 'planned', id: p.id } });
-    for (const d of datesInMonth(p.dueDate, p.repeat, ym)) push(d, p.name, 'Planned', p.amountPaise, { plannedId: p.id, overdue: d < t, src: { type: 'planned', id: p.id } });
+    const lbl = plannedLabel(p), kind = plannedKindTag(p);
+    if (ym === cur && p.dueDate < start) push(p.dueDate, lbl, kind, p.amountPaise, { overdue: true, plannedId: p.id, src: { type: 'planned', id: p.id } });
+    for (const d of datesInMonth(p.dueDate, p.repeat, ym)) push(d, lbl, kind, p.amountPaise, { plannedId: p.id, overdue: d < t, src: { type: 'planned', id: p.id } });
   }
   for (const x of activeSubscriptions(subscriptionsFrom(ps), state.subCancelled)) {
     const each = x.variable ? x.averagePaise : x.amountPaise;
@@ -1399,6 +1407,12 @@ function forecastItems(ym) {
   for (const x of state.policies) for (const d of datesInMonth(x.renewalDate, { every: 'yearly' }, ym)) push(d, `${x.insurer} (${x.type})`, 'Insurance', x.premiumPaise, { src: { type: 'policy', id: x.id } });
   for (const a of activeAppliances().filter((a) => a.amc?.endDate)) for (const d of datesInMonth(a.amc.endDate, { every: 'yearly' }, ym)) push(d, `${a.name} AMC`, 'AMC', a.amc.amountPaise, { src: { type: 'amc', id: a.id } });
   for (const v of activeVehicles().filter((v) => v.puc?.expiryDate)) for (const d of datesInMonth(v.puc.expiryDate, null, ym)) push(d, `${v.name} PUC`, 'PUC', null, { src: { type: 'puc', id: v.id } });
+  for (const m of state.family) (m.vaccinations || []).forEach((v, i) => {
+    if (!v.nextDue) return;
+    const label = `${m.name} · ${v.name}${v.dose ? ` (${v.dose})` : ''}`;
+    if (ym === cur && v.nextDue < start) push(v.nextDue, label, 'Vaccination', null, { overdue: true, src: { type: 'vacc', id: `${m.id}:${i}` } });
+    else if (v.nextDue >= start && v.nextDue <= end) push(v.nextDue, label, 'Vaccination', null, { overdue: v.nextDue < t, src: { type: 'vacc', id: `${m.id}:${i}` } });
+  });
   for (const c of state.cards.filter((c) => c.status === 'active' && c.kind === 'credit')) {
     const b = billingInfo(c, ps, t, state.billPayments);
     const pay = b?.payBy;
@@ -1407,6 +1421,10 @@ function forecastItems(ym) {
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
 }
 
+/** "Term 2 fees · Adhyasree" for a planned payment with a family member. */
+function plannedLabel(p) { const m = p.memberId && state.family.find((x) => x.id === p.memberId); return m ? `${p.name} · ${m.name}` : p.name; }
+const plannedKindTag = (p) => (p.kind && p.kind !== 'Other' ? p.kind : 'Planned');
+
 const FORECAST_MONTHS = 4; // this month + next 3; anything after shows under "Later"
 
 /** After the month window: the next date of each planned payment, insurance and AMC renewal, and PUC expiry. */
@@ -1414,7 +1432,8 @@ function forecastLater(afterYm) {
   const after = monthBounds(afterYm).end;
   const nextAfter = (first, spec) => { let d = first, g = 0; while (d && d <= after && spec && g++ < 800) d = nextDueDate(d, spec); return d && d > after ? d : null; };
   const out = [];
-  for (const p of state.planned.filter((x) => x.status !== 'done')) { const d = nextAfter(p.dueDate, p.repeat); if (d) out.push({ date: d, label: p.name, kind: 'Planned', amountPaise: p.amountPaise || null, plannedId: p.id, repeat: p.repeat, src: { type: 'planned', id: p.id } }); }
+  for (const m of state.family) (m.vaccinations || []).forEach((v, i) => { if (v.nextDue && v.nextDue > after) out.push({ date: v.nextDue, label: `${m.name} · ${v.name}${v.dose ? ` (${v.dose})` : ''}`, kind: 'Vaccination', amountPaise: null, src: { type: 'vacc', id: `${m.id}:${i}` } }); });
+  for (const p of state.planned.filter((x) => x.status !== 'done')) { const d = nextAfter(p.dueDate, p.repeat); if (d) out.push({ date: d, label: plannedLabel(p), kind: plannedKindTag(p), amountPaise: p.amountPaise || null, plannedId: p.id, repeat: p.repeat, src: { type: 'planned', id: p.id } }); }
   for (const x of state.policies) { const d = nextAfter(x.renewalDate, { every: 'yearly' }); if (d) out.push({ date: d, label: `${x.insurer} (${x.type})`, kind: 'Insurance', amountPaise: x.premiumPaise || null }); }
   for (const a of activeAppliances().filter((a) => a.amc?.endDate)) { const d = nextAfter(a.amc.endDate, { every: 'yearly' }); if (d) out.push({ date: d, label: `${a.name} AMC`, kind: 'AMC', amountPaise: a.amc.amountPaise || null }); }
   for (const v of activeVehicles().filter((v) => v.puc?.expiryDate && v.puc.expiryDate > after)) out.push({ date: v.puc.expiryDate, label: `${v.name} PUC`, kind: 'PUC', amountPaise: null });
@@ -1446,7 +1465,7 @@ function plannedView() {
           ${state.canWrite ? rowActions(x, ym === t.slice(0, 7) || later) : ''}
         </li>`)}</ul>`}
     ${ym === t.slice(0, 7) ? html`<p class="hint">Paid opens Add purchase filled in from the last payment; nothing is saved until you press Save.</p>` : ''}
-    <p class="hint">Includes your upcoming payments plus subscriptions, loan EMIs, insurance renewals (add the premium on the policy to count it), AMC and PUC renewals and credit card bills. Amounts marked ~ are estimates.</p>`;
+    <p class="hint">Includes your upcoming payments (school fees, tax…) and family vaccinations due, plus subscriptions, loan EMIs, insurance renewals (add the premium on the policy to count it), AMC and PUC renewals and credit card bills. Amounts marked ~ are estimates.</p>`;
 }
 
 /** Row buttons: Paid (current month, and Later for planned ones) opens a filled-in purchase; planned ones also Edit / ✕. */
@@ -1498,6 +1517,9 @@ function forecastPaid(type, id, date) {
   } else if (type === 'amc') {
     const a = applianceById(id); if (!a) return;
     draft = { ...base, ...(lastPurchaseLike((q) => q.applianceId === id && /amc/i.test(q.merchant + ' ' + (q.notes || ''))) || {}), merchant: a.amc.provider || `${a.name} AMC`, notes: `${a.name} AMC`, applianceId: id, amountPaise: a.amc.amountPaise || 0, afterSave: { type, id } };
+  } else if (type === 'vacc') {
+    const [mid, idx] = id.split(':'); const m = state.family.find((x) => x.id === mid); const v = m?.vaccinations?.[Number(idx)]; if (!v) return;
+    draft = { ...base, ...(lastPurchaseLike((q) => q.category === 'healthcare' && /vaccin/i.test(q.merchant + ' ' + (q.notes || ''))) || {}), merchant: `${v.name} vaccination`, category: 'healthcare', notes: `${m.name}${v.dose ? ' · dose ' + v.dose : ''}`, amountPaise: 0, afterSave: { type, id } };
   } else if (type === 'puc') {
     const v = vehicleById(id); if (!v) return;
     draft = { ...base, ...(lastPurchaseLike((q) => q.vehicleId === id && /\bpuc|pollution/i.test(q.merchant + ' ' + (q.notes || ''))) || { merchant: 'PUC check', notes: 'Pollution check' }), vehicleId: id, amountPaise: 0 };
@@ -1515,6 +1537,12 @@ async function afterPaidSaved(hook, purchase) {
   if (hook.type === 'planned') {
     const p = state.planned.find((x) => x.id === hook.id);
     if (p) await state.db.collection('planned').doc(p.id).set({ ...markPlannedPaid(p, purchase.date), updatedAt: now });
+  } else if (hook.type === 'vacc') {
+    const [mid, idx] = hook.id.split(':'); const m = state.family.find((x) => x.id === mid);
+    if (m?.vaccinations?.[Number(idx)]) {
+      const vaccinations = m.vaccinations.map((v, i) => (i === Number(idx) ? { ...v, givenOn: purchase.date, nextDue: '' } : v));
+      await state.db.collection('family').doc(m.id).set({ ...m, vaccinations, updatedAt: now });
+    }
   } else if (hook.type === 'policy') {
     const x = state.policies.find((p) => p.id === hook.id);
     if (x?.renewalDate) await state.db.collection('policies').doc(x.id).set({ ...x, renewalDate: nextDueDate(x.renewalDate, 'yearly'), premiumPaise: purchase.amountPaise || x.premiumPaise || null, updatedAt: now });
@@ -1531,7 +1559,11 @@ function plannedForm() {
   return html`<form class="panel" id="plan-form" novalidate>
     <h2>${d.id ? 'Edit upcoming payment' : 'Add upcoming payment'}</h2>
     ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
-    <div class="field"><label for="u-name">What for</label><input id="u-name" name="name" value="${d.name || ''}" placeholder="School fees, Municipal tax…" autocomplete="off">${err('name')}</div>
+    <div class="field"><label for="u-name">What for</label><input id="u-name" name="name" value="${d.name || ''}" placeholder="Term 2 fees, Municipal tax…" autocomplete="off">${err('name')}</div>
+    <div class="two">
+      <div class="field"><label for="u-kind">Type</label><select id="u-kind" name="kind">${PLANNED_KINDS.map((k) => html`<option ${(d.kind || 'Other') === k ? 'selected' : ''}>${k}</option>`)}</select></div>
+      <div class="field"><label for="u-member">For (optional)</label><select id="u-member" name="memberId"><option value="">Whole family</option>${[...state.family].sort((a, b) => a.name.localeCompare(b.name)).map((m) => html`<option value="${m.id}" ${d.memberId === m.id ? 'selected' : ''}>${m.name}</option>`)}</select></div>
+    </div>
     <div class="two">
       <div class="field"><label for="u-date">Due on</label><input id="u-date" name="dueDate" type="date" value="${d.dueDate || ''}">${err('dueDate')}</div>
       <div class="field"><label for="u-amount">Amount (₹, optional)</label><input id="u-amount" name="amount" inputmode="decimal" value="${d.amountPaise == null ? '' : String(d.amountPaise / 100)}" placeholder="Not known yet" autocomplete="off">${err('amountPaise')}</div>
@@ -1551,7 +1583,7 @@ async function savePlanned() {
   const f = Object.fromEntries(new FormData(document.getElementById('plan-form')));
   const amount = String(f.amount || '').trim() === '' ? null : (parseRupeesToPaise(f.amount) ?? -1);
   const repeat = f.every ? { every: f.every, ...(f.every === 'custom' ? { count: String(f.count || '').trim(), unit: f.unit } : {}) } : null;
-  const draft = { ...state.plannedDraft, name: f.name, dueDate: f.dueDate, amountPaise: amount, repeat, notes: f.notes };
+  const draft = { ...state.plannedDraft, name: f.name, dueDate: f.dueDate, amountPaise: amount, repeat, notes: f.notes, kind: f.kind, memberId: f.memberId || null };
   const existing = draft.id ? state.planned.find((x) => x.id === draft.id) : null;
   const r = validatePlanned({ ...draft, id: draft.id || uuid() }, existing);
   if (!r.ok) { state.plannedDraft = draft; state.plannedErrors = r.errors; return render(); }
@@ -1656,6 +1688,17 @@ async function saveLoan(patch = {}) {
   state.busy = false; render();
 }
 
+/** "Vaccinations: 3 · next MMR (dose 2) 10 Jan 2027" with a status tag, for the family list. */
+function vaccLine(m) {
+  const vs = m.vaccinations || [];
+  if (!vs.length) return '';
+  const nx = nextVaccination(m);
+  if (!nx) return html`<span class="id-docs"><span class="id-doc"><b>Vaccinations</b> ${vs.length} recorded</span></span>`;
+  const days = daysBetween(today(), nx.nextDue);
+  const [cls, label] = days < 0 ? ['st-urgent', 'Overdue'] : days <= 30 ? ['st-soon', 'Due soon'] : ['st-ok', 'Next'];
+  return html`<span class="id-docs"><span class="id-doc"><b>Vaccinations</b> ${vs.length} · <span class="pill ${cls}">${label}</span> ${nx.name}${nx.dose ? ` (${nx.dose})` : ''} ${fmtDate(nx.nextDue)}</span></span>`;
+}
+
 /** Family members: the people policies cover and cards belong to. */
 function familyView() {
   const list = [...state.family].sort((a, b) => (RELATIONS.indexOf(a.relation) + 1 || 99) - (RELATIONS.indexOf(b.relation) + 1 || 99) || a.name.localeCompare(b.name));
@@ -1670,6 +1713,7 @@ function familyView() {
     ${!list.length ? (state.memberDraft ? '' : html`<div class="empty"><p>Add the people in your family. They can then be ticked as covered on insurance policies and picked as card holders.</p></div>`)
       : html`<ul class="pay-list fam-list">${list.map((m) => html`<li>
         <span><b class="fam-name">${m.name}</b>${m.relation ? ` · ${m.relation}` : ''}${uses(m.name) ? ` · ${uses(m.name)}` : ''}
+          ${vaccLine(m)}
           ${(m.documents || []).length ? html`<span class="id-docs">${m.documents.map((x) => html`<span class="id-doc"><b>${x.type === 'Other' && x.label ? x.label : x.type}</b>${x.number ? html` <span class="num">${maskId(x.number)}</span>` : ''}${x.url ? html` · <a href="${x.url}" target="_blank" rel="noopener">View</a>` : ''}</span>`)}</span>` : ''}</span>
         ${state.canWrite ? (state.memberConfirmDel === m.id ? html`<span class="actions"><button class="btn danger small" data-action="mem-del-yes" data-id="${m.id}">Remove</button><button class="btn ghost small" data-action="mem-del-no">Keep</button></span>`
           : html`<span class="actions"><button class="btn ghost small" data-action="mem-edit" data-id="${m.id}">Edit</button><button class="btn ghost small" data-action="mem-del" data-id="${m.id}" aria-label="Remove ${m.name}">✕</button></span>`) : ''}</li>`)}</ul>
@@ -1694,7 +1738,19 @@ function memberForm() {
         ${e['documents.' + i] ? html`<span class="ferr" role="alert">${e['documents.' + i]}</span>` : ''}</div>`)}
       <div><button type="button" class="btn ghost small" data-action="mem-add-doc">Add document</button></div>
       <p class="hint">Aadhaar, PAN, driving licence, passport… Upload the file to Google Drive, choose Share → Copy link, and paste it. Only you can open this page; numbers are shown masked (last 4) in the list.</p>
-    </fieldset>` : html`<p class="hint">Save first, then tap Edit to add documents like Aadhaar, PAN or driving licence.</p>`}
+    </fieldset>
+    <fieldset class="subform"><legend>Vaccinations</legend>
+      ${(d.vaccinations || []).map((x, i) => html`<div class="doc3 vac" data-vac="${i}">
+        <input name="vname${i}" value="${x.name || ''}" placeholder="Vaccine (e.g. MMR, Typhoid)" aria-label="Vaccine" autocomplete="off">
+        <input name="vdose${i}" value="${x.dose || ''}" placeholder="Dose (e.g. 2 / booster)" aria-label="Dose" autocomplete="off">
+        <label class="mini">Given on<input name="vgiven${i}" type="date" value="${x.givenOn || ''}"></label>
+        <label class="mini">Next due<input name="vnext${i}" type="date" value="${x.nextDue || ''}"></label>
+        <input class="wide" name="vurl${i}" value="${x.url || ''}" placeholder="Certificate: Google Drive link (optional)" aria-label="Certificate link" autocomplete="off">
+        <button type="button" class="btn ghost small wide" data-action="mem-rm-vac" data-i="${i}">Remove</button>
+        ${e['vaccinations.' + i] ? html`<span class="ferr" role="alert">${e['vaccinations.' + i]}</span>` : ''}</div>`)}
+      <div><button type="button" class="btn ghost small" data-action="mem-add-vac">Add vaccination</button></div>
+      <p class="hint">Next due dates show in Upcoming payments, so you can plan for them.</p>
+    </fieldset>` : html`<p class="hint">Save first, then tap Edit to add documents (Aadhaar, PAN, licence…) and vaccinations.</p>`}
     <div class="actions"><button class="btn" type="submit" ${state.busy ? 'disabled' : ''}>${state.busy ? 'Saving…' : 'Save'}</button><button class="btn ghost" type="button" data-action="mem-cancel">Cancel</button></div>
   </form>`;
 }
@@ -1702,7 +1758,9 @@ function memberForm() {
 function readMemberForm() {
   const f = Object.fromEntries(new FormData(document.getElementById('mem-form')));
   const documents = (state.memberDraft.documents || []).map((x, i) => ({ ...x, type: f['dtype' + i] ?? x.type, number: f['dnum' + i] ?? x.number, url: f['durl' + i] ?? x.url }));
-  return { ...state.memberDraft, name: f.name, relation: f.relation, documents };
+  const vaccinations = (state.memberDraft.vaccinations || []).map((x, i) => ({ ...x, name: f['vname' + i] ?? x.name, dose: f['vdose' + i] ?? x.dose,
+    givenOn: f['vgiven' + i] ?? x.givenOn, nextDue: f['vnext' + i] ?? x.nextDue, url: f['vurl' + i] ?? x.url }));
+  return { ...state.memberDraft, name: f.name, relation: f.relation, documents, vaccinations };
 }
 
 async function saveMember() {
@@ -2322,6 +2380,8 @@ $app.addEventListener('click', async (ev) => {
   else if (a === 'mem-cancel') { state.memberDraft = null; state.memberErrors = {}; render(); }
   else if (a === 'mem-add-doc') { state.memberDraft = readMemberForm(); state.memberDraft.documents = [...(state.memberDraft.documents || []), { type: ID_DOC_TYPES[0], number: '', url: '' }]; render(); document.querySelector('#mem-form .doc3:last-of-type input')?.focus(); }
   else if (a === 'mem-rm-doc') { state.memberDraft = readMemberForm(); state.memberDraft.documents.splice(Number(t.dataset.i), 1); render(); }
+  else if (a === 'mem-add-vac') { state.memberDraft = readMemberForm(); state.memberDraft.vaccinations = [...(state.memberDraft.vaccinations || []), { name: '', dose: '', givenOn: '', nextDue: '', url: '' }]; render(); document.querySelector(`#mem-form [name=vname${state.memberDraft.vaccinations.length - 1}]`)?.focus(); }
+  else if (a === 'mem-rm-vac') { state.memberDraft = readMemberForm(); state.memberDraft.vaccinations.splice(Number(t.dataset.i), 1); render(); }
   else if (a === 'mem-del') { state.memberConfirmDel = id; render(); }
   else if (a === 'mem-del-no') { state.memberConfirmDel = null; render(); }
   else if (a === 'mem-del-yes') deleteMember(id);

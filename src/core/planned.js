@@ -9,6 +9,8 @@ const pad = (n) => String(n).padStart(2, '0');
 const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 
 /** First and last day of a "YYYY-MM" month. */
+export const PLANNED_KINDS = ['Other', 'School fees', 'Tax', 'Medical', 'Vaccination', 'Rent / maintenance'];
+
 export function monthBounds(ym) {
   const [y, m] = ym.split('-').map(Number);
   return { start: `${y}-${pad(m)}-01`, end: `${y}-${pad(m)}-${pad(lastDay(y, m))}` };
@@ -31,6 +33,8 @@ export function validatePlanned(d, existing = null, now = Date.now()) {
     notes: String(d.notes || '').trim(),
     status: d.status === 'done' ? 'done' : 'active',
     lastPaid: d.lastPaid || null,
+    kind: PLANNED_KINDS.includes(d.kind) ? d.kind : 'Other',
+    memberId: typeof d.memberId === 'string' && d.memberId ? d.memberId : null,
   };
   if (!p.name) errors.name = 'What is the payment for? For example "School fees" or "Municipal tax".';
   if (p.name.length > 60) errors.name = 'Keep the name under 60 characters.';
