@@ -148,3 +148,28 @@ All inputs are local, so the recommender is the same online or offline:
 3. You switch on GitHub Pages once (Settings → Pages). From then on every push I make is live at `https://<you>.github.io/ekfba/` within a minute.
 4. You open that link on your phone → "Install app" / "Add to Home Screen".
 5. Each phase ends with a short checklist for you to try on the phone; I fix anything you report.
+
+## 12. Current design on the Claude page (updated 6 Nov 2026)
+
+The app now runs as the private Claude page "EKFBA Cards" (ADR-008). Tabs: **Spends · Ask · Cards · Others**. All data is in the page's
+owner-only database; one document per record unless noted. Money in paise, dates `YYYY-MM-DD`, timestamps in ms.
+
+| Collection | Holds | Used by |
+|---|---|---|
+| `cards`, `rulePacks` | Cards (no full numbers/expiry/CVV) and versioned bank rules | Cards, Ask, bills, milestones |
+| `purchaseMonths/{YYYY-MM}` | All purchases of a month in one document. A purchase may carry `vehicleId`, `applianceId`, `loanId`, `subscription {every, count?, unit?, variable?}` | Spends, Others |
+| `billPayments` | Credit card bill payments (not spend) | Payment due on bills |
+| `vehicles` | Vehicle, RC (number, valid till, link), PUC (last, expiry, link) | Others → Vehicles |
+| `appliances` | Appliances and devices, warranty, AMC | Others → Appliances & devices |
+| `loans` | Home / personal / hand / other loans; outstanding from logged repayments | Others → Debts |
+| `policies` | Insurance (moved from NLNLALD), optional premium, Motor policy → vehicle | Others → Insurances, vehicle insurance date |
+| `family` | Family members, ID documents (masked in lists), **vaccinations** (vaccine, dose, given on, next due, certificate link) | Others → Family members, policy "who is covered" |
+| `planned` | **Future payments**: name, due date, optional amount, repeat, **type** (School fees, Tax, Medical, Vaccination, Rent / maintenance, Other), optional **family member** | Others → Upcoming payments |
+| `settings/others`, `settings/subscriptions` | Section order; cancelled subscriptions | Others |
+
+**Upcoming payments** (this month + next 3, and Later) is computed, not stored: planned payments, family vaccinations due, active
+subscriptions, loan EMIs (dropped once paid that month), insurance renewals, AMC renewals, PUC expiries and credit card bills.
+"Paid" opens Add purchase filled in from the last similar payment; nothing is saved until confirmed, then the source moves on
+(planned → next date or done, vaccination → marked given, insurance/AMC → next year).
+
+When the Flutter app is built (Stage 3), each collection maps to one local table with the same fields, synced to Google storage.
