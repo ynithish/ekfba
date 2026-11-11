@@ -319,6 +319,10 @@ details.opening summary { cursor: pointer; color: var(--accent); font-size: 14px
 .veh-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
 .veh-row.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .veh-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; text-align: left; background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.suggest { display: flex; flex-direction: column; margin-top: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.suggest-item { text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 0 14px; min-height: 44px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; }
+.suggest-item:first-child { border-top: 0; }
+.suggest-item:hover, .suggest-item:focus-visible { background: var(--accent-soft); }
 .p-search input { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--ink); }
 .p-search input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 .filters { align-items: center; }
@@ -2966,8 +2970,7 @@ function cardForm() {
       <label><input type="radio" name="kind" value="other" ${c.kind === 'other' ? 'checked' : ''}><span>Bank transfer / Other</span></label>
     </fieldset>
     <div class="two">
-      <div class="field"><label for="f-bank">Bank <span class="card-only" ${c.kind === 'other' ? 'hidden' : ''}>*</span></label><input id="f-bank" name="bank" list="bank-list" value="${c.bank || ''}" autocomplete="off" placeholder="HDFC Bank">
-        <datalist id="bank-list">${BANKS.map((b) => html`<option value="${b}">`)}</datalist>${err('bank')}</div>
+      <div class="field"><label for="f-bank">Bank <span class="card-only" ${c.kind === 'other' ? 'hidden' : ''}>*</span></label><input id="f-bank" name="bank" data-suggest="${suggestSource('bank', BANKS)}" value="${c.bank || ''}" autocomplete="off" placeholder="HDFC Bank">${err('bank')}</div>
       <div class="field"><label for="f-name" id="f-name-label">${c.kind === 'other' ? 'Name *' : 'Card name *'}</label><input id="f-name" name="name" value="${c.name || ''}" autocomplete="off" placeholder="${c.kind === 'other' ? 'UPI, Bank transfer, Cash' : 'Millennia'}">${err('name')}</div>
     </div>
     <div class="card-only" ${c.kind === 'other' ? 'hidden' : ''}>
@@ -2982,8 +2985,7 @@ function cardForm() {
     <p class="hint">Never the full card number, expiry date, CVV or PIN. The page refuses them.</p>
     <div class="two">
       <div class="field"><label for="f-holder">Primary or add-on</label><select id="f-holder" name="holder">${opt('primary', c.holder || 'primary', 'Primary card')}${opt('add-on', c.holder, 'Add-on card')}</select></div>
-      <div class="field"><label for="f-holderName">Card holder</label><input id="f-holderName" name="holderName" list="holder-list" value="${c.holderName || ''}" autocomplete="off" placeholder="Same spelling as in Policies">
-        <datalist id="holder-list">${names.map((n) => html`<option value="${n}">`)}</datalist>${err('holderName')}</div>
+      <div class="field"><label for="f-holderName">Card holder</label><input id="f-holderName" name="holderName" data-suggest="${suggestSource('holder', names)}" value="${c.holderName || ''}" autocomplete="off" placeholder="Same spelling as in Policies">${err('holderName')}</div>
     </div>
     <div class="two">
       <div class="field"><label for="f-joining">Joining fee (₹)</label><input id="f-joining" name="joiningFee" value="${rup(c.joiningFeePaise)}" inputmode="decimal" placeholder="0">${err('joiningFeePaise')}</div>
@@ -3124,8 +3126,7 @@ function logForm() {
       <div class="actions" style="margin-top:8px"><button class="btn small" type="button" data-action="log-save-anyway">Save anyway</button><button class="btn ghost small" type="button" data-action="log-cancel">Don't save</button></div></div>` : ''}
     ${e._form ? html`<div class="box bad">${e._form}</div>` : ''}
     <div class="two">
-      <div class="field"><label for="l-merchant">Shop, outlet or app</label><input id="l-merchant" name="merchant" list="merchant-list" value="${d.merchant || ''}" autocomplete="off">
-        <datalist id="merchant-list">${known.map((m) => html`<option value="${m}">`)}</datalist>${err('merchant')}</div>
+      <div class="field"><label for="l-merchant">Shop, outlet or app</label><input id="l-merchant" name="merchant" data-suggest="${suggestSource('shop', known)}" value="${d.merchant || ''}" autocomplete="off" autocapitalize="words">${err('merchant')}</div>
       <div class="field"><label for="l-amount">Amount paid (₹)</label><input id="l-amount" name="amount" inputmode="decimal" value="${rup(d.amountPaise)}" autocomplete="off">${err('amountPaise')}</div>
     </div>
     ${renameBox(d)}
@@ -3529,8 +3530,7 @@ function spendsView() {
       <button class="cat-row ${state.spendCategory === k ? 'selected' : ''}" data-action="spend-cat" data-cat="${k}" aria-pressed="${state.spendCategory === k}"><span>${CAT_LABEL[k] || k}</span><div class="bar thin"><span style="width:${Math.round((v * 100) / maxCat)}%"></span></div><span class="num">${formatPaise(v)}</span></button>`)}</section>` : ''}
     ${progress.length ? html`<h2>Card milestones</h2><section class="list">${progress}</section>` : ''}
     <h2 id="purchases-h">Purchases</h2>
-    ${ps.length ? html`<div class="p-search"><input id="p-search" type="search" placeholder="Search by shop or outlet" aria-label="Search purchases by shop or outlet" value="${state.spendQuery}" list="p-shops" autocomplete="off" enterkeyhint="search">
-      <datalist id="p-shops">${[...new Set(ps.filter((p) => p.date >= range.start && p.date <= range.end).map((p) => formatShopName(p.merchant)))].sort().map((n) => html`<option value="${n}">`)}</datalist></div>` : ''}
+    ${ps.length ? html`<div class="p-search"><input id="p-search" type="search" placeholder="Search by shop or outlet" aria-label="Search purchases by shop or outlet" value="${state.spendQuery}" data-suggest="${suggestSource('search', [...new Set(ps.filter((p) => p.date >= range.start && p.date <= range.end).map((p) => formatShopName(p.merchant)))].sort())}" autocomplete="off" enterkeyhint="search"></div>` : ''}
     ${state.spendCard || state.spendCategory || state.spendDay || state.spendVehicle || state.spendAppliance || state.spendLoan || state.spendEmi || state.spendQuery.trim() ? html`<div class="chips filters">
       ${state.spendEmi ? html`<button class="chip" aria-pressed="true" data-action="spend-emi">EMI payments ✕</button>` : ''}
       ${state.spendLoan ? html`<button class="chip" aria-pressed="true" data-action="spend-loan" data-id="${state.spendLoan}">${loanById(state.spendLoan)?.name || 'Loan'} ✕</button>` : ''}
@@ -4712,6 +4712,48 @@ $app.addEventListener('submit', async (ev) => {
   state.busy = false;
   render();
   document.querySelector('.ferr, #card-form .box.bad')?.scrollIntoView({ block: 'center' });
+});
+
+/* ---------------- Suggestions under a text box ----------------
+   Android shows the browser's own <datalist> popup on top of the keyboard, so suggestions are drawn by the page,
+   in the normal flow just below the box, and the box is scrolled near the top so they stay visible. */
+const SUGGEST = {};
+function suggestSource(key, list) { SUGGEST[key] = list; return key; }
+function suggestMatches(list, q, max = 6) {
+  const n = squash(q);
+  if (!n) return [];
+  const starts = [], has = [];
+  for (const x of list) { const k = squash(x); if (k === n) continue; if (k.startsWith(n)) starts.push(x); else if (k.includes(n)) has.push(x); }
+  return [...starts, ...has].slice(0, max);
+}
+function showSuggest(input) {
+  let box = input.parentElement.querySelector(':scope > .suggest');
+  const items = input.dataset.picked === input.value ? [] : suggestMatches(SUGGEST[input.dataset.suggest] || [], input.value); // just picked: stay closed
+  if (!items.length || document.activeElement !== input) { box?.remove(); return; }
+  if (!box) { box = document.createElement('div'); box.className = 'suggest'; box.setAttribute('role', 'listbox'); input.insertAdjacentElement('afterend', box); }
+  box.replaceChildren(...items.map((v) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'suggest-item'; b.setAttribute('role', 'option'); b.textContent = v; b.dataset.value = v; return b; }));
+}
+document.addEventListener('input', (ev) => { if (ev.target.dataset?.suggest) showSuggest(ev.target); });
+document.addEventListener('focusin', (ev) => {
+  const t = ev.target;
+  if (!t.dataset?.suggest) return;
+  // Keep the box and its suggestions above the on-screen keyboard.
+  setTimeout(() => { if (document.activeElement === t && window.innerWidth < 700 && t.getBoundingClientRect().top > (window.visualViewport?.height || window.innerHeight) * 0.35) t.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 300);
+  showSuggest(t);
+});
+document.addEventListener('focusout', (ev) => { const t = ev.target; if (t.dataset?.suggest) setTimeout(() => { if (document.activeElement !== t) t.parentElement?.querySelector(':scope > .suggest')?.remove(); }, 150); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && ev.target.dataset?.suggest) ev.target.parentElement?.querySelector(':scope > .suggest')?.remove(); });
+// pointerdown (not click) so the box keeps focus and the keyboard stays open while picking.
+document.addEventListener('pointerdown', (ev) => {
+  const b = ev.target.closest?.('.suggest-item');
+  if (!b) return;
+  ev.preventDefault();
+  const input = b.parentElement.previousElementSibling;
+  input.value = b.dataset.value;
+  input.dataset.picked = b.dataset.value;
+  b.parentElement.remove();
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
 });
 
 // Purchase search: filter as you type, keeping the cursor in the box.
