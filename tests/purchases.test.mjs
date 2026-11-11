@@ -173,10 +173,28 @@ test('bill payments reduce the amount due', async () => {
   b = billingInfo(card, ps, '2026-10-25', [pay('2026-10-22', 1050000)]);
   assert.equal(b.unbilledDuePaise, 150000);
   assert.equal(b.payBy.paidPaise, 50000);
-  // A payment before the bill date, another card's payment, or a future-dated one does not count.
+  // A payment during the cycle (before the bill date) lowers that bill; another card's or a future-dated one doesn't count.
   b = billingInfo(card, ps, '2026-10-25', [pay('2026-10-10', 999), { ...pay('2026-10-22', 500000), cardId: 'x' }, pay('2026-10-30', 500000)]);
-  assert.equal(b.payBy.remainingPaise, 1000000);
+  assert.equal(b.payBy.remainingPaise, 1000000 - 999);
   assert.equal(validateBillPayment({ cardId: 'c', date: '2026-10-22', amountPaise: 0 }).ok, false);
   assert.equal(validateBillPayment({ cardId: 'c', date: '2026-10-22', amountPaise: 500, note: 'OTP is 123456' }).ok, false);
   assert.equal(validateBillPayment({ id: 'p', cardId: 'c', date: '2026-10-22', amountPaise: 500, fromCardId: 'd' }, null, 1).payment.fromCardId, 'd');
+});
+
+test('statement balance: mid-cycle payment lowers the bill; previous bill paid exactly carries nothing', async () => {
+  const { billingInfo } = await import('../src/core/purchases.js');
+  // Axis-like: bill on the 10th, due on the 28th.
+  const card = { id: 'a', kind: 'credit', statementDay: 10, dueDay: 28 };
+  const buy = (date, rupees) => ({ cardId: 'a', date, amountPaise: rupees * 100, status: 'completed' });
+  const pay = (date, rupees) => ({ cardId: 'a', date, amountPaise: rupees * 100 });
+  const ps = [buy('2026-10-02', 6200), buy('2026-10-12', 4361), buy('2026-10-20', 14512), buy('2026-11-11', 460)];
+  // 12 Oct pays the 10 Oct bill (6,200); 1 Nov pays 13,700 before the 10 Nov bill.
+  const b = billingInfo(card, ps, '2026-11-11', [pay('2026-10-12', 6200), pay('2026-11-01', 13700)]);
+  assert.equal(b.lastBill, '2026-11-10');
+  assert.equal(b.lastBilledPaise, (4361 + 14512 - 13700) * 100); // ₹5,173, like the bank statement
+  assert.deepEqual([b.payBy.date, b.payBy.remainingPaise, b.payBy.billed], ['2026-11-28', 517300, true]);
+  assert.equal(b.unbilledDuePaise, 46000); // bought after the bill date: next bill
+  // Overpaying an old, unlogged bill never makes the balance negative.
+  const e = billingInfo(card, [buy('2026-10-20', 1000)], '2026-11-11', [pay('2026-10-05', 50000)]);
+  assert.equal(e.lastBilledPaise, 100000);
 });

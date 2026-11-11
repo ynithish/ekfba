@@ -207,33 +207,39 @@ export function dueDateFor(billDate, dueDay) {
 
 /**
  * Bill dates and amounts for a credit card with a statement (bill generation) day. Returns null without one.
- * Amounts come from logged purchases; `payments` are bill payments ({ cardId, date, amountPaise }).
- * Payments made after the last bill date pay that bill first; anything extra counts against the next bill.
+ * Works like the bank's statement: a running balance of logged purchases minus recorded bill payments, in date
+ * order (never below ₹0, since spends from before you started logging aren't known). The bill on a statement
+ * date is the balance that day, so a payment made during the cycle, before the bill is generated, lowers that
+ * bill. Payments after the bill date pay it; anything beyond counts against the next bill.
  * Returns {
- *   lastBill, lastDue, lastBilledPaise, lastPaidPaise, lastRemainingPaise, settledBill (last bill fully paid?),
- *   nextBill, nextDue, unbilledPaise, unbilledDuePaise (after any extra payment), payBy
- * } where payBy is the next payment still to make: the last bill if its due date is ahead and it is not fully
- * paid, else the next bill: { date, bill, amountPaise, paidPaise, remainingPaise, billed }.
+ *   lastBill, lastDue, lastBilledPaise (statement balance), lastPaidPaise, lastRemainingPaise, settledBill,
+ *   nextBill, nextDue, unbilledPaise (purchases since the bill), unbilledDuePaise (what the next bill would be now), payBy
+ * } where payBy is the next payment still to make: the last bill if its due date is ahead and something is left on
+ * it, else the next bill: { date, bill, amountPaise, paidPaise, remainingPaise, billed }.
  */
 export function billingInfo(card, purchases, today, payments = []) {
   if (card.kind !== 'credit') return null;
   const cur = periodContaining('statement_cycle', today, card);
   if (!cur) return null;
   const prev = periodContaining('statement_cycle', addDays(cur.start, -1), card);
-  const mine = purchases.filter((p) => p.cardId === card.id);
-  const sum = (per) => mine.filter((p) => p.date >= per.start && p.date <= per.end).reduce((a, p) => a + netSpend(p), 0);
+  const mine = purchases.filter((p) => p.cardId === card.id && p.date <= today);
+  const pays = payments.filter((x) => x.cardId === card.id && x.date <= today);
   const lastBill = prev.end;
   const lastDue = dueDateFor(lastBill, card.dueDay);
   const nextBill = cur.end;
   const nextDue = dueDateFor(nextBill, card.dueDay);
-  const lastBilledPaise = sum(prev);
-  const unbilledPaise = sum(cur);
-  const paidSinceBill = payments.filter((x) => x.cardId === card.id && x.date > lastBill && x.date <= today)
-    .reduce((a, x) => a + (x.amountPaise || 0), 0);
+  // Running balance up to and including a date: purchases first, then that day's payments.
+  const events = [
+    ...mine.map((p) => ({ date: p.date, delta: netSpend(p), order: 0 })),
+    ...pays.map((x) => ({ date: x.date, delta: -(x.amountPaise || 0), order: 1 })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order);
+  const balanceAt = (date) => { let b = 0; for (const e of events) { if (e.date > date) break; b = Math.max(0, b + e.delta); } return b; };
+  const lastBilledPaise = balanceAt(lastBill);
+  const paidSinceBill = pays.filter((x) => x.date > lastBill).reduce((a, x) => a + (x.amountPaise || 0), 0);
   const lastPaidPaise = Math.min(paidSinceBill, lastBilledPaise);
   const lastRemainingPaise = lastBilledPaise - lastPaidPaise;
-  const extra = paidSinceBill - lastPaidPaise;
-  const unbilledDuePaise = Math.max(0, unbilledPaise - extra);
+  const unbilledPaise = mine.filter((p) => p.date > lastBill).reduce((a, p) => a + netSpend(p), 0);
+  const unbilledDuePaise = Math.max(0, balanceAt(today) - lastRemainingPaise);
   const settledBill = lastBilledPaise > 0 && lastRemainingPaise === 0;
   // Nothing left to pay on the last bill (paid, or nothing logged for it): point at the next bill instead.
   const lastOpen = lastDue && lastDue >= today && lastRemainingPaise > 0;
@@ -241,7 +247,7 @@ export function billingInfo(card, purchases, today, payments = []) {
     lastBill, lastDue, lastBilledPaise, lastPaidPaise, lastRemainingPaise, settledBill, paidSinceBillPaise: paidSinceBill, lastCycle: prev,
     nextBill, nextDue, unbilledPaise, unbilledDuePaise, currentCycle: cur,
     payBy: lastOpen ? { date: lastDue, bill: lastBill, amountPaise: lastBilledPaise, paidPaise: lastPaidPaise, remainingPaise: lastRemainingPaise, billed: true }
-      : nextDue ? { date: nextDue, bill: nextBill, amountPaise: unbilledPaise, paidPaise: Math.min(extra, unbilledPaise), remainingPaise: unbilledDuePaise, billed: false } : null,
+      : nextDue ? { date: nextDue, bill: nextBill, amountPaise: unbilledPaise, paidPaise: Math.max(0, unbilledPaise - unbilledDuePaise), remainingPaise: unbilledDuePaise, billed: false } : null,
   };
 }
 
