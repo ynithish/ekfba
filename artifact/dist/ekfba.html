@@ -2611,7 +2611,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], family: [], planned: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false, family: false, planned: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendMonth: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, spendEmi: false, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, plannedDraft: null, plannedErrors: {}, plannedConfirm: null, forecastOffset: 0, subCancelled: {}, subConfirm: null, showCancelledSubs: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendOffset: 0, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, spendEmi: false, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, plannedDraft: null, plannedErrors: {}, plannedConfirm: null, forecastOffset: 0, subCancelled: {}, subConfirm: null, showCancelledSubs: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -3478,13 +3478,35 @@ function shopMatches(p, q) { const n = squash(q); return !n || squash(p.merchant
 /** EMI and loan repayments: the EMI category, or a purchase linked to a loan. */
 const isEmiPayment = (p) => p.category === 'emi' || !!p.loanId;
 
+/** The month/quarter/year `offset` periods before the current one, with a short chip label. */
+function spendRange(kind, offset, t) {
+  const curY = t.slice(0, 4);
+  if (kind === 'month') {
+    const ym = addMonths(t.slice(0, 7), -offset);
+    const label = offset ? new Date(ym + '-01T00:00:00').toLocaleDateString('en-IN', ym.slice(0, 4) === curY ? { month: 'short' } : { month: 'short', year: '2-digit' }) : 'Month';
+    return { range: periodContaining('calendar_month', ym + '-01'), label };
+  }
+  if (kind === 'quarter') {
+    const q0 = periodContaining('calendar_quarter', t).start.slice(0, 7);
+    const ym = addMonths(q0, -3 * offset);
+    const range = periodContaining('calendar_quarter', ym + '-01');
+    const m = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short' });
+    const label = offset ? `${m(range.start)}–${m(range.end)}${range.start.slice(0, 4) === curY ? '' : ' ' + range.start.slice(2, 4)}` : 'Quarter';
+    return { range, label };
+  }
+  const y = Number(curY) - offset;
+  return { range: periodContaining('calendar_year', `${y}-01-01`), label: offset ? String(y) : 'Year' };
+}
+
 function spendsView() {
   const t = today();
-  // Month view can step back to earlier months (‹ ›); quarter and year are always the current ones.
+  // ‹ › step the selected month, quarter or year back (spendOffset periods ago; 0 = the current one).
   const curYm = t.slice(0, 7);
-  const ym = state.spendPeriod === 'month' && state.spendMonth && state.spendMonth < curYm ? state.spendMonth : curYm;
-  const range = state.spendPeriod === 'month' ? periodContaining('calendar_month', ym + '-01') : periodContaining(state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year', t);
   const firstYm = state.months.map((m) => m.id).filter((id) => /^\d{4}-\d{2}$/.test(id)).sort()[0] || curYm;
+  const per = spendRange(state.spendPeriod, state.spendOffset || 0, t);
+  const range = per.range;
+  const ym = range.start.slice(0, 7);
+  const canBack = range.start.slice(0, 7) > firstYm;
   const ps = allPurchases();
   // EMI and loan repayments are tracked separately: kept out of the spend totals, by card/category and the daily graph.
   const spendOnly = ps.filter((p) => !isEmiPayment(p));
@@ -3501,7 +3523,7 @@ function spendsView() {
   const daily = dailySpend(spendOnly, range.start, range.end, t);
   const dayTotals = {};
   for (const p of list) if (!isEmiPayment(p)) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
-  const periodName = { month: new Date(ym + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)}`, year: String(t.slice(0, 4)) }[state.spendPeriod];
+  const periodName = { month: new Date(ym + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)} ${range.start.slice(0, 4)}`, year: range.start.slice(0, 4) }[state.spendPeriod];
   const pct = (v) => (tot.totalPaise ? Math.round((v * 100) / tot.totalPaise) : 0);
 
   const progress = active.map((c) => {
@@ -3524,9 +3546,9 @@ function spendsView() {
   return html`
     ${state.logDraft ? logForm() : ''}
     <div class="chips" role="group" aria-label="Period">${[['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year']].map(([k, l]) =>
-      k === 'month' && state.spendPeriod === 'month'
-        ? html`<span class="month-step"><button class="chip step" data-action="spend-month" data-dir="-1" ${ym <= firstYm ? 'disabled' : ''} aria-label="Previous month">‹</button><button class="chip" data-action="spend-period" data-p="month" aria-pressed="true">${ym === curYm ? 'Month' : new Date(ym + '-01T00:00:00').toLocaleDateString('en-IN', ym.slice(0, 4) === curYm.slice(0, 4) ? { month: 'short' } : { month: 'short', year: '2-digit' })}</button><button class="chip step" data-action="spend-month" data-dir="1" ${ym >= curYm ? 'disabled' : ''} aria-label="Next month">›</button></span>`
-        : html`<button class="chip" data-action="spend-period" data-p="${k}" aria-pressed="${state.spendPeriod === k}">${state.spendPeriod === 'month' ? l.replace('This ', '').replace(/^./, (c) => c.toUpperCase()) : l}</button>`)}</div>
+      k === state.spendPeriod
+        ? html`<span class="month-step"><button class="chip step" data-action="spend-month" data-dir="1" ${canBack ? '' : 'disabled'} aria-label="Previous ${k}">‹</button><button class="chip" data-action="spend-period" data-p="${k}" aria-pressed="true">${per.label}</button><button class="chip step" data-action="spend-month" data-dir="-1" ${state.spendOffset ? '' : 'disabled'} aria-label="Next ${k}">›</button></span>`
+        : html`<button class="chip" data-action="spend-period" data-p="${k}" aria-pressed="false">${l.replace('This ', '').replace(/^./, (c) => c.toUpperCase())}</button>`)}</div>
     <section class="total">
       <div class="meta">${periodName}</div>
       <div class="total-n num">${formatPaise(tot.totalPaise)}</div>
@@ -4699,13 +4721,8 @@ $app.addEventListener('click', async (ev) => {
     if (state.spendVehicle) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: fromOthers ? 'auto' : 'smooth' });
   }
   else if (a === 'wallet-filter') { const f = t.dataset.f; state.walletFilter = state.walletFilter === f ? null : f; render(); }
-  else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.spendMonth = null; state.spendDay = null; state.purchaseLimit = 10; render(); }
-  else if (a === 'spend-month') {
-    const cur = today().slice(0, 7);
-    const from = state.spendMonth && state.spendMonth < cur ? state.spendMonth : cur;
-    const next = addMonths(from, Number(t.dataset.dir));
-    state.spendMonth = next >= cur ? null : next; state.spendDay = null; state.purchaseLimit = 10; render();
-  }
+  else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.spendOffset = 0; state.spendDay = null; state.purchaseLimit = 10; render(); }
+  else if (a === 'spend-month') { state.spendOffset = Math.max(0, (state.spendOffset || 0) + Number(t.dataset.dir)); state.spendDay = null; state.purchaseLimit = 10; render(); }
   else if (a === 'spend-day') { const d = t.dataset.day; state.spendDay = state.spendDay === d ? null : d; state.purchaseLimit = 10; render(); if (state.spendDay) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; state.purchaseLimit = 10; render(); if (state.spendCard) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'spend-cat') { const k = t.dataset.cat; state.spendCategory = state.spendCategory === k ? null : k; state.purchaseLimit = 10; render(); if (state.spendCategory) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
