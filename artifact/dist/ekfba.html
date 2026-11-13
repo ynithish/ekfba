@@ -323,6 +323,12 @@ details.opening summary { cursor: pointer; color: var(--accent); font-size: 14px
 .suggest-item { text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 0 14px; min-height: 44px; font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; }
 .suggest-item:first-child { border-top: 0; }
 .suggest-item:hover, .suggest-item:focus-visible { background: var(--accent-soft); }
+.month-step { display: inline-flex; gap: 4px; align-items: center; }
+.chips[aria-label=Period] { gap: 6px; }
+.chips[aria-label=Period] .chip { padding: 0 11px; white-space: nowrap; }
+.chips[aria-label=Period] .chip.step { min-width: 30px; padding: 0 6px; font-size: 18px; line-height: 1; }
+.month-step { gap: 2px; }
+.chip.step:disabled { opacity: .35; cursor: default; }
 .p-search input { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--ink); }
 .p-search input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 .filters { align-items: center; }
@@ -2605,7 +2611,7 @@ const state = {
   tab: 'spends', askText: '', askResult: null, cards: [], packs: [], months: [], vehicles: [], policies: [], appliances: [], billPayments: [], loans: [], family: [], planned: [], ready: { cards: false, rulePacks: false, months: false, vehicles: false, policies: false, appliances: false, billPayments: false, loans: false, family: false, planned: false }, db: null, canWrite: true,
   open: null, editing: null, formErrors: {}, formDraft: null, importing: null, review: null, confirm: null,
   showArchived: false, busy: false, loadErr: '',
-  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, spendEmi: false, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, plannedDraft: null, plannedErrors: {}, plannedConfirm: null, forecastOffset: 0, subCancelled: {}, subConfirm: null, showCancelledSubs: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
+  spendPeriod: 'month', spendCard: null, spendCategory: null, spendDay: null, spendMonth: null, spendQuery: '', walletFilter: null, spendVehicle: null, vehicleDraft: null, vehicleErrors: {}, policyDraft: null, policyErrors: {}, policyOpen: null, policyConfirmDel: null, spendAppliance: null, applianceDraft: null, applianceErrors: {}, othersOpen: {}, payDraft: null, payErrors: {}, payConfirmDel: null, loanDraft: null, loanErrors: {}, spendLoan: null, spendEmi: false, memberDraft: null, memberErrors: {}, memberConfirmDel: null, othersOrder: null, reordering: false, plannedDraft: null, plannedErrors: {}, plannedConfirm: null, forecastOffset: 0, subCancelled: {}, subConfirm: null, showCancelledSubs: false, purchaseLimit: 10, logDraft: null, logErrors: {}, logDup: null,
 };
 
 const $app = document.getElementById('app');
@@ -3474,7 +3480,11 @@ const isEmiPayment = (p) => p.category === 'emi' || !!p.loanId;
 
 function spendsView() {
   const t = today();
-  const range = periodContaining(state.spendPeriod === 'month' ? 'calendar_month' : state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year', t);
+  // Month view can step back to earlier months (‹ ›); quarter and year are always the current ones.
+  const curYm = t.slice(0, 7);
+  const ym = state.spendPeriod === 'month' && state.spendMonth && state.spendMonth < curYm ? state.spendMonth : curYm;
+  const range = state.spendPeriod === 'month' ? periodContaining('calendar_month', ym + '-01') : periodContaining(state.spendPeriod === 'quarter' ? 'calendar_quarter' : 'calendar_year', t);
+  const firstYm = state.months.map((m) => m.id).filter((id) => /^\d{4}-\d{2}$/.test(id)).sort()[0] || curYm;
   const ps = allPurchases();
   // EMI and loan repayments are tracked separately: kept out of the spend totals, by card/category and the daily graph.
   const spendOnly = ps.filter((p) => !isEmiPayment(p));
@@ -3491,7 +3501,7 @@ function spendsView() {
   const daily = dailySpend(spendOnly, range.start, range.end, t);
   const dayTotals = {};
   for (const p of list) if (!isEmiPayment(p)) dayTotals[p.date] = (dayTotals[p.date] || 0) + netSpend(p);
-  const periodName = { month: new Date(t + 'T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)}`, year: String(t.slice(0, 4)) }[state.spendPeriod];
+  const periodName = { month: new Date(ym + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), quarter: `${fmtShort(range.start)} – ${fmtShort(range.end)}`, year: String(t.slice(0, 4)) }[state.spendPeriod];
   const pct = (v) => (tot.totalPaise ? Math.round((v * 100) / tot.totalPaise) : 0);
 
   const progress = active.map((c) => {
@@ -3514,7 +3524,9 @@ function spendsView() {
   return html`
     ${state.logDraft ? logForm() : ''}
     <div class="chips" role="group" aria-label="Period">${[['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year']].map(([k, l]) =>
-      html`<button class="chip" data-action="spend-period" data-p="${k}" aria-pressed="${state.spendPeriod === k}">${l}</button>`)}</div>
+      k === 'month' && state.spendPeriod === 'month'
+        ? html`<span class="month-step"><button class="chip step" data-action="spend-month" data-dir="-1" ${ym <= firstYm ? 'disabled' : ''} aria-label="Previous month">‹</button><button class="chip" data-action="spend-period" data-p="month" aria-pressed="true">${ym === curYm ? 'Month' : new Date(ym + '-01T00:00:00').toLocaleDateString('en-IN', ym.slice(0, 4) === curYm.slice(0, 4) ? { month: 'short' } : { month: 'short', year: '2-digit' })}</button><button class="chip step" data-action="spend-month" data-dir="1" ${ym >= curYm ? 'disabled' : ''} aria-label="Next month">›</button></span>`
+        : html`<button class="chip" data-action="spend-period" data-p="${k}" aria-pressed="${state.spendPeriod === k}">${state.spendPeriod === 'month' ? l.replace('This ', '').replace(/^./, (c) => c.toUpperCase()) : l}</button>`)}</div>
     <section class="total">
       <div class="meta">${periodName}</div>
       <div class="total-n num">${formatPaise(tot.totalPaise)}</div>
@@ -4687,7 +4699,13 @@ $app.addEventListener('click', async (ev) => {
     if (state.spendVehicle) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: fromOthers ? 'auto' : 'smooth' });
   }
   else if (a === 'wallet-filter') { const f = t.dataset.f; state.walletFilter = state.walletFilter === f ? null : f; render(); }
-  else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.spendDay = null; state.purchaseLimit = 10; render(); }
+  else if (a === 'spend-period') { state.spendPeriod = t.dataset.p; state.spendMonth = null; state.spendDay = null; state.purchaseLimit = 10; render(); }
+  else if (a === 'spend-month') {
+    const cur = today().slice(0, 7);
+    const from = state.spendMonth && state.spendMonth < cur ? state.spendMonth : cur;
+    const next = addMonths(from, Number(t.dataset.dir));
+    state.spendMonth = next >= cur ? null : next; state.spendDay = null; state.purchaseLimit = 10; render();
+  }
   else if (a === 'spend-day') { const d = t.dataset.day; state.spendDay = state.spendDay === d ? null : d; state.purchaseLimit = 10; render(); if (state.spendDay) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'spend-card') { state.spendCard = state.spendCard === id ? null : id; state.purchaseLimit = 10; render(); if (state.spendCard) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'spend-cat') { const k = t.dataset.cat; state.spendCategory = state.spendCategory === k ? null : k; state.purchaseLimit = 10; render(); if (state.spendCategory) document.getElementById('purchases-h')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
